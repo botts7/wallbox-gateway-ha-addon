@@ -1,0 +1,58 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  addon-lint:
+    name: Add-on linter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run frenck/action-addon-linter
+        uses: frenck/action-addon-linter@v2
+        with:
+          path: ./wallbox-gateway
+
+  hadolint:
+    name: Dockerfile lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: wallbox-gateway/Dockerfile
+          # Allow Alpine pin-version & install pipe-skip patterns we use
+          # deliberately to keep the image small.
+          ignore: DL3018,DL3013
+
+  yaml-lint:
+    name: YAML lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run yamllint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: wallbox-gateway/
+          config_data: |
+            extends: default
+            rules:
+              line-length: disable
+              document-start: disable
+              truthy:
+                check-keys: false

@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version label (defaults to config.yaml version)"
+        required: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, aarch64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read config
+        id: addon
+        run: |
+          version=$(grep '^version:' wallbox-gateway/config.yaml | head -1 | awk '{print $2}' | tr -d '"')
+          slug=$(grep '^slug:' wallbox-gateway/config.yaml | head -1 | awk '{print $2}' | tr -d '"')
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "slug=${slug}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build ${{ matrix.arch }} image
+        uses: home-assistant/builder@2024.08.2
+        with:
+          # The builder action expects a flat config-dir; we point it at
+          # the wallbox-gateway/ subfolder which holds config.yaml +
+          # Dockerfile + rootfs/.
+          args: |
+            --${{ matrix.arch }} \
+            --target /data/wallbox-gateway \
+            --version ${{ github.event.inputs.version || steps.addon.outputs.version }} \
+            --test \
+            --docker-hub-check
