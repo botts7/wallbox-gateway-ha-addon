@@ -1,0 +1,10 @@
+#!/usr/bin/with-contenv bashio
+
+# Pull the Add-on options into the environment so server.py can read them.
+export WB_GATEWAY_IP="$(bashio::config 'gateway_ip')"
+export WB_AUTH_USER="$(bashio::config 'gateway_auth_user')"
+export WB_AUTH_PASS="$(bashio::config 'gateway_auth_pass')"
+export WB_POLL_INTERVAL_S="$(bashio::config 'poll_interval_s')"
+
+cd /app
+exec python3 server.py

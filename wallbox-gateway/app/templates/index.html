@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wallbox Gateway</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header>
+  <h1>Wallbox BLE Gateway</h1>
+  <span id="gw-ip"></span>
+</header>
+
+<main>
+
+  <section id="not-configured" class="card warn" hidden>
+    <h2>Gateway not configured</h2>
+    <p>Set <code>gateway_ip</code> in the Add-on's Configuration tab
+       and restart the Add-on.</p>
+  </section>
+
+  <section id="unreachable" class="card warn" hidden>
+    <h2>Gateway unreachable</h2>
+    <p>Couldn't contact the gateway at <code id="unreachable-ip"></code>.
+       Check it's powered on and on the same network.</p>
+  </section>
+
+  <section class="card" id="status-card">
+    <h2>Status</h2>
+    <dl>
+      <dt>BLE link</dt><dd id="ble-state">&mdash;</dd>
+      <dt>Charger</dt><dd id="charger-name">&mdash;</dd>
+      <dt>Charger FW</dt><dd id="charger-fw">&mdash;</dd>
+      <dt>WiFi RSSI</dt><dd id="wifi-rssi">&mdash;</dd>
+      <dt>Uptime</dt><dd id="uptime">&mdash;</dd>
+      <dt>Heap free</dt><dd id="heap">&mdash;</dd>
+    </dl>
+  </section>
+
+  <section class="card" id="health-card">
+    <h2>Gateway health</h2>
+    <dl>
+      <dt>OK</dt><dd id="health-ok">&mdash;</dd>
+      <dt>Loop max (ms)</dt><dd id="loop-max">&mdash;</dd>
+      <dt>OTA proven</dt><dd id="ota-proven">&mdash;</dd>
+    </dl>
+  </section>
+
+  <section class="card" id="diag-card">
+    <h2>Connection diagnostics</h2>
+    <dl>
+      <dt>BLE reconnects</dt><dd id="ble-reconn">&mdash;</dd>
+      <dt>MQTT reconnects</dt><dd id="mqtt-reconn">&mdash;</dd>
+      <dt>WiFi reconnects</dt><dd id="wifi-reconn">&mdash;</dd>
+    </dl>
+  </section>
+
+  <p class="hint">
+    Auto-refreshes every <span id="poll-s">10</span> seconds.
+    Read-only in v0.1 &mdash; OTA upload arrives in v0.2.
+  </p>
+
+</main>
+
+<script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+</body>
+</html>

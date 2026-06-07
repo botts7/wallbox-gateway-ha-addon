@@ -1,0 +1,28 @@
+name: "Wallbox BLE Gateway Manager"
+version: "0.1.0"
+slug: wallbox_gateway
+description: >
+  Manage your ESP32-based Wallbox BLE gateway from inside Home Assistant.
+  Status, diagnostics, OTA updates (v0.2+).
+url: "https://github.com/botts7/wallbox-gateway-ha-addon"
+arch:
+  - amd64
+  - aarch64
+init: false
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:ev-station
+panel_title: "Wallbox Gateway"
+homeassistant_api: false
+hassio_api: false
+host_network: false
+options:
+  gateway_ip: ""
+  gateway_auth_user: "admin"
+  gateway_auth_pass: ""
+  poll_interval_s: 10
+schema:
+  gateway_ip: "str?"
+  gateway_auth_user: "str?"
+  gateway_auth_pass: "password?"
+  poll_interval_s: "int(5,300)?"

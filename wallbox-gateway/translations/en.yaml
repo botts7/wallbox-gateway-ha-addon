@@ -1,0 +1,24 @@
+configuration:
+  gateway_ip:
+    name: Gateway IP
+    description: >
+      Local IP address of the ESP32 Wallbox gateway. Find this in
+      your router's DHCP table, or in the gateway's serial log
+      on boot.
+  gateway_auth_user:
+    name: Gateway HTTP user
+    description: >
+      Web-auth username on the gateway. Defaults to "admin".
+      Leave the password blank if the gateway has web auth
+      disabled.
+  gateway_auth_pass:
+    name: Gateway HTTP password
+    description: >
+      Web-auth password on the gateway. Same value as the OTA
+      password shown on the gateway's serial log when web auth
+      is enabled.
+  poll_interval_s:
+    name: Poll interval (seconds)
+    description: >
+      How often the dashboard re-fetches status from the gateway.
+      Lower = fresher data, higher = less network chatter.
