@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wallbox Gateway &middot; OTA</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header>
+  <h1>Wallbox Gateway OTA</h1>
+  <span><a href="/" style="color:var(--accent)">&larr; Dashboard</a></span>
+</header>
+
+<main>
+
+  <section id="not-configured" class="card warn" hidden>
+    <h2>Gateway not configured</h2>
+    <p>Set <code>gateway_ip</code> in the Add-on's Configuration tab
+       and restart the Add-on before uploading firmware.</p>
+  </section>
+
+  <section class="card">
+    <h2>Upload firmware</h2>
+    <p class="hint" style="text-align:left;margin-bottom:12px">
+      Drop a <code>firmware.bin</code> built from the
+      <a href="https://github.com/botts7/esp32-wallbox" style="color:var(--accent)">esp32-wallbox</a>
+      tree (or downloaded from a release). The Add-on will compute
+      MD5 then forward to the gateway with end-to-end integrity
+      check. The gateway reboots automatically on success.
+    </p>
+
+    <div id="drop-zone">
+      <div class="dz-inner">
+        <div class="dz-icon">&#x2B07;</div>
+        <div class="dz-text">Drag firmware.bin here</div>
+        <div class="dz-sub">or
+          <label for="file-input" class="dz-btn">choose a file</label>
+        </div>
+        <input type="file" id="file-input" accept=".bin,application/octet-stream" hidden>
+        <div id="file-info" class="dz-sub" hidden></div>
+      </div>
+    </div>
+
+    <button id="upload-btn" class="primary-btn" disabled>Upload to gateway</button>
+
+    <div id="progress" hidden>
+      <div class="bar"><div id="bar-fill"></div></div>
+      <div id="progress-text" class="hint" style="text-align:left;margin-top:6px">0%</div>
+    </div>
+
+    <div id="result-ok"  class="result ok"  hidden></div>
+    <div id="result-err" class="result err" hidden></div>
+  </section>
+
+  <section class="card">
+    <h2>What happens during OTA</h2>
+    <ol class="hint" style="text-align:left;padding-left:20px;line-height:1.7">
+      <li>Add-on reads the file and computes its MD5 locally.</li>
+      <li>Add-on POSTs the file to the gateway's <code>/api/ota</code> as multipart with
+          <code>X-Firmware-MD5</code> header.</li>
+      <li>Gateway validates the ESP32 magic byte, pauses BLE for 5 minutes,
+          and writes to the OTA partition while verifying the MD5 streaming.</li>
+      <li>Gateway responds <code>200 OK</code>, then reboots ~2 s later into the new
+          firmware. The dashboard becomes unreachable for ~30 s.</li>
+      <li>Add-on history records the attempt either way (success or
+          rejection) so you can see what happened.</li>
+    </ol>
+  </section>
+
+</main>
+
+<script src="{{ url_for('static', filename='ota.js') }}"></script>
+</body>
+</html>

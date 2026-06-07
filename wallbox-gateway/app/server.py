@@ -1,10 +1,9 @@
 """Flask entrypoint for the Wallbox BLE Gateway HA Add-on.
 
-v0.1 scope (locked in docs/plans/3.x-ha-addon.md): read-only
-dashboard only. The Add-on talks to the configured gateway over
-plain HTTP and proxies the four diagnostic endpoints that drive
-the dashboard. No state mutation surface yet — OTA upload lands
-in v0.2 once the Add-on plumbing has shaken out.
+v0.2 scope: read-only dashboard (v0.1) PLUS firmware OTA upload
+proxy. User drops a firmware.bin onto the OTA page, the Add-on
+streams it to the gateway's /api/ota with the MD5 attached for
+end-to-end integrity verification.
 
 Run via the s6 service in rootfs/etc/services.d/wallbox/run.
 For local dev: WB_GATEWAY_IP=... python3 server.py
@@ -15,7 +14,7 @@ from __future__ import annotations
 import logging
 from typing import Tuple
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 from requests import HTTPError
 
 from proxy import (
@@ -24,6 +23,7 @@ from proxy import (
     config_from_env,
     fetch_json,
 )
+import ota
 
 
 app = Flask(__name__)
@@ -44,6 +44,11 @@ def _gateway_error(exc: Exception) -> Tuple[dict, int]:
 @app.route("/")
 def dashboard():
     return render_template("index.html")
+
+
+@app.route("/ota")
+def ota_page():
+    return render_template("ota.html")
 
 
 @app.route("/api/health")
@@ -96,6 +101,75 @@ def api_addon_config():
         "gateway_ip": cfg.ip,
         "auth_user": cfg.auth_user,
     })
+
+
+@app.route("/api/ota/upload", methods=["POST"])
+def api_ota_upload():
+    """Receive firmware.bin from the browser, validate it's an
+    ESP32 image, compute MD5 for end-to-end integrity, then forward
+    as multipart/form-data to the gateway's /api/ota.
+
+    The gateway responds 200 "OK" on a successful flash (and reboots
+    ~1 s later — that 200 is what we forward back to the user). On
+    rejection it returns 503+Retry-After (admission guard) or 500
+    (truncation / bad magic / Update.end failure).
+    """
+    cfg = config_from_env()
+    if not cfg.configured:
+        return jsonify({
+            "error": "not_configured",
+            "detail": "gateway_ip not set in Add-on options",
+        }), 503
+
+    if "firmware" not in request.files:
+        return jsonify({
+            "error": "no_file",
+            "detail": "missing 'firmware' form field",
+        }), 400
+    f = request.files["firmware"]
+    if not f.filename:
+        return jsonify({
+            "error": "no_file",
+            "detail": "empty filename",
+        }), 400
+
+    tmp_path = None
+    try:
+        tmp_path, md5_hex, byte_count = ota.save_to_tempfile(f.stream)
+        ok, msg = ota.validate_firmware_image(tmp_path)
+        if not ok:
+            return jsonify({
+                "error": "invalid_image",
+                "detail": msg,
+            }), 400
+        log.info(
+            "OTA: %d bytes md5=%s -> forwarding to %s",
+            byte_count, md5_hex, cfg.ip,
+        )
+        result = ota.forward_to_gateway(
+            cfg, tmp_path, md5_hex,
+            f.filename or "firmware.bin",
+        )
+        return jsonify({
+            "ok": result.status == 200,
+            "status": result.status,
+            "body": result.body,
+            "md5": result.md5,
+            "bytes": result.bytes_sent,
+        }), result.status
+    except GatewayNotConfigured as e:
+        return jsonify({"error": "not_configured", "detail": str(e)}), 503
+    except GatewayUnreachable as e:
+        return jsonify({"error": "unreachable", "detail": str(e)}), 504
+    except Exception as e:
+        log.exception("OTA upload failed")
+        return jsonify({
+            "error": "internal",
+            "detail": repr(e),
+        }), 500
+    finally:
+        if tmp_path:
+            ota.cleanup(tmp_path)
 
 
 if __name__ == "__main__":

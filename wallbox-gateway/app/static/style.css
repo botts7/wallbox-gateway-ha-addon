@@ -90,3 +90,94 @@ code {
   padding: 1px 6px;
   border-radius: 3px;
 }
+
+/* ---- OTA page ---- */
+
+#drop-zone {
+  border: 2px dashed rgba(127,127,127,0.4);
+  border-radius: 8px;
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  margin-bottom: 16px;
+}
+#drop-zone:hover,
+#drop-zone.drag {
+  border-color: var(--accent);
+  background: rgba(3,169,244,0.05);
+}
+#drop-zone .dz-icon {
+  font-size: 28px;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+#drop-zone .dz-text {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+#drop-zone .dz-sub {
+  color: var(--text2);
+  font-size: 13px;
+}
+#drop-zone .dz-btn {
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+#drop-zone #file-info {
+  margin-top: 10px;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.primary-btn {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.primary-btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+#progress {
+  margin-top: 14px;
+}
+#progress .bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(127,127,127,0.18);
+  border-radius: 4px;
+  overflow: hidden;
+}
+#progress #bar-fill {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width .15s ease-out;
+}
+
+.result {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.result.ok {
+  background: rgba(34,197,94,0.12);
+  border-left: 4px solid #22c55e;
+}
+.result.err {
+  background: rgba(239,68,68,0.10);
+  border-left: 4px solid #ef4444;
+}
