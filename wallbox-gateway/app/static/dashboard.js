@@ -10,6 +10,11 @@ const showCard = (id, show) => { const el = $(id); if (el) el.hidden = !show; };
 
 let unreachableShown = false;
 
+// HA Supervisor ingress: this Add-on is served under a path like
+// /api/hassio_ingress/<uuid>/ — absolute URLs (/api/status) would
+// route to HA Core's domain root, NOT this Add-on. All fetch paths
+// are therefore RELATIVE so the browser appends them to the current
+// ingress base URL.
 async function fetchJSON(path) {
   const r = await fetch(path, { cache: 'no-store' });
   const body = await r.json().catch(() => ({}));
@@ -30,7 +35,7 @@ function fmtUptime(seconds) {
 }
 
 async function refresh() {
-  const cfg = await fetchJSON('/api/addon/config');
+  const cfg = await fetchJSON('api/addon/config');
   if (cfg.ok && !cfg.body.configured) {
     showCard('not-configured', true);
     return;
@@ -38,7 +43,7 @@ async function refresh() {
   showCard('not-configured', false);
   if (cfg.ok) $('gw-ip').textContent = cfg.body.gateway_ip;
 
-  const status = await fetchJSON('/api/status');
+  const status = await fetchJSON('api/status');
   if (!status.ok && status.body?.error === 'unreachable') {
     showCard('unreachable', true);
     $('unreachable-ip').textContent = cfg.body?.gateway_ip ?? '?';
@@ -60,14 +65,14 @@ async function refresh() {
     setText('heap', s.heap != null ? `${(s.heap / 1024).toFixed(1)} KB` : '—');
   }
 
-  const health = await fetchJSON('/api/health');
+  const health = await fetchJSON('api/health');
   if (health.ok) {
     setText('health-ok', fmtBool(health.body.ok));
     setText('loop-max', health.body.loop_max_ms);
     setText('ota-proven', fmtBool(health.body.ota_proven));
   }
 
-  const diag = await fetchJSON('/api/diag/disconnects');
+  const diag = await fetchJSON('api/diag/disconnects');
   if (diag.ok) {
     setText('ble-reconn', diag.body.ble_reconnects);
     setText('mqtt-reconn', diag.body.mqtt_reconnects);

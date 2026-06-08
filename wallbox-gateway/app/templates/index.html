@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Wallbox Gateway</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="static/style.css">
 </head>
 <body>
 
@@ -59,11 +59,11 @@
 
   <p class="hint">
     Auto-refreshes every <span id="poll-s">10</span> seconds &middot;
-    <a href="/ota" style="color:var(--accent)">Upload firmware (OTA) &rarr;</a>
+    <a href="ota" style="color:var(--accent)">Upload firmware (OTA) &rarr;</a>
   </p>
 
 </main>
 
-<script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+<script src="static/dashboard.js"></script>
 </body>
 </html>

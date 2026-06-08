@@ -87,7 +87,8 @@ uploadBtn.addEventListener('click', () => {
   fd.append('firmware', selectedFile, selectedFile.name);
 
   const xhr = new XMLHttpRequest();
-  xhr.open('POST', '/api/ota/upload');
+  // Relative path under HA Supervisor ingress — see dashboard.js note.
+  xhr.open('POST', 'api/ota/upload');
   xhr.upload.onprogress = ev => {
     if (!ev.lengthComputable) return;
     const pct = (ev.loaded / ev.total * 100);
@@ -116,7 +117,7 @@ uploadBtn.addEventListener('click', () => {
 });
 
 // Hide the form entirely if no gateway is configured.
-fetch('/api/addon/config').then(r => r.json()).then(c => {
+fetch('api/addon/config').then(r => r.json()).then(c => {
   if (!c.configured) {
     document.getElementById('not-configured').hidden = false;
     document.querySelectorAll('.card').forEach(el => {
