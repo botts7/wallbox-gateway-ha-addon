@@ -91,6 +91,25 @@ def api_diag_disconnects():
         return jsonify(body), code
 
 
+@app.route("/api/meter")
+def api_meter():
+    """Proxy the BAPI `r_dca` realtime power-meter call through the
+    gateway's /api/command endpoint. Surfaces v1 (L1 voltage) and
+    p1+p2+p3 (total house power) for the Add-on dashboard's Mains /
+    House stats. Best-effort: a BLE-busy gateway will return null
+    fields, which the dashboard renders as `--`.
+    """
+    cfg = config_from_env()
+    try:
+        return jsonify(fetch_json(
+            cfg,
+            "/api/command?action=bapi&met=r_dca&par=null&wait=2000",
+        ))
+    except Exception as e:
+        body, code = _gateway_error(e)
+        return jsonify(body), code
+
+
 @app.route("/api/addon/config")
 def api_addon_config():
     """Surface non-secret Add-on options so the SPA knows whether

@@ -9,7 +9,7 @@
 <body>
 
 <header>
-  <h1>Wallbox BLE Gateway</h1>
+  <h1>Wallbox Gateway</h1>
   <span id="gw-ip"></span>
 </header>
 
@@ -27,39 +27,86 @@
        Check it's powered on and on the same network.</p>
   </section>
 
-  <section class="card" id="status-card">
-    <h2>Status</h2>
+  <!-- Hero: live charging state -->
+  <section class="hero" id="hero">
+    <div class="hero-status" id="hero-status">Connecting...</div>
+    <div class="hero-power"><span id="hero-power-num">--</span><span class="unit" id="hero-power-unit">kW</span></div>
+    <div class="hero-detail" id="hero-detail">Waiting for gateway...</div>
+  </section>
+
+  <!-- Quick-stats grid: live session telemetry -->
+  <section class="grid">
+    <div class="stat">
+      <div class="stat-label">Session</div>
+      <div class="stat-value"><span id="stat-energy">--</span><span class="unit">kWh</span></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Mains</div>
+      <div class="stat-value"><span id="stat-voltage">--</span><span class="unit">V</span></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">House</div>
+      <div class="stat-value"><span id="stat-house">--</span><span class="unit">W</span></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Max curr</div>
+      <div class="stat-value"><span id="stat-maxcur">--</span><span class="unit">A</span></div>
+    </div>
+  </section>
+
+  <!-- Connection health -->
+  <section class="card">
+    <h2>Connections</h2>
+    <div class="conn-row">
+      <span class="conn-dot" id="dot-ble"></span>
+      <span class="conn-label">BLE</span>
+      <span class="conn-detail" id="ble-rssi">--</span>
+      <span class="conn-value" id="ble-value">--</span>
+    </div>
+    <div class="conn-row">
+      <span class="conn-dot" id="dot-wifi"></span>
+      <span class="conn-label">WiFi</span>
+      <span class="conn-detail" id="wifi-ssid">--</span>
+      <span class="conn-value" id="wifi-value">--</span>
+    </div>
+    <div class="conn-row">
+      <span class="conn-dot" id="dot-mqtt"></span>
+      <span class="conn-label">MQTT</span>
+      <span class="conn-detail" id="mqtt-detail">--</span>
+      <span class="conn-value" id="mqtt-value">--</span>
+    </div>
+  </section>
+
+  <!-- Gateway / charger metadata -->
+  <section class="card">
+    <h2>Device info</h2>
     <dl>
-      <dt>BLE link</dt><dd id="ble-state">&mdash;</dd>
-      <dt>Charger</dt><dd id="charger-name">&mdash;</dd>
-      <dt>Charger FW</dt><dd id="charger-fw">&mdash;</dd>
-      <dt>WiFi RSSI</dt><dd id="wifi-rssi">&mdash;</dd>
-      <dt>Uptime</dt><dd id="uptime">&mdash;</dd>
-      <dt>Heap free</dt><dd id="heap">&mdash;</dd>
+      <dt>Charger</dt><dd id="charger-name">--</dd>
+      <dt>Firmware</dt><dd id="charger-fw">--</dd>
+      <dt>Project</dt><dd id="charger-project">--</dd>
+      <dt>Uptime</dt><dd id="uptime">--</dd>
+      <dt>Memory</dt><dd id="heap">--</dd>
+      <dt>Loop max</dt><dd id="loop-max">--</dd>
     </dl>
   </section>
 
-  <section class="card" id="health-card">
-    <h2>Gateway health</h2>
+  <!-- Diagnostics (reconnect counters, less prominent) -->
+  <section class="card">
+    <h2>Reconnect counters</h2>
     <dl>
-      <dt>OK</dt><dd id="health-ok">&mdash;</dd>
-      <dt>Loop max (ms)</dt><dd id="loop-max">&mdash;</dd>
-      <dt>OTA proven</dt><dd id="ota-proven">&mdash;</dd>
+      <dt>BLE</dt><dd id="ble-reconn">--</dd>
+      <dt>MQTT</dt><dd id="mqtt-reconn">--</dd>
+      <dt>WiFi</dt><dd id="wifi-reconn">--</dd>
     </dl>
   </section>
 
-  <section class="card" id="diag-card">
-    <h2>Connection diagnostics</h2>
-    <dl>
-      <dt>BLE reconnects</dt><dd id="ble-reconn">&mdash;</dd>
-      <dt>MQTT reconnects</dt><dd id="mqtt-reconn">&mdash;</dd>
-      <dt>WiFi reconnects</dt><dd id="wifi-reconn">&mdash;</dd>
-    </dl>
-  </section>
+  <!-- OTA call-to-action -->
+  <a href="ota" class="cta-link">⬆ Upload firmware (OTA)</a>
 
   <p class="hint">
-    Auto-refreshes every <span id="poll-s">10</span> seconds &middot;
-    <a href="ota" style="color:var(--accent)">Upload firmware (OTA) &rarr;</a>
+    Auto-refreshes every <span id="poll-s">10</span> s &middot;
+    Powered by the gateway's local HTTP API &middot;
+    <a href="https://github.com/botts7/esp32-wallbox" target="_blank" rel="noopener">docs</a>
   </p>
 
 </main>

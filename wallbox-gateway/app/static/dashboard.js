@@ -1,82 +1,207 @@
-// v0.1 Add-on dashboard. Polls the four read-only endpoints exposed
-// by server.py and updates the cards in place. No state mutation —
-// OTA upload arrives in v0.2 once this baseline has shaken out.
-
-const POLL_MS = 10_000;
-
-const $ = (id) => document.getElementById(id);
-const setText = (id, v) => { const el = $(id); if (el) el.textContent = (v ?? '—'); };
-const showCard = (id, show) => { const el = $(id); if (el) el.hidden = !show; };
-
-let unreachableShown = false;
-
+// v0.2 Add-on dashboard.
+//
 // HA Supervisor ingress: this Add-on is served under a path like
 // /api/hassio_ingress/<uuid>/ — absolute URLs (/api/status) would
 // route to HA Core's domain root, NOT this Add-on. All fetch paths
 // are therefore RELATIVE so the browser appends them to the current
 // ingress base URL.
-async function fetchJSON(path) {
-  const r = await fetch(path, { cache: 'no-store' });
-  const body = await r.json().catch(() => ({}));
-  return { ok: r.ok, status: r.status, body };
-}
 
-function fmtBool(v) {
-  if (v === true) return 'yes';
-  if (v === false) return 'no';
-  return '—';
+const POLL_MS = 10_000;
+
+const $ = (id) => document.getElementById(id);
+const setText = (id, v) => { const el = $(id); if (el) el.textContent = (v ?? '--'); };
+const setClass = (id, cls) => { const el = $(id); if (el) el.className = cls; };
+const showCard = (id, show) => { const el = $(id); if (el) el.hidden = !show; };
+
+let unreachableShown = false;
+
+async function fetchJSON(path) {
+  try {
+    const r = await fetch(path, { cache: 'no-store' });
+    const body = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, body };
+  } catch (e) {
+    return { ok: false, status: 0, body: { error: 'fetch_failed', detail: String(e) } };
+  }
 }
 
 function fmtUptime(seconds) {
-  if (typeof seconds !== 'number') return '—';
+  if (typeof seconds !== 'number') return '--';
   if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+  const m = Math.floor(seconds / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}
+
+// Charger-status code -> hero text + state class.
+// Mirrors STATUS_CODES from the gateway firmware (BAPI 0..18).
+const HERO_STATES = {
+  0:  { text: 'Ready',                  cls: '' },
+  1:  { text: 'Charging',               cls: 'is-charging' },
+  2:  { text: 'Connected — waiting',    cls: '' },
+  3:  { text: 'Connected — scheduled',  cls: '' },
+  4:  { text: 'Paused',                 cls: '' },
+  5:  { text: 'Charge complete',        cls: 'is-charging' },
+  6:  { text: 'Locked',                 cls: '' },
+  7:  { text: 'Error',                  cls: 'is-error' },
+  8:  { text: 'Waiting for current',    cls: '' },
+  9:  { text: 'Power sharing unconfig', cls: 'is-error' },
+  10: { text: 'Queued (Power Boost)',   cls: '' },
+  11: { text: 'Discharging',            cls: 'is-charging' },
+  12: { text: 'Waiting for admin (MID)',cls: '' },
+  13: { text: 'MID margin exceeded',    cls: 'is-error' },
+  14: { text: 'OCPP unavailable',       cls: 'is-error' },
+  15: { text: 'OCPP finishing',         cls: '' },
+  16: { text: 'OCPP reserved',          cls: '' },
+  17: { text: 'Updating firmware',      cls: '' },
+  18: { text: 'Queued (Eco-Smart)',     cls: '' },
+};
+
+function setHero(stateCode, powerKw, detail) {
+  const hero = $('hero');
+  const info = HERO_STATES[stateCode];
+  if (!hero) return;
+  // Reset state classes, apply current one
+  hero.className = 'hero' + (info && info.cls ? ' ' + info.cls : '');
+  setText('hero-status', info ? info.text : (stateCode == null ? 'Offline' : `Code ${stateCode}`));
+  if (typeof powerKw === 'number') {
+    $('hero-power-num').textContent = powerKw.toFixed(2);
+    $('hero-power-unit').textContent = 'kW';
+  } else {
+    $('hero-power-num').textContent = '--';
+    $('hero-power-unit').textContent = '';
+  }
+  setText('hero-detail', detail || '');
+}
+
+function setOffline() {
+  const hero = $('hero');
+  if (hero) hero.className = 'hero is-offline';
+  setText('hero-status', 'Offline');
+  $('hero-power-num').textContent = '--';
+  $('hero-power-unit').textContent = '';
+  setText('hero-detail', 'Cannot reach the gateway');
+  // also blank all connection dots
+  ['dot-ble','dot-wifi','dot-mqtt'].forEach(id => setClass(id, 'conn-dot is-down'));
 }
 
 async function refresh() {
+  // ---- Add-on config probe (also gives us the gateway IP for the header) ----
   const cfg = await fetchJSON('api/addon/config');
   if (cfg.ok && !cfg.body.configured) {
     showCard('not-configured', true);
     return;
   }
   showCard('not-configured', false);
-  if (cfg.ok) $('gw-ip').textContent = cfg.body.gateway_ip;
+  if (cfg.ok) setText('gw-ip', cfg.body.gateway_ip);
 
+  // ---- /api/status ----
   const status = await fetchJSON('api/status');
   if (!status.ok && status.body?.error === 'unreachable') {
     showCard('unreachable', true);
-    $('unreachable-ip').textContent = cfg.body?.gateway_ip ?? '?';
+    setText('unreachable-ip', cfg.body?.gateway_ip ?? '?');
     unreachableShown = true;
+    setOffline();
     return;
   }
-  if (unreachableShown) {
-    showCard('unreachable', false);
-    unreachableShown = false;
-  }
+  if (unreachableShown) { showCard('unreachable', false); unreachableShown = false; }
 
+  let chargerName = '--';
   if (status.ok) {
     const s = status.body;
-    setText('ble-state', s.ble ?? '—');
-    setText('charger-name', s.dev_name ?? '—');
-    setText('charger-fw', s.chg_app_fw ?? '—');
-    setText('wifi-rssi', s.wifi_rssi != null ? `${s.wifi_rssi} dBm` : '—');
+    chargerName = s.dev_name || '--';
+    setText('charger-name', s.dev_name);
+    setText('charger-fw', s.chg_app_fw);
+    setText('charger-project', s.chg_project);
     setText('uptime', fmtUptime(s.uptime));
-    setText('heap', s.heap != null ? `${(s.heap / 1024).toFixed(1)} KB` : '—');
+    setText('heap', s.heap != null ? `${(s.heap / 1024).toFixed(1)} KB` : '--');
+
+    // Connection dots
+    if (s.ble === 'connected') {
+      setClass('dot-ble', 'conn-dot is-up');
+      setText('ble-value', 'Connected');
+      setText('ble-rssi', s.rssi != null ? `${s.rssi} dBm` : '--');
+    } else {
+      setClass('dot-ble', 'conn-dot is-down');
+      setText('ble-value', s.ble || 'disconnected');
+      setText('ble-rssi', '--');
+    }
+    if (s.wifi === 'connected') {
+      setClass('dot-wifi', 'conn-dot is-up');
+      setText('wifi-value', 'Connected');
+      setText('wifi-ssid', s.ssid || '');
+      setText('ble-value', s.ble === 'connected' ? 'Connected' : (s.ble || '--'));
+      // also display WiFi RSSI in BLE row? no — WiFi has its own dBm
+      const rssiText = s.wifi_rssi != null ? `${s.wifi_rssi} dBm` : '';
+      const detail = $('wifi-ssid');
+      if (detail) detail.textContent = (s.ssid || '') + (rssiText ? ' · ' + rssiText : '');
+    } else {
+      setClass('dot-wifi', 'conn-dot is-down');
+      setText('wifi-value', s.wifi || 'disconnected');
+      setText('wifi-ssid', '--');
+    }
   }
 
+  // ---- /api/health ---- (we use loop_max_ms for the device info card)
   const health = await fetchJSON('api/health');
   if (health.ok) {
-    setText('health-ok', fmtBool(health.body.ok));
-    setText('loop-max', health.body.loop_max_ms);
-    setText('ota-proven', fmtBool(health.body.ota_proven));
+    setText('loop-max', health.body.loop_max_ms != null ? `${health.body.loop_max_ms} ms` : '--');
   }
 
+  // ---- /api/diag/disconnects ---- (reconnect counters + MQTT health)
   const diag = await fetchJSON('api/diag/disconnects');
   if (diag.ok) {
     setText('ble-reconn', diag.body.ble_reconnects);
     setText('mqtt-reconn', diag.body.mqtt_reconnects);
     setText('wifi-reconn', diag.body.wifi_reconnects);
+    // MQTT state inferred from recent reconnect count + uptime
+    const r = diag.body.mqtt_reconnects ?? 0;
+    if (r === 0) {
+      setClass('dot-mqtt', 'conn-dot is-up');
+      setText('mqtt-value', 'Stable');
+      setText('mqtt-detail', '');
+    } else {
+      setClass('dot-mqtt', 'conn-dot is-warn');
+      setText('mqtt-value', `${r} reconnect${r === 1 ? '' : 's'}`);
+      setText('mqtt-detail', '');
+    }
+  }
+
+  // ---- /api/charger ---- (hero + stats grid)
+  const charger = await fetchJSON('api/charger');
+  if (charger.ok && charger.body && charger.body.realtime && charger.body.realtime.r) {
+    const rt = charger.body.realtime.r;
+    const st = (charger.body.status && charger.body.status.r) || {};
+    const stateCode = (typeof rt.charger_status === 'number') ? rt.charger_status : null;
+    const kw = (typeof st.cp === 'number') ? st.cp : null;
+    const sessionKwh = (typeof st.en === 'number') ? st.en / 100 : null;
+    const maxCur = (typeof st.cur === 'number') ? st.cur : null;
+    setHero(stateCode, kw, chargerName !== '--' ? chargerName : '');
+    setText('stat-energy', sessionKwh != null ? sessionKwh.toFixed(2) : '--');
+    setText('stat-maxcur', maxCur != null ? maxCur : '--');
+  } else {
+    // BLE down or charger not responding — keep hero showing offline
+    setHero(null, null, 'Gateway online but charger not responding');
+    setText('stat-energy', '--');
+    setText('stat-maxcur', '--');
+  }
+
+  // ---- /api/meter ---- (BAPI r_dca passthrough: mains voltage + house power)
+  // Best-effort: BLE-busy gateway returns nulls, which we display as `--`.
+  const meter = await fetchJSON('api/meter');
+  if (meter.ok && meter.body && meter.body.r) {
+    const r = meter.body.r;
+    setText('stat-voltage', (typeof r.v1 === 'number') ? r.v1 : '--');
+    if (typeof r.p1 === 'number') {
+      const house = (r.p1 || 0) + (r.p2 || 0) + (r.p3 || 0);
+      setText('stat-house', house);
+    } else {
+      setText('stat-house', '--');
+    }
+  } else {
+    setText('stat-voltage', '--');
+    setText('stat-house', '--');
   }
 }
 
