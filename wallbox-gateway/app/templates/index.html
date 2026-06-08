@@ -34,14 +34,16 @@
     <div class="hero-detail" id="hero-detail">Waiting for gateway...</div>
   </section>
 
-  <!-- Schedule paused banner: shows when charger_status == 4 (manual
-       override of any active schedule / Eco Smart cycle). -->
+  <!-- Schedule paused banner: shows when r_dat.gen != 0 (manual
+       override of schedule / Eco Smart). The Resume button calls
+       /api/command?action=resume which fires s_cmode {"mode":0}. -->
   <section class="banner banner-warn" id="paused-banner" style="display:none">
     <span class="banner-icon">&#x23F8;&#xFE0F;</span>
     <div class="banner-body">
       <strong>Schedules &amp; Eco Smart paused</strong>
-      <span class="banner-detail">Manual control is active. Press Start to resume.</span>
+      <span class="banner-detail">Manual override is active.</span>
     </div>
+    <button type="button" class="banner-action" id="btn-resume">&#x25B6;&#xFE0F; Resume</button>
   </section>
 
   <!-- Controls: charge start/stop, lock/unlock, max current -->

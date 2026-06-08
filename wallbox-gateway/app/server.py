@@ -115,7 +115,7 @@ def api_meter():
 # malformed or unsafe query string from the browser (anything else
 # returns 400). The gateway's /api/command handler does its own
 # validation too — this is belt-and-braces.
-_ALLOWED_ACTIONS = {"start", "stop", "lock", "unlock", "current", "reboot"}
+_ALLOWED_ACTIONS = {"start", "stop", "resume", "lock", "unlock", "current", "reboot"}
 
 
 @app.route("/api/command")

@@ -143,8 +143,23 @@ main {
   color: var(--warning);
 }
 .banner-icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
-.banner-body { display: flex; flex-direction: column; gap: 2px; }
+.banner-body { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .banner-detail { color: var(--text2); font-size: 12px; }
+.banner-action {
+  margin-left: auto;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: var(--warning);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.banner-action:hover:not(:disabled) { background: rgba(245, 158, 11, 0.25); }
+.banner-action:disabled { opacity: 0.5; cursor: wait; }
 
 /* ---- Quick-stats grid ---- */
 .grid {

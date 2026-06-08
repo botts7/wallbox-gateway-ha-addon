@@ -259,6 +259,13 @@ async function sendCmd(action, btn, extraQs) {
 }
 window.sendCmd = sendCmd;  // exposed for the inline onclick handlers
 
+// Resume button inside the paused-banner. Calls action=resume which
+// the gateway maps to s_cmode {"mode":0} (clears r_dat.gen).
+const btnResume = $('btn-resume');
+if (btnResume) {
+  btnResume.addEventListener('click', () => sendCmd('resume', btnResume));
+}
+
 // Max-current slider: live label + debounced send
 const slider = $('cur-slider');
 let _curTimer = null;
