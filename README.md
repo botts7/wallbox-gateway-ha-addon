@@ -5,16 +5,31 @@ Home Assistant Add-on for managing the
 
 ## What it does
 
-Adds a sidebar panel to Home Assistant for read-only gateway
-status, health, and connection diagnostics. The gateway itself
-keeps publishing entities via MQTT discovery — this Add-on does
-not replace that path.
+Adds a sidebar panel to Home Assistant for the gateway: live
+charging state, controls (Start / Stop / Lock / Unlock / Max
+current), connection health for BLE / WiFi / MQTT, and a
+drag-and-drop OTA firmware upload. Same dark theme as the
+gateway's own `/dashboard` — they're meant to feel like one
+product.
+
+The Add-on doesn't replace the MQTT discovery the gateway
+already publishes — entities you've already set up keep working
+as before. This is for HAOS / HA Supervised users who want a
+sidebar panel for the gateway without leaving Home Assistant.
 
 Roadmap:
 
-- **v0.1** — read-only dashboard (status + health + diagnostics)
-- **v0.2** — OTA firmware upload from inside HA
-- **v0.3** — recent-events sparkline + boot history surface
+- **v0.1.0** — read-only dashboard (status + health + diagnostics)
+- **v0.2.0** — OTA firmware upload from inside HA
+- **v0.3.0** — Supervisor ingress URL fix · redesigned dashboard
+  (dark theme · hero card · stats grid) · controls (Start / Stop /
+  Lock / Unlock / Max current) · power-meter values (mains V,
+  house W)
+- **v0.4.0** — recent-events sparkline + boot history surface
+- **v0.5.0** — schedule editor (mirror of the gateway's
+  `/settings` schedule UI)
+- **v1.0.0** — submit to community-hassio-addons for upstream
+  store listing
 
 ## Installation
 
