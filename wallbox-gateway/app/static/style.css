@@ -126,6 +126,26 @@ main {
 .hero.is-offline::before { background: var(--text3); }
 .hero.is-offline .hero-status { color: var(--text3); }
 
+/* Schedule-paused banner: appears when charger_status == 4 (PAUSED). */
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.4;
+  border: 1px solid transparent;
+}
+.banner-warn {
+  background: rgba(245, 158, 11, 0.10);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: var(--warning);
+}
+.banner-icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+.banner-body { display: flex; flex-direction: column; gap: 2px; }
+.banner-detail { color: var(--text2); font-size: 12px; }
+
 /* ---- Quick-stats grid ---- */
 .grid {
   display: grid;

@@ -34,6 +34,12 @@ gateway's own `/dashboard` for the common control surface.
   `STATUS_CODES`. Hero status pill colour shifts: green for
   charging/complete/discharging, red for error/MID-exceeded/
   OCPP-unavailable, neutral for the rest.
+- **Schedule-paused banner** — amber warning between the hero card
+  and the controls when the charger is in manual override
+  (`r_dat.gen != 0`). Mirrors the Wallbox app's "Schedule & Solar
+  charging paused" label. Independent of charging state: stays
+  visible if you Start charging without first pressing Resume in
+  the Wallbox app.
 
 ### Fixed
 

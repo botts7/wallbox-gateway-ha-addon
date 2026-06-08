@@ -58,7 +58,7 @@ const HERO_STATES = {
   18: { text: 'Queued (Eco-Smart)',     cls: '' },
 };
 
-function setHero(stateCode, powerKw, detail) {
+function setHero(stateCode, powerKw, detail, schedulePaused) {
   const hero = $('hero');
   const info = HERO_STATES[stateCode];
   if (!hero) return;
@@ -73,6 +73,11 @@ function setHero(stateCode, powerKw, detail) {
     $('hero-power-unit').textContent = '';
   }
   setText('hero-detail', detail || '');
+  // r_dat.gen is the sticky manual-override flag: != 0 means the
+  // Wallbox app's "Schedules & Solar charging paused" label is on,
+  // regardless of charging state.
+  const banner = $('paused-banner');
+  if (banner) banner.style.display = schedulePaused ? '' : 'none';
 }
 
 function setOffline() {
@@ -84,6 +89,9 @@ function setOffline() {
   setText('hero-detail', 'Cannot reach the gateway');
   // also blank all connection dots
   ['dot-ble','dot-wifi','dot-mqtt'].forEach(id => setClass(id, 'conn-dot is-down'));
+  // gateway is offline; whatever the previous paused state was, hide it
+  const banner = $('paused-banner');
+  if (banner) banner.style.display = 'none';
 }
 
 async function refresh() {
@@ -177,7 +185,8 @@ async function refresh() {
     const kw = (typeof st.cp === 'number') ? st.cp : null;
     const sessionKwh = (typeof st.en === 'number') ? st.en / 100 : null;
     const maxCur = (typeof st.cur === 'number') ? st.cur : null;
-    setHero(stateCode, kw, chargerName !== '--' ? chargerName : '');
+    const schedulePaused = (typeof st.gen === 'number') && st.gen !== 0;
+    setHero(stateCode, kw, chargerName !== '--' ? chargerName : '', schedulePaused);
     setText('stat-energy', sessionKwh != null ? sessionKwh.toFixed(2) : '--');
     setText('stat-maxcur', maxCur != null ? maxCur : '--');
     syncCurrentSlider(maxCur);

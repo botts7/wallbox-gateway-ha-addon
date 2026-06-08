@@ -34,6 +34,16 @@
     <div class="hero-detail" id="hero-detail">Waiting for gateway...</div>
   </section>
 
+  <!-- Schedule paused banner: shows when charger_status == 4 (manual
+       override of any active schedule / Eco Smart cycle). -->
+  <section class="banner banner-warn" id="paused-banner" style="display:none">
+    <span class="banner-icon">&#x23F8;&#xFE0F;</span>
+    <div class="banner-body">
+      <strong>Schedules &amp; Eco Smart paused</strong>
+      <span class="banner-detail">Manual control is active. Press Start to resume.</span>
+    </div>
+  </section>
+
   <!-- Controls: charge start/stop, lock/unlock, max current -->
   <section class="card controls">
     <h2>Controls</h2>
