@@ -239,6 +239,76 @@ dd {
   text-align: right;
 }
 
+/* ---- Controls card ---- */
+.ctrl-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+@media (min-width: 540px) {
+  .ctrl-row { grid-template-columns: repeat(4, 1fr); }
+}
+.ctrl-btn {
+  padding: 12px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .12s, border-color .12s, transform .08s;
+}
+.ctrl-btn:hover:not(:disabled) { border-color: var(--primary); }
+.ctrl-btn:active:not(:disabled) { transform: translateY(1px); }
+.ctrl-btn:disabled { opacity: .4; cursor: not-allowed; }
+.ctrl-btn.is-busy { opacity: .6; cursor: progress; }
+.ctrl-success { background: rgba(34,197,94,0.12); color: #4ade80; border-color: rgba(34,197,94,0.30); }
+.ctrl-success:hover:not(:disabled) { background: rgba(34,197,94,0.18); border-color: #22c55e; }
+.ctrl-danger  { background: rgba(239,68,68,0.10); color: #f87171; border-color: rgba(239,68,68,0.30); }
+.ctrl-danger:hover:not(:disabled)  { background: rgba(239,68,68,0.16); border-color: #ef4444; }
+
+.ctrl-slider { margin-top: 6px; }
+.ctrl-slider label {
+  display: block;
+  color: var(--text2);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.ctrl-slider-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+}
+.ctrl-slider-row input[type=range] {
+  width: 100%;
+  accent-color: var(--primary);
+}
+.ctrl-slider-val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text);
+  min-width: 56px;
+  text-align: right;
+}
+
+.ctrl-toast {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.ctrl-toast.is-ok   { background: rgba(34,197,94,0.10); color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
+.ctrl-toast.is-err  { background: rgba(239,68,68,0.10); color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+.ctrl-toast.is-info { background: rgba(59,130,246,0.10); color: #93c5fd; border: 1px solid rgba(59,130,246,0.25); }
+
 /* OTA call-to-action */
 .cta-link {
   display: flex;

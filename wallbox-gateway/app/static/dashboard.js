@@ -180,6 +180,7 @@ async function refresh() {
     setHero(stateCode, kw, chargerName !== '--' ? chargerName : '');
     setText('stat-energy', sessionKwh != null ? sessionKwh.toFixed(2) : '--');
     setText('stat-maxcur', maxCur != null ? maxCur : '--');
+    syncCurrentSlider(maxCur);
   } else {
     // BLE down or charger not responding — keep hero showing offline
     setHero(null, null, 'Gateway online but charger not responding');
@@ -202,6 +203,76 @@ async function refresh() {
   } else {
     setText('stat-voltage', '--');
     setText('stat-house', '--');
+  }
+}
+
+// ---- Controls ----
+//
+// All control buttons hit /api/command on the Add-on proxy, which
+// whitelists action against {start, stop, lock, unlock, current,
+// reboot} and forwards to the gateway. BLE-busy / unreachable
+// gateway -> toast with the error; the next status poll will pick
+// up the new state.
+
+function showToast(msg, kind) {
+  const t = $('ctrl-toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.className = 'ctrl-toast is-' + (kind || 'info');
+  t.hidden = false;
+  // auto-hide after 4s for success/info, leave error visible until next action
+  if (kind !== 'err') {
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.hidden = true; }, 4000);
+  }
+}
+
+async function sendCmd(action, btn, extraQs) {
+  if (btn) btn.classList.add('is-busy');
+  const url = 'api/command?action=' + encodeURIComponent(action)
+            + (extraQs ? '&' + extraQs : '');
+  showToast(`Sending ${action}...`, 'info');
+  const r = await fetchJSON(url);
+  if (btn) btn.classList.remove('is-busy');
+  if (!r.ok) {
+    const detail = r.body?.detail || r.body?.error || ('HTTP ' + r.status);
+    showToast(`${action} failed: ${detail}`, 'err');
+    return;
+  }
+  if (r.body && r.body.error) {
+    showToast(`${action} rejected: ${r.body.error}`, 'err');
+    return;
+  }
+  showToast(`${action} OK`, 'ok');
+  // Force a refresh ~1s later so the hero + connection rows reflect
+  // the new state (status takes a beat to propagate from charger -> BLE).
+  setTimeout(refresh, 1000);
+}
+window.sendCmd = sendCmd;  // exposed for the inline onclick handlers
+
+// Max-current slider: live label + debounced send
+const slider = $('cur-slider');
+let _curTimer = null;
+let _curSliderTouched = false;  // don't fight the poll-driven sync
+if (slider) {
+  slider.addEventListener('input', (e) => {
+    _curSliderTouched = true;
+    $('cur-value').textContent = e.target.value;
+    if (_curTimer) clearTimeout(_curTimer);
+    _curTimer = setTimeout(() => {
+      sendCmd('current', null, 'value=' + e.target.value);
+      // re-allow poll-driven sync ~3s after the user stops dragging
+      setTimeout(() => { _curSliderTouched = false; }, 3000);
+    }, 350);
+  });
+}
+
+// Sync slider to charger's reported max current on each poll, unless
+// the user is actively dragging it.
+function syncCurrentSlider(amps) {
+  if (!_curSliderTouched && slider && typeof amps === 'number') {
+    slider.value = amps;
+    $('cur-value').textContent = amps;
   }
 }
 

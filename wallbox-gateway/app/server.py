@@ -110,6 +110,41 @@ def api_meter():
         return jsonify(body), code
 
 
+# Whitelist of control actions we allow through the proxy. Limiting
+# the surface here means the Add-on never accidentally forwards a
+# malformed or unsafe query string from the browser (anything else
+# returns 400). The gateway's /api/command handler does its own
+# validation too — this is belt-and-braces.
+_ALLOWED_ACTIONS = {"start", "stop", "lock", "unlock", "current", "reboot"}
+
+
+@app.route("/api/command")
+def api_command():
+    """Proxy charger control commands to the gateway's /api/command.
+
+    Used by the dashboard's Controls section for Start / Stop /
+    Lock / Unlock / Max current / Reboot. Action whitelist enforced;
+    extra query params (like &value= for current) are forwarded.
+    """
+    cfg = config_from_env()
+    action = (request.args.get("action") or "").strip().lower()
+    if action not in _ALLOWED_ACTIONS:
+        return jsonify({
+            "error": "bad_action",
+            "detail": f"action '{action}' not allowed",
+            "allowed": sorted(_ALLOWED_ACTIONS),
+        }), 400
+    # Forward the entire query string — preserves &value=N for
+    # the current setter and &wait=ms for fine-tuning timeouts.
+    qs = request.query_string.decode("utf-8")
+    path = "/api/command" + (("?" + qs) if qs else "")
+    try:
+        return jsonify(fetch_json(cfg, path, timeout=8.0))
+    except Exception as e:
+        body, code = _gateway_error(e)
+        return jsonify(body), code
+
+
 @app.route("/api/addon/config")
 def api_addon_config():
     """Surface non-secret Add-on options so the SPA knows whether

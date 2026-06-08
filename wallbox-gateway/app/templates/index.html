@@ -34,6 +34,25 @@
     <div class="hero-detail" id="hero-detail">Waiting for gateway...</div>
   </section>
 
+  <!-- Controls: charge start/stop, lock/unlock, max current -->
+  <section class="card controls">
+    <h2>Controls</h2>
+    <div class="ctrl-row">
+      <button id="btn-start" class="ctrl-btn ctrl-success" onclick="sendCmd('start', this)">&#x25B6; Start</button>
+      <button id="btn-stop"  class="ctrl-btn ctrl-danger"  onclick="sendCmd('stop',  this)">&#x23F9; Stop</button>
+      <button id="btn-unlock" class="ctrl-btn" onclick="sendCmd('unlock', this)">&#x1F513; Unlock</button>
+      <button id="btn-lock"   class="ctrl-btn" onclick="sendCmd('lock',   this)">&#x1F512; Lock</button>
+    </div>
+    <div class="ctrl-slider">
+      <label for="cur-slider">Max current</label>
+      <div class="ctrl-slider-row">
+        <input type="range" id="cur-slider" min="6" max="32" step="1" value="16">
+        <span class="ctrl-slider-val"><span id="cur-value">16</span> A</span>
+      </div>
+    </div>
+    <div id="ctrl-toast" class="ctrl-toast" hidden></div>
+  </section>
+
   <!-- Quick-stats grid: live session telemetry -->
   <section class="grid">
     <div class="stat">
