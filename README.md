@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="wallbox-gateway/logo.png" alt="Wallbox Gateway" width="600">
+  <img src="branding/logo.png" alt="Wallbox Gateway" width="600">
 </p>
 
 # Wallbox BLE Gateway HA Add-on
