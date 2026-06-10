@@ -34,9 +34,11 @@ jobs:
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: wallbox-gateway/Dockerfile
-          # Allow Alpine pin-version & install pipe-skip patterns we use
-          # deliberately to keep the image small.
-          ignore: DL3018,DL3013
+          # DL3018 + DL3013: alpine pin-version / pip install skip
+          # DL3006: FROM ${BUILD_FROM} — BUILD_FROM is the HA builder's
+          #         dynamic base-image ARG; it IS tagged at build time
+          #         but hadolint can't see through the ARG.
+          ignore: DL3018,DL3013,DL3006
 
   yaml-lint:
     name: YAML lint
