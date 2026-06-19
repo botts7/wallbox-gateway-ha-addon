@@ -42,15 +42,30 @@ jobs:
         with:
           platforms: arm64
 
+      # Required so the builder can PUSH the per-arch images to ghcr.io.
+      # Without this (and with the old --test flag) the images were built
+      # but never published, so HA Supervisor's anonymous pull got a 403
+      # ("requested access to the resource is denied") on install.
+      # Pushes only happen on main / tag builds, never on PRs.
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build ${{ matrix.arch }} image
         uses: home-assistant/builder@2024.08.2
         with:
           # The builder action expects a flat config-dir; we point it at
           # the wallbox-gateway/ subfolder which holds config.yaml +
           # Dockerfile + rootfs/.
+          # On PRs we keep --test (build-only, no push); on main/tags we
+          # drop it so the images are actually published to ghcr.io.
           args: |
             --${{ matrix.arch }} \
             --target /data/wallbox-gateway \
             --version ${{ github.event.inputs.version || steps.addon.outputs.version }} \
-            --test \
+            ${{ github.event_name == 'pull_request' && '--test' || '' }} \
             --docker-hub-check
