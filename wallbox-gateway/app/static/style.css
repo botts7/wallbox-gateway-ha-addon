@@ -498,3 +498,25 @@ a { color: var(--accent); }
 
 /* [hidden] must win over the flex display above */
 .sched-form[hidden] { display: none; }
+
+/* ---- Power Flow card (matches gateway dashboard) ---- */
+.pf-card { text-align: center; }
+.pf-head {
+  display: flex; align-items: center; gap: 8px; justify-content: flex-start;
+  font-weight: 600; font-size: 15px; color: var(--text); margin-bottom: 4px;
+}
+.pf-head-icon { color: var(--warning); font-size: 18px; }
+.pf-svg { display: block; width: 100%; max-width: 360px; margin: 4px auto 0; }
+.pf-status {
+  font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text2); margin-top: 6px;
+}
+.pf-card.is-charging .pf-status { color: var(--success); }
+.pf-card.is-error .pf-status { color: var(--danger); }
+.pf-card.is-offline .pf-status { color: var(--text3); }
+.pf-session-row {
+  display: flex; justify-content: space-between; font-size: 14px;
+  padding: 10px 4px 2px; margin-top: 10px; border-top: 1px solid var(--border);
+}
+.pf-session-row span:first-child { color: var(--text2); }
+.pf-session-row span:last-child { font-weight: 600; font-variant-numeric: tabular-nums; }

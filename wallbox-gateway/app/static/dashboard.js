@@ -103,38 +103,54 @@ const HERO_STATES = {
   18: { text: 'Queued (Eco-Smart)',     cls: '' },
 };
 
-function setHero(stateCode, powerKw, detail, schedulePaused) {
-  const hero = $('hero');
+// ---- Power Flow card (matches the gateway's own dashboard) ----
+// Grid -> Charger -> Vehicle. cp = charging power (vehicle kW), house =
+// grid kW, conn = car connected (status-code derived, mirrors firmware
+// carConnected()). The Vehicle node swaps to "Plug in" when not connected.
+const _pf = { cp: null, en: null, house: null, conn: null };
+function carConn(st) { return [1, 2, 3, 4, 5, 8, 10, 11, 12, 13, 18].indexOf(st) !== -1; }
+function pfAnimate(el, on, kw) {
+  if (!el) return;
+  if (on) {
+    const dur = Math.max(500, 1400 - (kw || 0) * 100);
+    if (el._anim && Math.abs((el._animDur || 0) - dur) > 50) { el._anim.cancel(); el._anim = null; }
+    if (!el._anim) {
+      el._anim = el.animate([{ strokeDashoffset: 0 }, { strokeDashoffset: -26 }], { duration: dur, iterations: Infinity });
+      el._animDur = dur;
+    }
+  } else if (el._anim) { el._anim.cancel(); el._anim = null; el._animDur = 0; }
+}
+function pfRender() {
+  if (typeof _pf.cp === 'number') setText('pf-veh-kw', _pf.cp.toFixed(2) + ' kW');
+  if (typeof _pf.house === 'number') setText('pf-grid-kw', (_pf.house / 1000).toFixed(2) + ' kW');
+  if (typeof _pf.en === 'number') setText('pf-session', (_pf.en / 100).toFixed(2) + ' kWh');
+  const charging = (typeof _pf.cp === 'number' && _pf.cp > 0.05);
+  const l1 = $('pf-line1'), l2 = $('pf-line2');
+  if (l1) l1.style.opacity = charging ? '1' : '0';
+  if (l2) l2.style.opacity = charging ? '1' : '0';
+  pfAnimate(l1, charging, _pf.cp); pfAnimate(l2, charging, _pf.cp);
+  const plug = $('pf-plugin'), vk = $('pf-veh-kw');
+  if (_pf.conn === false) { if (plug) plug.style.display = ''; if (vk) vk.style.display = 'none'; }
+  else { if (plug) plug.style.display = 'none'; if (vk) vk.style.display = ''; }
+}
+// Status text under the power-flow + the schedule-paused banner toggle.
+function setStatus(stateCode, schedulePaused) {
   const info = HERO_STATES[stateCode];
-  if (!hero) return;
-  // Reset state classes, apply current one
-  hero.className = 'hero' + (info && info.cls ? ' ' + info.cls : '');
-  setText('hero-status', info ? info.text : (stateCode == null ? 'Offline' : `Code ${stateCode}`));
-  if (typeof powerKw === 'number') {
-    $('hero-power-num').textContent = powerKw.toFixed(2);
-    $('hero-power-unit').textContent = 'kW';
-  } else {
-    $('hero-power-num').textContent = '--';
-    $('hero-power-unit').textContent = '';
-  }
-  setText('hero-detail', detail || '');
-  // r_dat.gen is the sticky manual-override flag: != 0 means the
-  // Wallbox app's "Schedules & Solar charging paused" label is on,
-  // regardless of charging state.
+  const card = $('card-powerflow');
+  if (card) card.className = 'card pf-card' + (info && info.cls ? ' ' + info.cls : '');
+  setText('pf-status', info ? info.text : (stateCode == null ? 'Offline' : `Code ${stateCode}`));
   const banner = $('paused-banner');
   if (banner) banner.style.display = schedulePaused ? '' : 'none';
 }
 
 function setOffline() {
-  const hero = $('hero');
-  if (hero) hero.className = 'hero is-offline';
-  setText('hero-status', 'Offline');
-  $('hero-power-num').textContent = '--';
-  $('hero-power-unit').textContent = '';
-  setText('hero-detail', 'Cannot reach the gateway');
-  // also blank all connection dots
-  ['dot-ble','dot-wifi','dot-mqtt'].forEach(id => setClass(id, 'conn-dot is-down'));
-  // gateway is offline; whatever the previous paused state was, hide it
+  const card = $('card-powerflow');
+  if (card) card.className = 'card pf-card is-offline';
+  setText('pf-status', 'Cannot reach the gateway');
+  _pf.cp = null; _pf.en = null; _pf.house = null; _pf.conn = null;
+  setText('pf-veh-kw', '--'); setText('pf-grid-kw', '--'); setText('pf-session', '--');
+  pfRender();
+  ['dot-ble', 'dot-wifi', 'dot-mqtt'].forEach(id => setClass(id, 'conn-dot is-down'));
   const banner = $('paused-banner');
   if (banner) banner.style.display = 'none';
   const cr = $('charge-reminder');
@@ -235,13 +251,18 @@ async function refresh() {
     const sessionKwh = (typeof st.en === 'number') ? st.en / 100 : null;
     const maxCur = (typeof st.cur === 'number') ? st.cur : null;
     const schedulePaused = (typeof st.gen === 'number') && st.gen !== 0;
-    setHero(stateCode, kw, chargerName !== '--' ? chargerName : '', schedulePaused);
+    setStatus(stateCode, schedulePaused);
+    _pf.cp = kw;
+    _pf.en = (typeof st.en === 'number') ? st.en : null;
+    _pf.conn = (typeof stateCode === 'number') ? carConn(stateCode) : null;
+    pfRender();
     setText('stat-energy', sessionKwh != null ? sessionKwh.toFixed(2) : '--');
     setText('stat-maxcur', maxCur != null ? maxCur : '--');
     syncCurrentSlider(maxCur);
   } else {
-    // BLE down or charger not responding — keep hero showing offline
-    setHero(null, null, 'Gateway online but charger not responding');
+    // BLE down or charger not responding — show offline on the power flow
+    setStatus(null, false);
+    _pf.cp = null; _pf.en = null; _pf.conn = null; pfRender();
     setText('stat-energy', '--');
     setText('stat-maxcur', '--');
   }
@@ -255,6 +276,7 @@ async function refresh() {
     if (typeof r.p1 === 'number') {
       const house = (r.p1 || 0) + (r.p2 || 0) + (r.p3 || 0);
       setText('stat-house', house);
+      _pf.house = house; pfRender();   // grid kW on the Power Flow card
     } else {
       setText('stat-house', '--');
     }

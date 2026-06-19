@@ -27,11 +27,23 @@
        Check it's powered on and on the same network.</p>
   </section>
 
-  <!-- Hero: live charging state -->
-  <section class="hero" id="hero">
-    <div class="hero-status" id="hero-status">Connecting...</div>
-    <div class="hero-power"><span id="hero-power-num">--</span><span class="unit" id="hero-power-unit">kW</span></div>
-    <div class="hero-detail" id="hero-detail">Waiting for gateway...</div>
+  <!-- Power Flow: Grid -> Charger -> Vehicle, matching the gateway's own
+       dashboard (/dashboard on the device) for a consistent look. The
+       Vehicle node swaps to "Plug in" when no car is connected. -->
+  <section class="card pf-card" id="card-powerflow">
+    <div class="pf-head"><span class="pf-head-icon">&#x26A1;</span><span>Power Flow</span></div>
+    <svg viewBox="0 0 360 132" class="pf-svg" role="img" aria-label="Live power flow Grid Charger Vehicle">
+      <defs><marker id="pf-arrow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="var(--accent)"/></marker></defs>
+      <line x1="75" y1="70" x2="145" y2="70" stroke="var(--border)" stroke-width="2" stroke-dasharray="5 4"/>
+      <line x1="215" y1="70" x2="285" y2="70" stroke="var(--border)" stroke-width="2" stroke-dasharray="5 4"/>
+      <line id="pf-line1" x1="75" y1="70" x2="145" y2="70" stroke="var(--success)" stroke-width="2.5" stroke-dasharray="8 5" marker-end="url(#pf-arrow)" style="opacity:0;transition:opacity .25s"/>
+      <line id="pf-line2" x1="215" y1="70" x2="285" y2="70" stroke="var(--success)" stroke-width="2.5" stroke-dasharray="8 5" marker-end="url(#pf-arrow)" style="opacity:0;transition:opacity .25s"/>
+      <g><circle cx="45" cy="70" r="30" fill="var(--elevated)" stroke="var(--border)" stroke-width="1.5"/><text x="45" y="79" text-anchor="middle" font-size="26">&#x1F50C;</text><text x="45" y="119" text-anchor="middle" font-size="11" fill="var(--text2)" font-weight="500">Grid</text><text id="pf-grid-kw" x="45" y="30" text-anchor="middle" font-size="13" fill="var(--text)" font-weight="700">--</text></g>
+      <g><rect x="150" y="40" width="60" height="60" rx="12" fill="var(--surface)" stroke="var(--primary)" stroke-width="1.5"/><text x="180" y="81" text-anchor="middle" font-size="26">&#x26A1;</text><text x="180" y="119" text-anchor="middle" font-size="11" fill="var(--text2)" font-weight="500">Charger</text></g>
+      <g><circle cx="315" cy="70" r="30" fill="var(--elevated)" stroke="var(--border)" stroke-width="1.5"/><text x="315" y="80" text-anchor="middle" font-size="24">&#x1F697;</text><text x="315" y="119" text-anchor="middle" font-size="11" fill="var(--text2)" font-weight="500">Vehicle</text><text id="pf-veh-kw" x="315" y="30" text-anchor="middle" font-size="13" fill="var(--text)" font-weight="700">--</text><text id="pf-plugin" x="315" y="30" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-weight="700" style="display:none">&#x1F50C; Plug in</text></g>
+    </svg>
+    <div class="pf-status" id="pf-status">Connecting…</div>
+    <div class="pf-session-row"><span>Since plugged in</span><span id="pf-session">--</span></div>
   </section>
 
   <!-- Schedule paused banner: shows when r_dat.gen != 0 (manual
