@@ -341,6 +341,162 @@ function syncCurrentSlider(amps) {
   }
 }
 
+// ---- Charge schedules ----
+//
+// Reads via /api/sched?met=r_schs, writes via s_sch (insert/update, keyed by
+// sid) and clr_sch ({"sid":[N]}) — the same proven shapes the gateway's own
+// dashboard sends. Times are entered/displayed LOCAL and stored as the UTC
+// HHMM the charger keeps (matching the gateway dashboard's conversion).
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+let _schedules = [];
+let _editingSid = null;
+
+const pad2 = (n) => String(n).padStart(2, '0');
+function localToUtc(hhmm) {            // "HH:MM" local -> "HHMM" UTC
+  const p = String(hhmm).split(':');
+  const d = new Date();
+  d.setHours(+p[0] || 0, +p[1] || 0, 0, 0);
+  return pad2(d.getUTCHours()) + pad2(d.getUTCMinutes());
+}
+function utcToLocal(hhmm) {            // "1400"/HHMM UTC -> "HH:MM" local
+  const s = String(hhmm).padStart(4, '0');
+  const d = new Date();
+  d.setUTCHours(+s.slice(0, 2) || 0, +s.slice(2) || 0, 0, 0);
+  return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
+function daysBitsToArray(bits) {       // bitmask (bit0=Mon..bit6=Sun) -> [0/1 x7]
+  const a = []; for (let i = 0; i < 7; i++) a.push((bits >> i) & 1); return a;
+}
+function daysLabel(bits) {
+  const on = []; for (let i = 0; i < 7; i++) if ((bits >> i) & 1) on.push(DAY_NAMES[i]);
+  if (on.length === 7) return 'Every day';
+  if (on.length === 0) return 'No days';
+  return on.join(' ');
+}
+
+function renderSchedules() {
+  const list = $('sched-list');
+  if (!list) return;
+  if (!_schedules.length) {
+    list.textContent = '';
+    const e = document.createElement('div'); e.className = 'sched-empty'; e.textContent = 'No schedules yet.';
+    list.appendChild(e); return;
+  }
+  list.textContent = '';
+  // Built with textContent / createElement (no innerHTML) so charger-returned
+  // values can never be interpreted as HTML.
+  const mk = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  };
+  _schedules.forEach((s) => {
+    const row = mk('div', 'sched-item' + (s.enabled ? '' : ' is-off'));
+    const bits = (typeof s.days === 'number') ? s.days : 0;
+    const when = mk('div', 'sched-when');
+    when.appendChild(mk('strong', null, `${utcToLocal(s.start)}–${utcToLocal(s.stop)}`));
+    when.appendChild(mk('span', 'sched-days-lbl', daysLabel(bits)));
+    row.appendChild(when);
+    row.appendChild(mk('div', 'sched-meta', `${s.mcr || '--'} A${s.enabled ? '' : ' · paused'}`));
+    const act = mk('div', 'sched-actions');
+    const edit = mk('button', 'sched-mini', 'Edit');
+    edit.onclick = () => openSchedForm(s);
+    const del = mk('button', 'sched-mini sched-del', 'Delete');
+    del.onclick = () => deleteSchedule(s.sid);
+    act.appendChild(edit); act.appendChild(del);
+    row.appendChild(act);
+    list.appendChild(row);
+  });
+}
+
+async function loadSchedules() {
+  const r = await fetchJSON('api/sched?met=r_schs&par=null&wait=6000');
+  let rows = [];
+  if (r.ok && r.body && r.body.r) {
+    const rr = r.body.r;
+    rows = Array.isArray(rr) ? rr : (Array.isArray(rr.schedules) ? rr.schedules : []);
+  }
+  _schedules = rows.filter((x) => x && typeof x.sid !== 'undefined')
+    .map((x) => ({ sid: +x.sid, start: x.start, stop: x.stop, days: +x.days || 0, mcr: +x.mcr || 0, enabled: x.enabled ? 1 : 0 }));
+  renderSchedules();
+}
+
+function openSchedForm(s) {
+  _editingSid = s ? s.sid : null;
+  $('sched-form-title').textContent = s ? `Edit schedule #${s.sid}` : 'New schedule';
+  $('sf-start').value = s ? utcToLocal(s.start) : '23:00';
+  $('sf-stop').value = s ? utcToLocal(s.stop) : '07:00';
+  const bits = s ? s.days : 0;
+  $('sf-days').querySelectorAll('input').forEach((c, i) => { c.checked = !!((bits >> i) & 1); });
+  $('sf-cur').value = s ? (s.mcr || 32) : 32;
+  $('sf-cur-v').textContent = $('sf-cur').value;
+  $('sf-en').checked = s ? !!s.enabled : true;
+  $('sched-form').hidden = false;
+}
+
+function schedToast(msg, kind) {
+  const t = $('sched-toast'); if (!t) return;
+  t.textContent = msg; t.className = 'ctrl-toast is-' + (kind || 'info'); t.hidden = false;
+  if (kind !== 'err') { clearTimeout(t._timer); t._timer = setTimeout(() => { t.hidden = true; }, 4000); }
+}
+
+async function saveSchedule() {
+  const daysArr = Array.from($('sf-days').querySelectorAll('input')).map((c) => c.checked ? 1 : 0);
+  if (!daysArr.some(Boolean)) { schedToast('Pick at least one day', 'err'); return; }
+  let sid = _editingSid;
+  if (sid === null) sid = _schedules.length ? Math.max(..._schedules.map((s) => s.sid)) + 1 : 0;
+  const entry = {
+    sid, start: parseInt(localToUtc($('sf-start').value), 10),
+    stop: parseInt(localToUtc($('sf-stop').value), 10), days: daysArr,
+    mcr: parseInt($('sf-cur').value, 10) || 32, type: 0,
+    enabled: $('sf-en').checked ? 1 : 0, target: { type: 0, value: 0 }, repeat: 1,
+  };
+  const par = encodeURIComponent(JSON.stringify({ schedules: [entry] }));
+  schedToast('Saving…', 'info');
+  const r = await fetchJSON(`api/sched?met=s_sch&par=${par}&wait=6000`);
+  if (!r.ok || (r.body && r.body.error)) {
+    schedToast('Save failed: ' + (r.body?.error?.message || r.body?.error || r.body?.detail || 'HTTP ' + r.status), 'err');
+    return;
+  }
+  schedToast(`Schedule #${sid} saved`, 'ok');
+  $('sched-form').hidden = true; _editingSid = null;
+  setTimeout(loadSchedules, 1500);  // async write — let it land before re-reading
+}
+
+async function deleteSchedule(sid) {
+  if (!confirm(`Delete schedule #${sid}?`)) return;
+  const par = encodeURIComponent(JSON.stringify({ sid: [sid] }));
+  schedToast(`Deleting #${sid}…`, 'info');
+  const r = await fetchJSON(`api/sched?met=clr_sch&par=${par}&wait=6000`);
+  if (!r.ok || (r.body && r.body.error)) {
+    schedToast('Delete failed: ' + (r.body?.error?.message || r.body?.error || r.body?.detail || 'HTTP ' + r.status), 'err');
+    loadSchedules(); return;
+  }
+  schedToast(`Schedule #${sid} deleted`, 'ok');
+  loadSchedules();
+}
+
+// Build the day checkboxes once + wire the form buttons.
+(function initSchedUI() {
+  const days = $('sf-days');
+  if (days) {
+    DAY_NAMES.forEach((name, i) => {
+      const l = document.createElement('label'); l.className = 'sched-day';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.day = i;
+      const sp = document.createElement('span'); sp.textContent = name;
+      l.appendChild(cb); l.appendChild(sp);
+      days.appendChild(l);
+    });
+  }
+  const cur = $('sf-cur');
+  if (cur) cur.addEventListener('input', (e) => { $('sf-cur-v').textContent = e.target.value; });
+  const add = $('btn-add-sched'); if (add) add.addEventListener('click', () => openSchedForm(null));
+  const save = $('sf-save'); if (save) save.addEventListener('click', saveSchedule);
+  const cancel = $('sf-cancel'); if (cancel) cancel.addEventListener('click', () => { $('sched-form').hidden = true; _editingSid = null; });
+})();
+
 $('poll-s').textContent = POLL_MS / 1000;
 refresh();
+loadSchedules();
 setInterval(refresh, POLL_MS);

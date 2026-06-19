@@ -142,6 +142,32 @@
     </dl>
   </section>
 
+  <!-- Charge schedules: create / edit / delete via the gateway BAPI
+       (s_sch insert-or-update, clr_sch delete) proxied through /api/sched. -->
+  <section class="card" id="sched-card">
+    <h2>Charge schedules</h2>
+    <div id="sched-list" class="sched-list"><div class="sched-empty">Loading…</div></div>
+    <button type="button" class="ctrl-btn" id="btn-add-sched">&#x2795; Add schedule</button>
+    <div id="sched-form" class="sched-form" hidden>
+      <div class="sched-form-title" id="sched-form-title">New schedule</div>
+      <div class="sched-times">
+        <label>Start<input type="time" id="sf-start" value="23:00"></label>
+        <label>Stop<input type="time" id="sf-stop" value="07:00"></label>
+      </div>
+      <div class="sched-days" id="sf-days"></div>
+      <label class="sched-cur">Max current
+        <input type="range" id="sf-cur" min="6" max="32" step="1" value="32">
+        <span><span id="sf-cur-v">32</span> A</span>
+      </label>
+      <label class="sched-en"><input type="checkbox" id="sf-en" checked> Enabled</label>
+      <div class="sched-form-actions">
+        <button type="button" class="ctrl-btn ctrl-success" id="sf-save">Save</button>
+        <button type="button" class="ctrl-btn" id="sf-cancel">Cancel</button>
+      </div>
+    </div>
+    <div id="sched-toast" class="ctrl-toast" hidden></div>
+  </section>
+
   <!-- OTA call-to-action -->
   <a href="ota" class="cta-link">⬆ Upload firmware (OTA)</a>
 

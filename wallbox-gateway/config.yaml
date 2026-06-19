@@ -1,10 +1,11 @@
 name: "Wallbox BLE Gateway Manager"
-version: "0.3.1"
+version: "0.4.0"
 slug: wallbox_gateway
 description: >
   Manage your ESP32-based Wallbox BLE gateway from inside Home Assistant.
-  Read-only status + diagnostics dashboard, plus drag-and-drop OTA
-  firmware upload with end-to-end MD5 integrity check.
+  Live status + controls dashboard, a charge-schedule editor (create /
+  edit / delete), and drag-and-drop OTA firmware upload with end-to-end
+  MD5 integrity check.
 url: "https://github.com/botts7/wallbox-gateway-ha-addon"
 image: "ghcr.io/botts7/wallbox-gateway-{arch}"
 arch:

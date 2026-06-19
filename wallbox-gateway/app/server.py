@@ -145,6 +145,37 @@ def api_command():
         return jsonify(body), code
 
 
+# Schedule BAPI methods the dashboard's schedule editor may call. Reads
+# (r_schs/r_sch) + writes (s_sch insert/update, clr_sch delete, w_sch for the
+# original Pulsar). Whitelisted so the proxy never forwards an arbitrary met.
+_ALLOWED_SCHED_METS = {"r_schs", "r_sch", "s_sch", "clr_sch", "w_sch"}
+
+
+@app.route("/api/sched")
+def api_sched():
+    """Proxy schedule reads/writes to the gateway's BAPI passthrough.
+
+    The browser builds the par (UTC HHMM start/stop, Mon-Sun days bit-array,
+    etc — same shape the gateway's own dashboard sends) and we forward it,
+    forcing action=bapi and validating the met against the whitelist.
+    """
+    cfg = config_from_env()
+    met = (request.args.get("met") or "").strip()
+    if met not in _ALLOWED_SCHED_METS:
+        return jsonify({
+            "error": "bad_met",
+            "detail": f"met '{met}' not allowed",
+            "allowed": sorted(_ALLOWED_SCHED_METS),
+        }), 400
+    qs = request.query_string.decode("utf-8")
+    path = "/api/command?action=bapi&" + qs
+    try:
+        return jsonify(fetch_json(cfg, path, timeout=9.0))
+    except Exception as e:
+        body, code = _gateway_error(e)
+        return jsonify(body), code
+
+
 @app.route("/api/addon/config")
 def api_addon_config():
     """Surface non-secret Add-on options so the SPA knows whether
