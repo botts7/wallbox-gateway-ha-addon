@@ -495,3 +495,6 @@ a { color: var(--accent); }
 .sched-cur input[type="range"] { flex: 1; accent-color: var(--primary); }
 .sched-en { display: flex; align-items: center; gap: 6px; font-size: 14px; }
 .sched-form-actions { display: flex; gap: 10px; }
+
+/* [hidden] must win over the flex display above */
+.sched-form[hidden] { display: none; }

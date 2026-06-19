@@ -410,13 +410,17 @@ function renderSchedules() {
   });
 }
 
-async function loadSchedules() {
+async function loadSchedules(retry) {
   const r = await fetchJSON('api/sched?met=r_schs&par=null&wait=6000');
-  let rows = [];
-  if (r.ok && r.body && r.body.r) {
-    const rr = r.body.r;
-    rows = Array.isArray(rr) ? rr : (Array.isArray(rr.schedules) ? rr.schedules : []);
+  if (!(r.ok && r.body && r.body.r)) {
+    // Transient (the gateway rate-limits /api/command; the dashboard's poll
+    // burst can momentarily exhaust its token bucket). Retry once after it
+    // refills before declaring "no schedules".
+    if (!retry) { setTimeout(() => loadSchedules(true), 1800); return; }
+    renderSchedules(); return;
   }
+  const rr = r.body.r;
+  const rows = Array.isArray(rr) ? rr : (Array.isArray(rr.schedules) ? rr.schedules : []);
   _schedules = rows.filter((x) => x && typeof x.sid !== 'undefined')
     .map((x) => ({ sid: +x.sid, start: x.start, stop: x.stop, days: +x.days || 0, mcr: +x.mcr || 0, enabled: x.enabled ? 1 : 0 }));
   renderSchedules();
@@ -498,5 +502,7 @@ async function deleteSchedule(sid) {
 
 $('poll-s').textContent = POLL_MS / 1000;
 refresh();
-loadSchedules();
+// Stagger the schedule read so it doesn't pile onto refresh()'s request
+// burst and trip the gateway's /api/command rate limiter.
+setTimeout(loadSchedules, 1200);
 setInterval(refresh, POLL_MS);
