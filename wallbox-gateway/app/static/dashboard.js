@@ -34,6 +34,51 @@ function fmtUptime(seconds) {
   return `${h}h ${m % 60}m`;
 }
 
+// Charge-reminder banner (#127). next_scheduled_charge (UTC epoch) +
+// plug_reminder come straight from /api/status — gateway-computed, no
+// charger round-trip. Times render in the browser's locale.
+function fmtChargeTime(epoch) {
+  try {
+    return new Date(epoch * 1000).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return new Date(epoch * 1000).toLocaleString();
+  }
+}
+// #129: hide the Mains/House tiles when the charger has no power meter
+// (Power Boost absent — r_dca reports unsupported). meter===undefined
+// (older gateway firmware) is treated as present, so nothing hides.
+function applyMeterCapability(meter) {
+  const hide = (meter === false);
+  ['stat-mains-tile', 'stat-house-tile'].forEach((id) => {
+    const el = $(id);
+    if (el) el.style.display = hide ? 'none' : '';
+  });
+}
+function updateChargeReminder(s) {
+  const el = $('charge-reminder');
+  if (!el) return;
+  // Don't trust plug/schedule state when the charger link is down.
+  if (!s || s.ble !== 'connected') { el.style.display = 'none'; return; }
+  const nsc = s.next_scheduled_charge;
+  if (s.plug_reminder) {
+    el.className = 'banner banner-warn';
+    setText('charge-reminder-icon', '\u{1F50C}');
+    setText('charge-reminder-title', 'Not plugged in');
+    setText('charge-reminder-detail',
+      nsc ? `Scheduled charge at ${fmtChargeTime(nsc)} — connect the cable so it can start.`
+          : 'A scheduled charge is due soon — connect the cable so it can start.');
+    el.style.display = '';
+  } else if (nsc) {
+    el.className = 'banner';
+    setText('charge-reminder-icon', '\u{1F5D3}\u{FE0F}');
+    setText('charge-reminder-title', 'Next scheduled charge');
+    setText('charge-reminder-detail', fmtChargeTime(nsc));
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
 // Charger-status code -> hero text + state class.
 // Mirrors STATUS_CODES from the gateway firmware (BAPI 0..18).
 const HERO_STATES = {
@@ -92,6 +137,8 @@ function setOffline() {
   // gateway is offline; whatever the previous paused state was, hide it
   const banner = $('paused-banner');
   if (banner) banner.style.display = 'none';
+  const cr = $('charge-reminder');
+  if (cr) cr.style.display = 'none';
 }
 
 async function refresh() {
@@ -149,6 +196,8 @@ async function refresh() {
       setText('wifi-value', s.wifi || 'disconnected');
       setText('wifi-ssid', '--');
     }
+    updateChargeReminder(s);
+    applyMeterCapability(s.meter);
   }
 
   // ---- /api/health ---- (we use loop_max_ms for the device info card)

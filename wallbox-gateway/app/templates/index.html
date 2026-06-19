@@ -46,6 +46,17 @@
     <button type="button" class="banner-action" id="btn-resume">&#x25B6;&#xFE0F; Resume</button>
   </section>
 
+  <!-- Charge reminder (#127): next scheduled charge + plug-in nudge.
+       Driven by /api/status next_scheduled_charge + plug_reminder, both
+       gateway-computed. Switches to banner-warn when not plugged in. -->
+  <section class="banner" id="charge-reminder" style="display:none">
+    <span class="banner-icon" id="charge-reminder-icon">&#x1F5D3;&#xFE0F;</span>
+    <div class="banner-body">
+      <strong id="charge-reminder-title">Next scheduled charge</strong>
+      <span class="banner-detail" id="charge-reminder-detail"></span>
+    </div>
+  </section>
+
   <!-- Controls: charge start/stop, lock/unlock, max current -->
   <section class="card controls">
     <h2>Controls</h2>
@@ -71,11 +82,11 @@
       <div class="stat-label">Session</div>
       <div class="stat-value"><span id="stat-energy">--</span><span class="unit">kWh</span></div>
     </div>
-    <div class="stat">
+    <div class="stat" id="stat-mains-tile">
       <div class="stat-label">Mains</div>
       <div class="stat-value"><span id="stat-voltage">--</span><span class="unit">V</span></div>
     </div>
-    <div class="stat">
+    <div class="stat" id="stat-house-tile">
       <div class="stat-label">House</div>
       <div class="stat-value"><span id="stat-house">--</span><span class="unit">W</span></div>
     </div>
