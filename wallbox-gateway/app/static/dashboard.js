@@ -54,6 +54,28 @@ function applyMeterCapability(meter) {
     if (el) el.style.display = hide ? 'none' : '';
   });
 }
+// Charge-control owner banner. control_owner (from /api/status) says who may
+// drive charging; an external owner pauses the charger's own schedules.
+const _CO_INFO = {
+  integration: { icon: '\u{1F3E0}', title: 'Controlled by Home Assistant',
+    detail: 'The integration’s Charge Assistant is in control — the charger’s own schedules are paused while it manages charging.' },
+  addon: { icon: '\u{1F9E9}', title: 'Controlled by the Add-on',
+    detail: 'The Add-on is managing charging — the charger’s own schedules are paused.' },
+  none: { icon: '\u{1F590}\u{FE0F}', title: 'Manual control only',
+    detail: 'No automation is managing charging — schedules are off; start/stop manually or on plug-in.' },
+};
+function updateControlOwner(s) {
+  const el = $('control-owner');
+  if (!el) return;
+  const owner = s && s.control_owner;
+  const info = _CO_INFO[owner];
+  if (!info) { el.style.display = 'none'; return; }   // wallbox_schedule / unknown -> hidden
+  el.className = 'banner';
+  setText('co-icon', info.icon);
+  setText('co-title', info.title);
+  setText('co-detail', info.detail);
+  el.style.display = '';
+}
 function updateChargeReminder(s) {
   const el = $('charge-reminder');
   if (!el) return;
@@ -155,6 +177,8 @@ function setOffline() {
   if (banner) banner.style.display = 'none';
   const cr = $('charge-reminder');
   if (cr) cr.style.display = 'none';
+  const co = $('control-owner');
+  if (co) co.style.display = 'none';
 }
 
 async function refresh() {
@@ -214,6 +238,7 @@ async function refresh() {
     }
     updateChargeReminder(s);
     applyMeterCapability(s.meter);
+    updateControlOwner(s);
   }
 
   // ---- /api/health ---- (we use loop_max_ms for the device info card)

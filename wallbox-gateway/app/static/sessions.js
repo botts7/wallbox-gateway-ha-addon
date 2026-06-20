@@ -40,8 +40,62 @@ function fmtTime(epoch, opts) {
   catch (e) { return new Date(epoch * 1000).toLocaleString(undefined, opts); }
 }
 
-function loadRate() { const v = parseFloat(localStorage.getItem(RATE_KEY)); return isNaN(v) ? null : v; }
-function saveRate(v) { if (v > 0) localStorage.setItem(RATE_KEY, String(v)); else localStorage.removeItem(RATE_KEY); }
+// ---- tariff model ----
+// Stored in localStorage. Either a flat rate, or time-of-use with named rate
+// bands (e.g. Off-peak/Shoulder/Peak) and a per-hour band assignment for
+// weekday + (optionally separate) weekend. Charger timezone is used for the
+// hour-of-day so bands line up with the charger's clock.
+const TARIFF_KEY = 'wb-addon-tariff-v1';
+const DEFAULT_BANDS = [
+  { id: 'off', name: 'Off-peak', rate: 0.18, color: '#22c55e' },
+  { id: 'sho', name: 'Shoulder', rate: 0.28, color: '#f59e0b' },
+  { id: 'pk', name: 'Peak', rate: 0.45, color: '#ef4444' },
+];
+function defaultTariff() {
+  return {
+    type: 'tou', currency: '$', provider: '', flatRate: 0.30,
+    bands: DEFAULT_BANDS.map((b) => ({ ...b })),
+    weekday: Array(24).fill('off'),
+    weekend: Array(24).fill('off'),
+    weekendSame: true,
+  };
+}
+function loadTariff() {
+  try { const t = JSON.parse(localStorage.getItem(TARIFF_KEY)); if (t && t.type) return t; } catch (e) {}
+  return null;
+}
+function saveTariff(t) { localStorage.setItem(TARIFF_KEY, JSON.stringify(t)); }
+function clearTariff() { localStorage.removeItem(TARIFF_KEY); }
+
+function _bandFor(tariff, epoch) {
+  const { day, hour } = tzDayHour(epoch);
+  const weekend = (day === 0 || day === 6);
+  const assign = (weekend && !tariff.weekendSame && tariff.weekend) ? tariff.weekend : tariff.weekday;
+  const id = (assign && assign[hour]) || (tariff.bands[0] && tariff.bands[0].id);
+  return tariff.bands.find((b) => b.id === id) || tariff.bands[0] || { rate: 0 };
+}
+// Cost of one session split by rate band: {total, byBand:{id:{kwh,cost,name,color}}}
+function _sessionCost(tariff, s) {
+  const totalKwh = (s.en || 0) / 1000;
+  if (tariff.type === 'flat') {
+    const c = totalKwh * (tariff.flatRate || 0);
+    return { total: c, byBand: { flat: { kwh: totalKwh, cost: c, name: 'Energy', color: 'var(--primary)' } } };
+  }
+  const dur = s.dur || 3600, step = 300, n = Math.max(1, Math.ceil(dur / step));
+  const per = totalKwh / n;
+  const byBand = {}; let total = 0;
+  for (let i = 0; i < n; i++) {
+    const t = s.ts + i * step;
+    if (t >= s.ts + dur) break;
+    const band = _bandFor(tariff, t);
+    const cost = per * (band.rate || 0);
+    total += cost;
+    const k = band.id || 'x';
+    byBand[k] = byBand[k] || { kwh: 0, cost: 0, name: band.name, color: band.color };
+    byBand[k].kwh += per; byBand[k].cost += cost;
+  }
+  return { total, byBand };
+}
 
 function readCache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch (e) { return {}; } }
 function writeCache(c) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch (e) {} }
@@ -51,22 +105,72 @@ function recompute() {
   const now = Date.now() / 1000;
   const weekAgo = now - 7 * 86400;
   const d = new Date(); const monthStart = new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000;
-  let wk = 0, mo = 0;
+  const tariff = loadTariff();
+  let wk = 0, mo = 0, wkCost = 0, moCost = 0;
+  const monthBands = {};
   _sessions.forEach((s) => {
     const kwh = (s.en || 0) / 1000;
-    if (s.ts >= weekAgo) wk += kwh;
-    if (s.ts >= monthStart) mo += kwh;
+    const inWeek = s.ts >= weekAgo, inMonth = s.ts >= monthStart;
+    if (inWeek) wk += kwh;
+    if (inMonth) mo += kwh;
+    if (tariff && (inWeek || inMonth)) {
+      const bd = _sessionCost(tariff, s);
+      if (inWeek) wkCost += bd.total;
+      if (inMonth) {
+        moCost += bd.total;
+        for (const [k, v] of Object.entries(bd.byBand)) {
+          monthBands[k] = monthBands[k] || { kwh: 0, cost: 0, name: v.name, color: v.color };
+          monthBands[k].kwh += v.kwh; monthBands[k].cost += v.cost;
+        }
+      }
+    }
   });
   if (_lifetimeKwh != null) setText('tile-allt', _lifetimeKwh.toFixed(0));
   setText('tile-week', wk.toFixed(1));
   setText('tile-month', mo.toFixed(1));
-  const rate = loadRate();
-  const row = $('cost-row');
-  if (rate != null && rate > 0) {
+  updateTariffSummary(tariff);
+  const row = $('cost-row'), cb = $('cost-breakdown');
+  const cur = (tariff && tariff.currency) || '$';
+  if (tariff) {
     row.hidden = false;
-    setText('tile-week-cost', (wk * rate).toFixed(2));
-    setText('tile-month-cost', (mo * rate).toFixed(2));
-  } else { row.hidden = true; }
+    setText('tile-week-cost', cur + wkCost.toFixed(2));
+    setText('tile-month-cost', cur + moCost.toFixed(2));
+    renderCostBreakdown(monthBands, cur);
+  } else {
+    row.hidden = true;
+    if (cb) cb.hidden = true;
+  }
+}
+
+function updateTariffSummary(tariff) {
+  const el = $('tariff-text');
+  if (!el) return;
+  if (!tariff) { el.textContent = 'No tariff set — costs hidden.'; return; }
+  const cur = tariff.currency || '$';
+  if (tariff.type === 'flat') {
+    el.textContent = `Flat ${cur}${(tariff.flatRate || 0).toFixed(2)}/kWh${tariff.provider ? ' · ' + tariff.provider : ''}`;
+    return;
+  }
+  const bands = (tariff.bands || []).map((b) => `${b.name} ${cur}${(b.rate || 0).toFixed(2)}`).join(' · ');
+  el.textContent = `Time-of-use: ${bands}${tariff.provider ? ' · ' + tariff.provider : ''}`;
+}
+
+function renderCostBreakdown(bands, cur) {
+  const el = $('cost-breakdown');
+  if (!el) return;
+  el.textContent = '';
+  const entries = Object.values(bands).filter((b) => b.kwh > 0);
+  if (entries.length < 2) { el.hidden = true; return; }  // breakdown only meaningful for ToU
+  el.hidden = false;
+  entries.sort((a, b) => b.cost - a.cost).forEach((b) => {
+    const chip = document.createElement('div'); chip.className = 'cb-chip';
+    const sw = document.createElement('span'); sw.className = 'cb-sw'; sw.style.background = b.color || 'var(--primary)';
+    chip.appendChild(sw);
+    const t = document.createElement('span');
+    t.textContent = `${b.name || 'Rate'}: ${cur}${b.cost.toFixed(2)} · ${b.kwh.toFixed(1)} kWh`;
+    chip.appendChild(t);
+    el.appendChild(chip);
+  });
 }
 
 // ---- heatmap (day x hour kWh intensity), browser-local ----
@@ -196,6 +300,103 @@ function exportCsv() {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+// ---- tariff editor modal ----
+let _edit = null;  // working copy while the modal is open
+
+function openTariff() {
+  const cur = loadTariff();
+  _edit = cur ? JSON.parse(JSON.stringify(cur)) : defaultTariff();
+  if (!Array.isArray(_edit.bands) || !_edit.bands.length) _edit.bands = DEFAULT_BANDS.map((b) => ({ ...b }));
+  if (!Array.isArray(_edit.weekday) || _edit.weekday.length !== 24) _edit.weekday = Array(24).fill(_edit.bands[0].id);
+  if (!Array.isArray(_edit.weekend) || _edit.weekend.length !== 24) _edit.weekend = Array(24).fill(_edit.bands[0].id);
+  $('tm-provider').value = _edit.provider || '';
+  $('tm-currency').value = _edit.currency || '$';
+  $('tm-flat-rate').value = _edit.flatRate != null ? _edit.flatRate : '';
+  document.querySelectorAll('input[name="tm-type"]').forEach((r) => { r.checked = (r.value === _edit.type); });
+  $('tm-weekend-same').checked = !!_edit.weekendSame;
+  $('tm-paint-hint').textContent = 'Tip: tap an hour repeatedly to cycle through your rate bands.';
+  renderTariffType(); renderBands(); renderHours(); renderWeekendWrap();
+  $('tariff-modal').hidden = false;
+}
+function closeTariff() { $('tariff-modal').hidden = true; _edit = null; }
+function renderTariffType() { $('tm-flat').hidden = _edit.type !== 'flat'; $('tm-tou').hidden = _edit.type !== 'tou'; }
+function renderWeekendWrap() { $('tm-weekend-wrap').hidden = !!_edit.weekendSame; }
+
+function renderBands() {
+  const wrap = $('tm-bands'); wrap.textContent = '';
+  _edit.bands.forEach((b, i) => {
+    const row = document.createElement('div'); row.className = 'tm-band';
+    const sw = document.createElement('input'); sw.type = 'color'; sw.value = b.color || '#3b82f6'; sw.className = 'tm-band-color';
+    sw.oninput = () => { b.color = sw.value; renderHours(); };
+    const name = document.createElement('input'); name.type = 'text'; name.value = b.name || ''; name.placeholder = 'Name'; name.className = 'tm-band-name';
+    name.oninput = () => { b.name = name.value; };
+    const rate = document.createElement('input'); rate.type = 'number'; rate.min = '0'; rate.step = '0.01'; rate.placeholder = '0.00'; rate.className = 'tm-band-rate';
+    rate.value = b.rate != null ? b.rate : '';
+    rate.oninput = () => { b.rate = parseFloat(rate.value) || 0; };
+    row.appendChild(sw); row.appendChild(name); row.appendChild(rate);
+    if (_edit.bands.length > 1) {
+      const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'tm-band-rm'; rm.textContent = '×';
+      rm.onclick = () => removeBand(i);
+      row.appendChild(rm);
+    }
+    wrap.appendChild(row);
+  });
+}
+function removeBand(i) {
+  const removed = _edit.bands[i].id;
+  _edit.bands.splice(i, 1);
+  const fb = _edit.bands[0].id;
+  ['weekday', 'weekend'].forEach((w) => { _edit[w] = _edit[w].map((id) => (id === removed ? fb : id)); });
+  renderBands(); renderHours();
+}
+function addBand() {
+  const colors = ['#3b82f6', '#a855f7', '#06b6d4', '#84cc16', '#ec4899'];
+  _edit.bands.push({ id: 'b' + Date.now().toString(36), name: 'Rate ' + (_edit.bands.length + 1), rate: 0.30, color: colors[_edit.bands.length % colors.length] });
+  renderBands();
+}
+
+function renderHours() {
+  ['weekday', 'weekend'].forEach((which) => {
+    const grid = $(which === 'weekday' ? 'tm-weekday' : 'tm-weekend');
+    if (!grid) return;
+    grid.textContent = '';
+    for (let h = 0; h < 24; h++) {
+      const band = _edit.bands.find((b) => b.id === _edit[which][h]) || _edit.bands[0];
+      const cell = document.createElement('button');
+      cell.type = 'button'; cell.className = 'tm-hr';
+      cell.style.background = band.color || 'var(--elevated)';
+      cell.textContent = h;
+      cell.title = `${h}:00 — ${band.name}`;
+      cell.onclick = () => cycleHour(which, h);
+      grid.appendChild(cell);
+    }
+  });
+}
+function cycleHour(which, h) {
+  const ids = _edit.bands.map((b) => b.id);
+  _edit[which][h] = ids[(ids.indexOf(_edit[which][h]) + 1) % ids.length];
+  renderHours();
+}
+function saveTariffEdit() {
+  _edit.provider = $('tm-provider').value.trim();
+  _edit.currency = $('tm-currency').value.trim() || '$';
+  _edit.flatRate = parseFloat($('tm-flat-rate').value) || 0;
+  _edit.weekendSame = $('tm-weekend-same').checked;
+  saveTariff(_edit);
+  closeTariff();
+  recompute();
+}
+(function initTariffUI() {
+  const open = $('tariff-edit'); if (open) open.addEventListener('click', openTariff);
+  const close = $('tm-close'); if (close) close.addEventListener('click', closeTariff);
+  const modal = $('tariff-modal'); if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeTariff(); });
+  document.querySelectorAll('input[name="tm-type"]').forEach((r) => r.addEventListener('change', () => { if (_edit) { _edit.type = r.value; renderTariffType(); } }));
+  const ws = $('tm-weekend-same'); if (ws) ws.addEventListener('change', () => { if (_edit) { _edit.weekendSame = ws.checked; renderWeekendWrap(); } });
+  const ab = $('tm-add-band'); if (ab) ab.addEventListener('click', addBand);
+  const sv = $('tm-save'); if (sv) sv.addEventListener('click', saveTariffEdit);
+  const cl = $('tm-clear'); if (cl) cl.addEventListener('click', () => { clearTariff(); closeTariff(); recompute(); });
+})();
+
 // ---- init ----
 (async function init() {
   const cfg = await fetchJSON('api/addon/config');
@@ -206,8 +407,6 @@ function exportCsv() {
   const total = $('sess-total');
   const st = await fetchJSON('api/status');
   if (st.ok && typeof st.body.chg_sessions === 'number' && total) total.textContent = st.body.chg_sessions + ' total';
-  const ri = $('rate-input'); if (ri) { const r = loadRate(); if (r != null) ri.value = r; }
-  const rs = $('rate-save'); if (rs) rs.addEventListener('click', () => { saveRate(parseFloat($('rate-input').value)); recompute(); });
   const cb = $('csv-btn'); if (cb) cb.addEventListener('click', exportCsv);
   loadSessions();
 })();

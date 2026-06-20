@@ -48,6 +48,17 @@
     </div>
   </div>
 
+  <!-- Charge-control owner banner: appears when something other than the
+       charger's own schedule is in charge (control_owner from /api/status).
+       External owners pause the native schedules while they control. -->
+  <section class="banner" id="control-owner" hidden>
+    <span class="banner-icon" id="co-icon">&#x1F39B;&#xFE0F;</span>
+    <div class="banner-body">
+      <strong id="co-title">Charge control</strong>
+      <span class="banner-detail" id="co-detail"></span>
+    </div>
+  </section>
+
   <!-- Power Flow: Grid -> Charger -> Vehicle, matching the gateway's own
        dashboard (/dashboard on the device) for a consistent look. The
        Vehicle node swaps to "Plug in" when no car is connected. -->

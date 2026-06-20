@@ -655,3 +655,40 @@ a { color: var(--accent); }
   .page-sessions #not-configured { grid-column: 1 / -1; }
 }
 .sess-sub { font-size: 12px; color: var(--text3); margin: -6px 0 10px; }
+
+/* ---- Tariff: summary, cost breakdown ---- */
+.stat-value.cost::before { content: none; }   /* currency now comes from JS */
+.tariff-summary { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.tariff-text { flex: 1; min-width: 160px; font-size: 13px; color: var(--text2); }
+.cost-breakdown { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.cost-breakdown[hidden] { display: none; }
+.cb-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--elevated); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 12px; color: var(--text2); }
+.cb-sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+/* ---- Tariff editor modal ---- */
+.tariff-modal { position: fixed; inset: 0; z-index: 300; padding: 16px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.tariff-modal[hidden] { display: none; }
+.tariff-modal-inner { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; max-width: 560px; width: 100%; max-height: 88vh; overflow: auto; padding: 16px; }
+.tm-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.tm-head h3 { margin: 0; font-size: 16px; }
+.tm-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.tm-row label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text2); }
+.tm-row input, .tm-section input[type="number"], .tm-band input[type="text"], .tm-band input[type="number"] { background: var(--elevated); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; }
+.tm-type { display: flex; gap: 16px; margin-bottom: 12px; font-size: 14px; }
+.tm-type label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.tm-section[hidden] { display: none; }
+.tm-section label { font-size: 14px; }
+.tm-per { color: var(--text3); }
+.tm-sub { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--text3); font-weight: 600; margin: 14px 0 6px; }
+.tm-bands { display: flex; flex-direction: column; gap: 6px; }
+.tm-band { display: flex; align-items: center; gap: 8px; }
+.tm-band-color { width: 34px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: none; cursor: pointer; }
+.tm-band-name { flex: 1; min-width: 0; }
+.tm-band-rate { width: 84px; }
+.tm-band-rm { background: var(--surface); color: var(--text3); border: 1px solid var(--border); border-radius: 8px; width: 30px; height: 32px; font-size: 18px; line-height: 1; cursor: pointer; }
+.tm-band-rm:hover { color: var(--danger); border-color: var(--danger); }
+.tm-hours { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; }
+.tm-hr { aspect-ratio: 1; min-height: 22px; border: none; border-radius: 4px; color: #fff; font-size: 10px; font-weight: 600; cursor: pointer; text-shadow: 0 1px 1px rgba(0,0,0,.4); }
+.tm-weekend-same { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 14px 0 4px; cursor: pointer; }
+#tm-weekend-wrap[hidden] { display: none; }
+.tm-actions { display: flex; gap: 10px; margin-top: 16px; }

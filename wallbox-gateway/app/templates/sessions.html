@@ -38,12 +38,10 @@
       <div class="stat"><div class="stat-label">Week cost</div><div class="stat-value cost"><span id="tile-week-cost">--</span></div></div>
       <div class="stat"><div class="stat-label">Month cost</div><div class="stat-value cost"><span id="tile-month-cost">--</span></div></div>
     </div>
-    <div class="cost-config">
-      <label>Electricity rate
-        <input type="number" id="rate-input" min="0" step="0.01" placeholder="e.g. 0.30">
-        <span id="rate-cur">/kWh</span>
-      </label>
-      <button type="button" class="ctrl-btn" id="rate-save">Save</button>
+    <div class="cost-breakdown" id="cost-breakdown" hidden></div>
+    <div class="tariff-summary">
+      <div id="tariff-text" class="tariff-text">No tariff set — costs hidden.</div>
+      <button type="button" class="ctrl-btn" id="tariff-edit">&#x2699;&#xFE0F; Tariff</button>
     </div>
   </section>
 
@@ -70,6 +68,52 @@
   <p class="hint">Long-term graphs: use the Home Assistant Energy dashboard.</p>
 
 </main>
+
+<!-- Tariff editor: flat or time-of-use (peak/shoulder/off-peak) rates with
+     separate weekday/weekend hour assignment. Drives the cost figures. -->
+<div class="tariff-modal" id="tariff-modal" hidden>
+  <div class="tariff-modal-inner">
+    <div class="tm-head">
+      <h3>&#x26A1; Electricity tariff</h3>
+      <button type="button" id="tm-close" class="notif-close">&times;</button>
+    </div>
+
+    <div class="tm-row">
+      <label>Provider <input id="tm-provider" type="text" placeholder="optional"></label>
+      <label>Currency <input id="tm-currency" type="text" maxlength="3" placeholder="$" style="width:60px"></label>
+    </div>
+
+    <div class="tm-type">
+      <label><input type="radio" name="tm-type" value="flat"> Flat rate</label>
+      <label><input type="radio" name="tm-type" value="tou"> Time of use</label>
+    </div>
+
+    <div id="tm-flat" class="tm-section">
+      <label>Rate <input id="tm-flat-rate" type="number" min="0" step="0.01" placeholder="0.30"> <span class="tm-per">/kWh</span></label>
+    </div>
+
+    <div id="tm-tou" class="tm-section" hidden>
+      <div class="tm-sub">Rate bands (<span class="tm-per">per kWh</span>)</div>
+      <div id="tm-bands" class="tm-bands"></div>
+      <button type="button" class="ctrl-btn" id="tm-add-band">&#x2795; Add band</button>
+
+      <div class="tm-sub">Weekday — tap an hour to set its band</div>
+      <div id="tm-weekday" class="tm-hours"></div>
+
+      <label class="tm-weekend-same"><input type="checkbox" id="tm-weekend-same"> Weekend same as weekday</label>
+      <div id="tm-weekend-wrap">
+        <div class="tm-sub">Weekend</div>
+        <div id="tm-weekend" class="tm-hours"></div>
+      </div>
+      <div class="sess-sub" id="tm-paint-hint"></div>
+    </div>
+
+    <div class="tm-actions">
+      <button type="button" class="ctrl-btn ctrl-success" id="tm-save">Save tariff</button>
+      <button type="button" class="ctrl-btn" id="tm-clear">Clear</button>
+    </div>
+  </div>
+</div>
 
 <script src="static/sessions.js"></script>
 </body>
