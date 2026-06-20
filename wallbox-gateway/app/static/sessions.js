@@ -22,6 +22,23 @@ async function fetchJSON(path) {
 
 let _sessions = [];   // [{id, ts, dur, en(Wh)}]
 let _lifetimeKwh = null;
+// Render all times in the CHARGER's timezone (from g_tzn), not the viewing
+// browser's — so times are correct even when viewed from a phone in another
+// timezone, and match the gateway's own dashboard. Falls back to browser TZ.
+let CHARGER_TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) { return 'UTC'; } })();
+// epoch -> {day:0-6 (Sun=0), hour:0-23} in CHARGER_TZ
+function tzDayHour(epoch) {
+  try {
+    const local = new Date(new Date(epoch * 1000).toLocaleString('en-US', { timeZone: CHARGER_TZ }));
+    return { day: local.getDay(), hour: local.getHours() };
+  } catch (e) {
+    const d = new Date(epoch * 1000); return { day: d.getDay(), hour: d.getHours() };
+  }
+}
+function fmtTime(epoch, opts) {
+  try { return new Date(epoch * 1000).toLocaleString(undefined, Object.assign({ timeZone: CHARGER_TZ }, opts)); }
+  catch (e) { return new Date(epoch * 1000).toLocaleString(undefined, opts); }
+}
 
 function loadRate() { const v = parseFloat(localStorage.getItem(RATE_KEY)); return isNaN(v) ? null : v; }
 function saveRate(v) { if (v > 0) localStorage.setItem(RATE_KEY, String(v)); else localStorage.removeItem(RATE_KEY); }
@@ -66,9 +83,9 @@ function buildHeatmap() {
     for (let i = 0; i < n; i++) {
       const t = s.ts + i * step;
       if (t >= s.ts + dur) break;
-      const dt = new Date(t * 1000);
-      grid[dt.getDay()][dt.getHours()] += per;
-      if (grid[dt.getDay()][dt.getHours()] > max) max = grid[dt.getDay()][dt.getHours()];
+      const { day, hour } = tzDayHour(t);
+      grid[day][hour] += per;
+      if (grid[day][hour] > max) max = grid[day][hour];
     }
   });
   hm.textContent = '';
@@ -110,7 +127,7 @@ function renderList() {
   shown.forEach((s) => {
     const row = document.createElement('div'); row.className = 'sess-item';
     const when = document.createElement('div'); when.className = 'sess-when';
-    when.textContent = new Date(s.ts * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    when.textContent = fmtTime(s.ts, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     const meta = document.createElement('div'); meta.className = 'sess-meta';
     const mins = Math.round((s.dur || 0) / 60);
     meta.textContent = `${((s.en || 0) / 1000).toFixed(2)} kWh · ${mins} min`;
@@ -183,6 +200,9 @@ function exportCsv() {
 (async function init() {
   const cfg = await fetchJSON('api/addon/config');
   if (cfg.ok && !cfg.body.configured) { const nc = $('not-configured'); if (nc) nc.hidden = false; return; }
+  // Resolve the charger's timezone so all times render in it.
+  const tz = await fetchJSON('api/sess?met=g_tzn&par=null&wait=4000');
+  if (tz.ok && tz.body.r && tz.body.r.timezone) CHARGER_TZ = tz.body.r.timezone;
   const total = $('sess-total');
   const st = await fetchJSON('api/status');
   if (st.ok && typeof st.body.chg_sessions === 'number' && total) total.textContent = st.body.chg_sessions + ' total';
