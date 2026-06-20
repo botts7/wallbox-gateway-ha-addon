@@ -34,6 +34,7 @@
       <div class="stat"><div class="stat-label">This week</div><div class="stat-value"><span id="tile-week">--</span><span class="unit">kWh</span></div></div>
       <div class="stat"><div class="stat-label">This month</div><div class="stat-value"><span id="tile-month">--</span><span class="unit">kWh</span></div></div>
     </div>
+    <div class="cost-breakdown" id="src-split" hidden></div>
     <div class="grid" id="cost-row" hidden>
       <div class="stat"><div class="stat-label">Week cost</div><div class="stat-value cost"><span id="tile-week-cost">--</span></div></div>
       <div class="stat"><div class="stat-label">Month cost</div><div class="stat-value cost"><span id="tile-month-cost">--</span></div></div>
@@ -48,7 +49,7 @@
   <!-- Weekly heatmap -->
   <section class="card">
     <h2>Weekly heatmap</h2>
-    <div class="sess-sub">Energy by hour, spread across each session from plug-in.</div>
+    <div class="sess-sub">Energy by hour, placed in the actual charging window (schedule-aware).</div>
     <div class="hm-wrap"><div id="heatmap" class="hm-grid"></div></div>
     <div class="hm-legend">
       <span>Low</span>
@@ -82,6 +83,11 @@
       <label>Provider <input id="tm-provider" type="text" placeholder="optional"></label>
       <label>Currency <input id="tm-currency" type="text" maxlength="3" placeholder="$" style="width:60px"></label>
     </div>
+
+    <div class="tm-row">
+      <label title="Sessions before this date keep their previous rates">Rates effective from <input id="tm-effective" type="date"></label>
+    </div>
+    <div class="sess-sub" id="tm-history"></div>
 
     <div class="tm-type">
       <label><input type="radio" name="tm-type" value="flat"> Flat rate</label>

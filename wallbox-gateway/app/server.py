@@ -59,7 +59,7 @@ def sessions_page():
 # Session-history BAPI methods the /sessions page reads: r_ses (last id +
 # ring size), r_log (one session by id), r_dca (lifetime energy counter),
 # g_tzn (charger timezone — so times render in the charger's TZ).
-_ALLOWED_SESS_METS = {"r_ses", "r_log", "r_dca", "g_tzn"}
+_ALLOWED_SESS_METS = {"r_ses", "r_log", "r_dca", "g_tzn", "r_lse"}
 
 
 @app.route("/api/sess")
@@ -100,6 +100,17 @@ def api_status():
     cfg = config_from_env()
     try:
         return jsonify(fetch_json(cfg, "/api/status"))
+    except Exception as e:
+        body, code = _gateway_error(e)
+        return jsonify(body), code
+
+
+@app.route("/api/charge_log")
+def api_charge_log():
+    """Real per-session charge-burst windows recorded by the gateway firmware."""
+    cfg = config_from_env()
+    try:
+        return jsonify(fetch_json(cfg, "/api/charge_log"))
     except Exception as e:
         body, code = _gateway_error(e)
         return jsonify(body), code

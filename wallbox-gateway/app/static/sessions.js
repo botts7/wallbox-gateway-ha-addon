@@ -7,7 +7,7 @@
 const $ = (id) => document.getElementById(id);
 const setText = (id, v) => { const el = $(id); if (el) el.textContent = (v ?? '--'); };
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const CACHE_KEY = 'wb-addon-sessions-v1';
+const CACHE_KEY = 'wb-addon-sessions-v2';  // v2: includes gen (green energy) + gap-fill retry
 const RATE_KEY = 'wb-addon-rate-v1';
 
 async function fetchJSON(path) {
@@ -20,8 +20,15 @@ async function fetchJSON(path) {
   }
 }
 
-let _sessions = [];   // [{id, ts, dur, en(Wh)}]
+let _sessions = [];   // [{id, ts, dur, en(Wh), gen(Wh), usid}]
 let _lifetimeKwh = null;
+// Real charge windows. _chargeLog is a flat list of [{start,stop,wh}] captured
+// by the gateway firmware (ground truth) — mapped to sessions by TIME, since
+// the charger's usid is shared across sessions (NOT unique per charge).
+// _scheduleWindows holds the enabled native schedules (UTC) used to INFER the
+// window for sessions that predate firmware capture. See _chargeSegments().
+let _chargeLog = [];
+let _scheduleWindows = [];
 // Render all times in the CHARGER's timezone (from g_tzn), not the viewing
 // browser's — so times are correct even when viewed from a phone in another
 // timezone, and match the gateway's own dashboard. Falls back to browser TZ.
@@ -86,42 +93,173 @@ function _bandRate(tariff, band, seasonId) {
   }
   return band.rate || 0;
 }
-function loadTariff() {
+function loadTariff() {  // the CURRENT tariff (latest rates)
   try { const t = JSON.parse(localStorage.getItem(TARIFF_KEY)); if (t && t.type) return t; } catch (e) {}
   return null;
 }
 function saveTariff(t) { localStorage.setItem(TARIFF_KEY, JSON.stringify(t)); }
-function clearTariff() { localStorage.removeItem(TARIFF_KEY); }
+function clearTariff() { localStorage.removeItem(TARIFF_KEY); localStorage.removeItem(TARIFF_HIST_KEY); }
 
+// Tariff history: archived PRIOR tariff versions, each with its own validFrom.
+// The current tariff (TARIFF_KEY) carries validFrom = when its rates took
+// effect (0 = always). _tariffForSession bills each session at the rate that
+// was in effect WHEN it happened, so changing rates doesn't rewrite the past.
+const TARIFF_HIST_KEY = 'wb-addon-tariff-history-v1';
+function loadTariffHistory() {
+  try {
+    const h = JSON.parse(localStorage.getItem(TARIFF_HIST_KEY));
+    if (Array.isArray(h)) return h.slice().sort((a, b) => (a.validFrom || 0) - (b.validFrom || 0));
+  } catch (e) {}
+  return [];
+}
+function saveTariffHistory(arr) { localStorage.setItem(TARIFF_HIST_KEY, JSON.stringify(arr)); }
+function _tariffForSession(s) {
+  const cur = loadTariff();
+  if (!cur) return null;
+  const ts = s.ts || 0;
+  if (ts >= (cur.validFrom || 0)) return cur;       // session on/after current rates
+  const hist = loadTariffHistory();
+  for (let i = hist.length - 1; i >= 0; i--) {
+    if (ts >= (hist[i].validFrom || 0)) return hist[i];
+  }
+  return hist[0] || cur;  // before any recorded period -> earliest known rates
+}
+
+// Cheapest band by base rate — the safe default for any hour the user left
+// unpainted (never silently bill an unassigned hour at the most expensive band).
+function _cheapestBand(tariff) {
+  const bands = tariff.bands || [];
+  if (!bands.length) return { rate: 0 };
+  return bands.reduce((a, b) => ((b.rate || 0) < (a.rate || 0) ? b : a), bands[0]);
+}
 function _bandFor(tariff, epoch) {
   const { day, hour } = tzDayHour(epoch);
   const weekend = (day === 0 || day === 6);
   const assign = (weekend && !tariff.weekendSame && tariff.weekend) ? tariff.weekend : tariff.weekday;
-  const id = (assign && assign[hour]) || (tariff.bands[0] && tariff.bands[0].id);
-  return tariff.bands.find((b) => b.id === id) || tariff.bands[0] || { rate: 0 };
+  const painted = assign && assign[hour];
+  if (painted) {
+    const b = tariff.bands.find((x) => x.id === painted);
+    if (b) return b;
+  }
+  return _cheapestBand(tariff);  // unpainted hour -> cheapest band, not bands[0]
 }
-// Cost of one session split by rate band: {total, byBand:{id:{kwh,cost,name,color}}}
+// "HHMM" -> minutes since midnight. Schedule times are stored UTC.
+function _parseHHMM(v) {
+  const n = parseInt(String(v), 10) || 0;
+  return Math.floor(n / 100) * 60 + (n % 100);
+}
+// UTC weekday (0=Sun..6=Sat) -> Mon-indexed bit (0=Mon..6=Sun), matching the
+// charger's day bitmask.
+function _monBit(epoch) { return ((new Date(epoch * 1000).getUTCDay() + 6) % 7); }
+
+// Infer the real charge-START epoch for a session that has no firmware
+// interval, using the enabled native schedule: the car waits and charges in
+// the schedule window, not at plug-in. Returns null when no schedule governs
+// (then we fall back to the plug-in time).
+function _governingStart(ts, dur) {
+  if (!_scheduleWindows.length) return null;
+  let best = null;
+  _scheduleWindows.forEach((w) => {
+    const dayStart = Math.floor(ts / 86400) * 86400;  // UTC midnight of plug-in
+    let cand = dayStart + w.startMinUTC * 60;
+    if (ts >= cand + w.lenS) cand += 86400;  // window already passed today -> next day
+    for (let g = 0; g < 8; g++) {            // honour the schedule's day-of-week set
+      if (w.days & (1 << _monBit(cand))) break;
+      cand += 86400;
+    }
+    const start = Math.max(ts, cand);        // plugged in mid-window -> start now
+    if (best === null || start < best) best = start;
+  });
+  return best;
+}
+
+// The actual charge window(s) for a session, as segments
+// [{start, dur, frac, gFrac}] where frac is the share of session ENERGY and
+// gFrac the share of session GREEN in that segment. Priority: (1) real firmware
+// intervals (by time, with per-burst green from gwh), (2) schedule inference,
+// (3) plug-in time. Every time-based surface (cost, heatmap) uses this so energy
+// — and its solar/grid mix — lands when it was really delivered.
+function _chargeSegments(s) {
+  // (1) Ground truth: firmware intervals whose start falls within this
+  // session's plug-in span [ts, stop]. Mapped by TIME (usid isn't per-session).
+  const spanEnd = (s.stop && s.stop > s.ts) ? s.stop : (s.ts + (s.dur || 3600) + 86400);
+  const ivals = _chargeLog.filter((iv) => iv.start >= s.ts && iv.start <= spanEnd);
+  if (ivals.length) {
+    const totWh = ivals.reduce((a, b) => a + (b.wh || 0), 0) || 1;
+    const totGwh = ivals.reduce((a, b) => a + (b.gwh || 0), 0);
+    return ivals.map((iv) => ({
+      start: iv.start,
+      dur: Math.max(60, (iv.stop || iv.start) - iv.start),
+      frac: (iv.wh || 0) / totWh,
+      // per-burst green share when the firmware captured it; else mirror energy.
+      gFrac: totGwh > 0 ? (iv.gwh || 0) / totGwh : (iv.wh || 0) / totWh,
+    }));
+  }
+  const dur = s.dur || 3600;
+  const gs = _governingStart(s.ts, dur);     // (2) schedule inference
+  if (gs != null) return [{ start: gs, dur, frac: 1, gFrac: 1 }];
+  return [{ start: s.ts, dur, frac: 1, gFrac: 1 }];     // (3) plug-in fallback
+}
+
+// Cost of one session. Solar (green) energy is free; only the GRID portion
+// (total - green) is billed. `saved` = what the green kWh WOULD have cost at
+// the same tariff (so the UI can show the solar dollar saving).
+// Returns {total, green, saved, byBand:{id:{kwh,cost,name,color}}}.
 function _sessionCost(tariff, s) {
-  const totalKwh = (s.en || 0) / 1000;
+  const en = (s.en || 0) / 1000, gen = (s.gen || 0) / 1000;
+  const green = Math.max(0, Math.min(en, gen));
+  const gridKwh = Math.max(0, en - green);
   if (tariff.type === 'flat') {
-    const c = totalKwh * (tariff.flatRate || 0);
-    return { total: c, byBand: { flat: { kwh: totalKwh, cost: c, name: 'Energy', color: 'var(--primary)' } } };
+    const rate = tariff.flatRate || 0;
+    const c = gridKwh * rate;
+    return { total: c, green, saved: green * rate,
+             byBand: { grid: { kwh: gridKwh, cost: c, name: 'Grid', color: 'var(--primary)' } } };
   }
-  const dur = s.dur || 3600, step = 300, n = Math.max(1, Math.ceil(dur / step));
-  const per = totalKwh / n;
+  // ToU: distribute an arbitrary kWh amount across the session's REAL charge
+  // segments (firmware intervals / schedule-inferred / plug-in fallback) and,
+  // within each segment, across its hours — summing the per-band cost. Used for
+  // both the billed grid kWh and the saved green kWh, so each lands in the band
+  // for the time it was actually delivered.
+  const step = 300;
   const seasonId = _seasonFor(tariff, s.ts);  // season is fixed for the session
-  const byBand = {}; let total = 0;
-  for (let i = 0; i < n; i++) {
-    const t = s.ts + i * step;
-    if (t >= s.ts + dur) break;
-    const band = _bandFor(tariff, t);
-    const cost = per * _bandRate(tariff, band, seasonId);
-    total += cost;
-    const k = band.id || 'x';
-    byBand[k] = byBand[k] || { kwh: 0, cost: 0, name: band.name, color: band.color };
-    byBand[k].kwh += per; byBand[k].cost += cost;
-  }
-  return { total, byBand };
+  const segs = _chargeSegments(s);
+  // Per-segment grid + green kWh: each segment's grid = its total energy minus
+  // its OWN green (so a midday solar burst is mostly free and an evening grid
+  // burst is mostly billed — not the session average smeared across both).
+  // Sums stay = the r_log session totals (en, green).
+  // Grid per segment, then RESCALE so it always sums to the authoritative
+  // session grid (en-green) — a skewed gFrac (or firmware gwh>wh) can't over- or
+  // under-bill across bands. Normal case: shares already sum right, no change.
+  const rawGrid = segs.map((sg) => Math.max(0, en * sg.frac - green * sg.gFrac));
+  const sumRaw = rawGrid.reduce((a, b) => a + b, 0);
+  const gridPer = (sumRaw > 0)
+    ? rawGrid.map((g) => g * gridKwh / sumRaw)
+    : segs.map((sg) => gridKwh * sg.frac);
+  const greenPer = segs.map((sg) => green * sg.gFrac);  // Σ == green (gFrac sums to 1)
+  const dist = (amounts, accum) => {
+    let sum = 0;
+    segs.forEach((seg, si) => {
+      const n = Math.max(1, Math.ceil(seg.dur / step));
+      const per = amounts[si] / n;
+      for (let i = 0; i < n; i++) {
+        const t = seg.start + i * step;
+        if (t >= seg.start + seg.dur) break;
+        const band = _bandFor(tariff, t);
+        const cost = per * _bandRate(tariff, band, seasonId);
+        sum += cost;
+        if (accum) {
+          const k = band.id || 'x';
+          accum[k] = accum[k] || { kwh: 0, cost: 0, name: band.name, color: band.color };
+          accum[k].kwh += per; accum[k].cost += cost;
+        }
+      }
+    });
+    return sum;
+  };
+  const byBand = {};
+  const total = dist(gridPer, byBand);
+  const saved = green > 0 ? dist(greenPer, null) : 0;
+  return { total, green, saved, byBand };
 }
 
 function readCache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch (e) { return {}; } }
@@ -133,18 +271,22 @@ function recompute() {
   const weekAgo = now - 7 * 86400;
   const d = new Date(); const monthStart = new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000;
   const tariff = loadTariff();
-  let wk = 0, mo = 0, wkCost = 0, moCost = 0;
+  let wk = 0, mo = 0, wkCost = 0, moCost = 0, moGreen = 0, moGrid = 0, moSaved = 0;
   const monthBands = {};
   _sessions.forEach((s) => {
     const kwh = (s.en || 0) / 1000;
+    const green = Math.max(0, Math.min(kwh, (s.gen || 0) / 1000));
     const inWeek = s.ts >= weekAgo, inMonth = s.ts >= monthStart;
     if (inWeek) wk += kwh;
-    if (inMonth) mo += kwh;
+    if (inMonth) { mo += kwh; moGreen += green; moGrid += (kwh - green); }
     if (tariff && (inWeek || inMonth)) {
-      const bd = _sessionCost(tariff, s);
+      // Bill at the tariff that was in effect WHEN this session happened, not
+      // necessarily the current one (historically-accurate cost).
+      const bd = _sessionCost(_tariffForSession(s), s);
       if (inWeek) wkCost += bd.total;
       if (inMonth) {
         moCost += bd.total;
+        moSaved += bd.saved || 0;
         for (const [k, v] of Object.entries(bd.byBand)) {
           monthBands[k] = monthBands[k] || { kwh: 0, cost: 0, name: v.name, color: v.color };
           monthBands[k].kwh += v.kwh; monthBands[k].cost += v.cost;
@@ -155,6 +297,7 @@ function recompute() {
   if (_lifetimeKwh != null) setText('tile-allt', _lifetimeKwh.toFixed(0));
   setText('tile-week', wk.toFixed(1));
   setText('tile-month', mo.toFixed(1));
+  renderSourceSplit(moGrid, moGreen, tariff ? moSaved : 0, tariff && tariff.currency || '$');
   updateTariffSummary(tariff);
   const row = $('cost-row'), cb = $('cost-breakdown');
   const cur = (tariff && tariff.currency) || '$';
@@ -167,6 +310,18 @@ function recompute() {
     row.hidden = true;
     if (cb) cb.hidden = true;
   }
+  // Publish the cost summary so the Dashboard can show week/month cost tiles
+  // without duplicating the tariff/cost engine (single source of truth here).
+  try {
+    if (tariff) {
+      localStorage.setItem('wb-addon-cost-summary', JSON.stringify({
+        weekCost: wkCost, monthCost: moCost, weekKwh: wk, monthKwh: mo,
+        currency: cur, ts: Math.floor(Date.now() / 1000),
+      }));
+    } else {
+      localStorage.removeItem('wb-addon-cost-summary');
+    }
+  } catch (e) { /* localStorage full / disabled — tiles just stay hidden */ }
 }
 
 function updateTariffSummary(tariff) {
@@ -201,6 +356,35 @@ function renderCostBreakdown(bands, cur) {
   });
 }
 
+// This-month grid vs solar (green) energy split. Solar is free; only grid is
+// billed. Hidden until sessions carry the green field (cache v2).
+function renderSourceSplit(grid, green, saved, cur) {
+  const el = $('src-split');
+  if (!el) return;
+  const total = grid + green;
+  if (total <= 0 || green <= 0) { el.hidden = true; return; }  // no solar -> nothing to split
+  el.hidden = false;
+  el.textContent = '';
+  const pct = Math.round((green / total) * 100);
+  const chip = (label, kwh, color) => {
+    const c = document.createElement('div'); c.className = 'cb-chip';
+    const sw = document.createElement('span'); sw.className = 'cb-sw'; sw.style.background = color;
+    c.appendChild(sw);
+    const t = document.createElement('span'); t.textContent = `${label}: ${kwh.toFixed(1)} kWh`;
+    c.appendChild(t);
+    return c;
+  };
+  el.appendChild(chip('⚡ Grid (paid)', grid, 'var(--primary)'));
+  el.appendChild(chip('☀️ Solar (free)', green, 'var(--success)'));
+  const p = document.createElement('div'); p.className = 'cb-chip'; p.textContent = `${pct}% solar this month`;
+  el.appendChild(p);
+  if (saved > 0) {  // dollar value the free solar saved at the current tariff
+    const sv = document.createElement('div'); sv.className = 'cb-chip cb-saved';
+    sv.textContent = `💰 Solar saved ${cur}${saved.toFixed(2)} this month`;
+    el.appendChild(sv);
+  }
+}
+
 // ---- heatmap (day x hour kWh intensity), browser-local ----
 function buildHeatmap() {
   const hm = $('heatmap'); if (!hm) return;
@@ -209,16 +393,19 @@ function buildHeatmap() {
   _sessions.forEach((s) => {
     if (!s.ts || !s.en) return;
     const totalKwh = s.en / 1000;
-    const dur = s.dur || 3600;
-    const step = 300, n = Math.max(1, Math.ceil(dur / step));
-    const per = totalKwh / n;
-    for (let i = 0; i < n; i++) {
-      const t = s.ts + i * step;
-      if (t >= s.ts + dur) break;
-      const { day, hour } = tzDayHour(t);
-      grid[day][hour] += per;
-      if (grid[day][hour] > max) max = grid[day][hour];
-    }
+    const step = 300;
+    // Place energy in the REAL charge window(s), not at plug-in time.
+    _chargeSegments(s).forEach((seg) => {
+      const n = Math.max(1, Math.ceil(seg.dur / step));
+      const per = (totalKwh * seg.frac) / n;
+      for (let i = 0; i < n; i++) {
+        const t = seg.start + i * step;
+        if (t >= seg.start + seg.dur) break;
+        const { day, hour } = tzDayHour(t);
+        grid[day][hour] += per;
+        if (grid[day][hour] > max) max = grid[day][hour];
+      }
+    });
   });
   hm.textContent = '';
   const cell = (cls, text, title) => {
@@ -293,26 +480,48 @@ async function loadSessions() {
   const ses = await fetchJSON('api/sess?met=r_ses&par=null&wait=6000');
   const last = (ses.ok && ses.body.r && ses.body.r.last) ? ses.body.r.last : 0;
   if (!last) { if (!_sessions.length) renderList(); return; }
-  const cachedSids = Object.keys(cache.s).map(Number);
-  const maxCached = cachedSids.length ? Math.max(...cachedSids) : 0;
-  if (maxCached >= last) { writeCache(cache); return; }
-  // First load: cap to the most recent 60 sessions; later loads: only new ones.
-  let sid = maxCached === 0 ? Math.max(1, last - 59) : maxCached + 1;
-  const total = last - sid + 1;
+  // Re-fetch any session in the most-recent window that isn't cached — covers
+  // NEW sessions AND earlier ones whose read previously failed (rate-limit /
+  // BLE busy). Without this, a single failed read permanently dropped a
+  // session from the totals (the old code only tracked the highest id).
+  const startSid = Math.max(1, last - 59);
+  const missing = [];
+  for (let sid = startSid; sid <= last; sid++) {
+    if (!cache.s[sid]) missing.push(sid);
+  }
+  if (!missing.length) { writeCache(cache); return; }
   const listEl = $('sess-list');
+  const firstLoad = !Object.keys(cache.s).length;
   let done = 0;
-  while (sid <= last) {
-    if (!Object.keys(cache.s).length && listEl) listEl.textContent = `Loading ${done + 1} / ${total}…`;
-    const r = await fetchJSON('api/sess?met=r_log&par=' + sid + '&wait=6000');
-    if (r.ok && r.body.r && r.body.r.start) {
-      const sd = r.body.r;
-      cache.s[sid] = { id: sid, ts: sd.start, dur: sd.sec || sd.dur || sd.duration || 0, en: sd.en || sd.energy || 0 };
+  for (const sid of missing) {
+    if (firstLoad && listEl) listEl.textContent = `Loading ${done + 1} / ${missing.length}…`;
+    const sd = await _fetchLog(sid);  // retries on transient failure
+    if (sd) {
+      cache.s[sid] = {
+        id: sid, ts: sd.start, stop: sd.stop || 0,  // plug-in span [ts, stop]
+        dur: sd.sec || sd.dur || sd.duration || 0,   // actual CHARGE seconds
+        en: sd.en || sd.energy || 0,
+        gen: sd.gen || 0,  // green (solar) energy — free, not billed
+      };
+      // Persist incrementally so progress survives a mid-load reload.
+      _sessions = Object.values(cache.s); writeCache(cache);
     }
-    sid++; done++;
+    done++;
   }
   _sessions = Object.values(cache.s);
   writeCache(cache);
   renderAll();
+}
+
+// One session log, retried on transient failure (gateway rate-limit / BLE busy)
+// with a short backoff, so a session is never silently skipped.
+async function _fetchLog(sid, attempts = 3) {
+  for (let i = 0; i < attempts; i++) {
+    const r = await fetchJSON('api/sess?met=r_log&par=' + sid + '&wait=6000');
+    if (r.ok && r.body && r.body.r && r.body.r.start) return r.body.r;
+    await new Promise((res) => setTimeout(res, 600));
+  }
+  return null;
 }
 
 function exportCsv() {
@@ -346,8 +555,9 @@ function openTariff() {
   $('tm-weekend-same').checked = !!_edit.weekendSame;
   $('tm-seasonal').checked = !!_edit.seasonal;
   $('tm-paint-hint').textContent = 'Tip: tap an hour repeatedly to cycle through your rate bands.';
+  const eff = $('tm-effective'); if (eff) eff.value = _epochToDateInput(_edit.validFrom || 0);
   populateMonthSelects();
-  renderTariffType(); renderSeasons(); renderHours(); renderWeekendWrap();
+  renderTariffType(); renderSeasons(); renderHours(); renderWeekendWrap(); renderTariffHistory();
   $('tariff-modal').hidden = false;
 }
 function _fillMonthSelect(id, selected) {
@@ -411,7 +621,7 @@ function renderBands() {
 function removeBand(i) {
   const removed = _edit.bands[i].id;
   _edit.bands.splice(i, 1);
-  const fb = _edit.bands[0].id;
+  const fb = _cheapestBand(_edit).id;  // orphaned hours -> cheapest band (visible + billed alike)
   ['weekday', 'weekend'].forEach((w) => { _edit[w] = _edit[w].map((id) => (id === removed ? fb : id)); });
   renderBands(); renderHours();
 }
@@ -427,7 +637,7 @@ function renderHours() {
     if (!grid) return;
     grid.textContent = '';
     for (let h = 0; h < 24; h++) {
-      const band = _edit.bands.find((b) => b.id === _edit[which][h]) || _edit.bands[0];
+      const band = _edit.bands.find((b) => b.id === _edit[which][h]) || _cheapestBand(_edit);
       const cell = document.createElement('button');
       cell.type = 'button'; cell.className = 'tm-hr';
       cell.style.background = band.color || 'var(--elevated)';
@@ -455,9 +665,61 @@ function saveTariffEdit() {
   };
   setSeason('summer', 'tm-sum-from', 'tm-sum-to');
   setSeason('winter', 'tm-win-from', 'tm-win-to');
+  // Effective-date handling: if these rates start LATER than the current
+  // tariff's, archive the current period and begin a new one — so sessions
+  // before the change keep the old rates.
+  const effFrom = _dateInputToEpoch($('tm-effective').value);
+  const cur = loadTariff();
+  if (cur && effFrom > (cur.validFrom || 0)) {
+    const hist = loadTariffHistory();
+    hist.push(JSON.parse(JSON.stringify(cur)));  // keeps its own validFrom
+    saveTariffHistory(hist);
+    _edit.validFrom = effFrom;
+  } else {
+    _edit.validFrom = effFrom || (cur && cur.validFrom) || 0;
+  }
   saveTariff(_edit);
   closeTariff();
   recompute();
+}
+function _epochToDateInput(epoch) {
+  if (!epoch) return '';
+  const d = new Date(epoch * 1000), p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function _dateInputToEpoch(v) {
+  if (!v) return 0;
+  const t = new Date(v + 'T00:00:00').getTime();
+  return isNaN(t) ? 0 : Math.floor(t / 1000);
+}
+function renderTariffHistory() {
+  const el = $('tm-history'); if (!el) return;
+  el.textContent = '';
+  const cur = loadTariff();
+  const periods = loadTariffHistory();
+  if (cur) periods.push(cur);
+  if (periods.length <= 1) {
+    el.textContent = 'One rate period — applies to all sessions. Set a date above when your rates change so past costs stay accurate.';
+    return;
+  }
+  const title = document.createElement('div');
+  title.textContent = 'Rate periods (older sessions keep older rates):';
+  title.style.fontWeight = '600'; el.appendChild(title);
+  periods.forEach((p, i) => {
+    const from = p.validFrom ? _epochToDateInput(p.validFrom) : 'always';
+    const to = (i < periods.length - 1) ? _epochToDateInput(periods[i + 1].validFrom) : 'now';
+    const rates = p.type === 'flat'
+      ? `flat ${p.currency || ''}${(p.flatRate || 0).toFixed(2)}`
+      : (p.bands || []).map((b) => (b.rate || 0).toFixed(2)).join('/');
+    const row = document.createElement('div');
+    row.textContent = `• ${from} → ${to}: ${rates}`;
+    el.appendChild(row);
+  });
+  const reset = document.createElement('button');
+  reset.type = 'button'; reset.className = 'ctrl-btn'; reset.style.marginTop = '6px';
+  reset.textContent = 'Clear rate history';
+  reset.onclick = () => { saveTariffHistory([]); renderTariffHistory(); recompute(); };
+  el.appendChild(reset);
 }
 (function initTariffUI() {
   const open = $('tariff-edit'); if (open) open.addEventListener('click', openTariff);
@@ -482,5 +744,29 @@ function saveTariffEdit() {
   const st = await fetchJSON('api/status');
   if (st.ok && typeof st.body.chg_sessions === 'number' && total) total.textContent = st.body.chg_sessions + ' total';
   const cb = $('csv-btn'); if (cb) cb.addEventListener('click', exportCsv);
+  // Load the real/inferred charge windows BEFORE rendering so cost + heatmap
+  // place energy correctly on first paint. Both are best-effort.
+  await Promise.all([loadChargeLog(), loadScheduleWindows()]);
   loadSessions();
 })();
+
+// Enabled native schedules as UTC windows — used to infer the charge window
+// for sessions that predate firmware capture (the car charges in the window,
+// not at plug-in). start/stop are "HHMM" UTC; days is a Mon-indexed bitmask.
+async function loadScheduleWindows() {
+  const r = await fetchJSON('api/sched?met=r_schs&par=null&wait=6000');
+  const scheds = (r.ok && r.body.r && Array.isArray(r.body.r.schedules)) ? r.body.r.schedules : [];
+  _scheduleWindows = scheds.filter((s) => s.enabled).map((s) => {
+    const startMin = _parseHHMM(s.start);
+    let lenMin = _parseHHMM(s.stop) - startMin;
+    if (lenMin <= 0) lenMin += 1440;  // window wraps past midnight
+    return { startMinUTC: startMin, lenS: lenMin * 60, days: parseInt(s.days, 10) || 0 };
+  });
+}
+
+// Real charge intervals recorded by the gateway firmware (flat list, mapped to
+// sessions by time in _chargeSegments). Ground truth; overrides inference.
+async function loadChargeLog() {
+  const r = await fetchJSON('api/charge_log');
+  _chargeLog = (r.ok && r.body && Array.isArray(r.body.intervals)) ? r.body.intervals : [];
+}

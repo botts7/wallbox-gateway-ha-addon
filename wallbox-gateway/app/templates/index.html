@@ -17,6 +17,7 @@
   <a href="." class="active">&#x1F4CA; Dashboard</a>
   <a href="sessions">&#x1F4C8; Sessions</a>
   <a href="ota">&#x2B06; OTA</a>
+  <span class="nav-next" id="nav-next" hidden title="Next scheduled charge">&#x1F5D3;&#xFE0F;&nbsp;<span id="nav-next-time">--</span></span>
 </nav>
 
 <main>
@@ -59,23 +60,48 @@
     </div>
   </section>
 
-  <!-- Power Flow: Grid -> Charger -> Vehicle, matching the gateway's own
-       dashboard (/dashboard on the device) for a consistent look. The
-       Vehicle node swaps to "Plug in" when no car is connected. -->
+  <!-- Energy flow: Solar + Grid -> Vehicle, HA-style. Per-source kWh come from
+       the gateway's r_lse feed (green_energy / grid_energy / charged_energy);
+       live rate from charging_power. Solar line lights only when this session
+       drew solar; Grid line is the default source. Vehicle node swaps to
+       "Plug in" when no car is connected. -->
   <section class="card pf-card" id="card-powerflow">
-    <div class="pf-head"><span class="pf-head-icon">&#x26A1;</span><span>Power Flow</span></div>
-    <svg viewBox="0 0 360 132" class="pf-svg" role="img" aria-label="Live power flow Grid Charger Vehicle">
-      <defs><marker id="pf-arrow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="var(--accent)"/></marker></defs>
-      <line x1="75" y1="70" x2="145" y2="70" stroke="var(--border)" stroke-width="2" stroke-dasharray="5 4"/>
-      <line x1="215" y1="70" x2="285" y2="70" stroke="var(--border)" stroke-width="2" stroke-dasharray="5 4"/>
-      <line id="pf-line1" x1="75" y1="70" x2="145" y2="70" stroke="var(--success)" stroke-width="2.5" stroke-dasharray="8 5" marker-end="url(#pf-arrow)" style="opacity:0;transition:opacity .25s"/>
-      <line id="pf-line2" x1="215" y1="70" x2="285" y2="70" stroke="var(--success)" stroke-width="2.5" stroke-dasharray="8 5" marker-end="url(#pf-arrow)" style="opacity:0;transition:opacity .25s"/>
-      <g><circle cx="45" cy="70" r="30" fill="var(--elevated)" stroke="var(--border)" stroke-width="1.5"/><text x="45" y="79" text-anchor="middle" font-size="26">&#x1F50C;</text><text x="45" y="119" text-anchor="middle" font-size="11" fill="var(--text2)" font-weight="500">Grid</text><text id="pf-grid-kw" x="45" y="30" text-anchor="middle" font-size="13" fill="var(--text)" font-weight="700">--</text></g>
-      <g><rect x="150" y="40" width="60" height="60" rx="12" fill="var(--surface)" stroke="var(--primary)" stroke-width="1.5"/><text x="180" y="81" text-anchor="middle" font-size="26">&#x26A1;</text><text x="180" y="119" text-anchor="middle" font-size="11" fill="var(--text2)" font-weight="500">Charger</text></g>
-      <g><circle cx="315" cy="70" r="30" fill="var(--elevated)" stroke="var(--border)" stroke-width="1.5"/><text x="315" y="80" text-anchor="middle" font-size="24">&#x1F697;</text><text x="315" y="119" text-anchor="middle" font-size="11" fill="var(--text2)" font-weight="500">Vehicle</text><text id="pf-veh-kw" x="315" y="30" text-anchor="middle" font-size="13" fill="var(--text)" font-weight="700">--</text><text id="pf-plugin" x="315" y="30" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-weight="700" style="display:none">&#x1F50C; Plug in</text></g>
+    <div class="pf-head"><span class="pf-head-icon">&#x26A1;</span><span>Energy flow</span></div>
+    <svg viewBox="0 0 320 192" class="pf-svg" role="img" aria-label="Live energy flow: Solar and Grid to Vehicle">
+      <!-- static guide paths -->
+      <path d="M160,74 C160,116 214,122 246,130" fill="none" stroke="var(--border)" stroke-width="2" stroke-dasharray="5 4"/>
+      <line x1="76" y1="140" x2="244" y2="140" stroke="var(--border)" stroke-width="2" stroke-dasharray="5 4"/>
+      <!-- active flows (animated dashes when charging) -->
+      <path id="pf-solar-line" d="M160,74 C160,116 214,122 246,130" fill="none" stroke="#f59e0b" stroke-width="3.5" stroke-dasharray="9 6" style="opacity:0;transition:opacity .3s"/>
+      <line id="pf-grid-line" x1="76" y1="140" x2="244" y2="140" stroke="var(--primary)" stroke-width="3.5" stroke-dasharray="9 6" style="opacity:0;transition:opacity .3s"/>
+      <!-- live charge rate, centre -->
+      <text id="pf-live" x="158" y="112" text-anchor="middle" font-size="12" fill="var(--text)" font-weight="700"></text>
+      <!-- Solar node (top) -->
+      <g>
+        <circle cx="160" cy="44" r="30" fill="rgba(245,158,11,.10)" stroke="#f59e0b" stroke-width="1.6"/>
+        <text x="160" y="40" text-anchor="middle" font-size="18">&#x2600;&#xFE0F;</text>
+        <text id="pf-solar-kwh" x="160" y="58" text-anchor="middle" font-size="11" fill="var(--text)" font-weight="700">--</text>
+        <text x="160" y="88" text-anchor="middle" font-size="11" fill="var(--text2)" font-weight="500">Solar</text>
+      </g>
+      <!-- Grid node (bottom-left) -->
+      <g>
+        <circle cx="46" cy="140" r="30" fill="var(--elevated)" stroke="var(--primary)" stroke-width="1.6"/>
+        <text x="46" y="136" text-anchor="middle" font-size="18">&#x1F3ED;</text>
+        <text id="pf-grid-kwh" x="46" y="154" text-anchor="middle" font-size="11" fill="var(--text)" font-weight="700">--</text>
+        <text x="46" y="184" text-anchor="middle" font-size="11" fill="var(--text2)" font-weight="500">Grid</text>
+      </g>
+      <!-- Vehicle node (bottom-right) -->
+      <g>
+        <circle cx="274" cy="140" r="32" fill="var(--elevated)" stroke="var(--border)" stroke-width="1.6"/>
+        <text x="274" y="138" text-anchor="middle" font-size="20">&#x1F697;</text>
+        <text id="pf-car-kwh" x="274" y="156" text-anchor="middle" font-size="11" fill="var(--text)" font-weight="700">--</text>
+        <text id="pf-plugin" x="274" y="144" text-anchor="middle" font-size="10" fill="var(--accent)" font-weight="700" style="display:none">&#x1F50C; Plug in</text>
+        <text x="274" y="186" text-anchor="middle" font-size="11" fill="var(--text2)" font-weight="500">Vehicle</text>
+      </g>
     </svg>
     <div class="pf-status" id="pf-status">Connecting…</div>
     <div class="pf-session-row"><span>Since plugged in</span><span id="pf-session">--</span></div>
+    <div class="pf-session-row" id="pf-lastburst-row" hidden><span>Last charge burst</span><span id="pf-lastburst">--</span></div>
   </section>
 
   <!-- Schedule paused banner: shows when r_dat.gen != 0 (manual
@@ -98,6 +124,16 @@
     <div class="banner-body">
       <strong id="charge-reminder-title">Next scheduled charge</strong>
       <span class="banner-detail" id="charge-reminder-detail"></span>
+    </div>
+  </section>
+
+  <!-- Charging-now banner (#141): driven by /api/status charging_now, set by
+       the firmware's live charge-interval tracker (cp>0). -->
+  <section class="banner banner-charging" id="charging-banner" style="display:none">
+    <span class="banner-icon">&#x26A1;</span>
+    <div class="banner-body">
+      <strong id="charging-title">Charging now</strong>
+      <span class="banner-detail" id="charging-detail"></span>
     </div>
   </section>
 
@@ -137,6 +173,16 @@
     <div class="stat">
       <div class="stat-label">Max curr</div>
       <div class="stat-value"><span id="stat-maxcur">--</span><span class="unit">A</span></div>
+    </div>
+    <!-- Cost tiles: computed on the Sessions page (single source of truth for
+         the tariff) and published to localStorage; we just display them. -->
+    <div class="stat" id="stat-weekcost-tile" hidden>
+      <div class="stat-label">Week cost</div>
+      <div class="stat-value cost"><span id="stat-weekcost">--</span></div>
+    </div>
+    <div class="stat" id="stat-monthcost-tile" hidden>
+      <div class="stat-label">Month cost</div>
+      <div class="stat-value cost"><span id="stat-monthcost">--</span></div>
     </div>
   </section>
 

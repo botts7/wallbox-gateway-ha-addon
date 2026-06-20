@@ -161,6 +161,13 @@ main > * {
   border-color: rgba(245, 158, 11, 0.35);
   color: var(--warning);
 }
+.banner-charging {
+  background: rgba(34, 197, 94, 0.10);
+  border-color: rgba(34, 197, 94, 0.40);
+  color: var(--success);
+}
+.banner-charging .banner-icon { animation: chargePulse 1.6s ease-in-out infinite; }
+@keyframes chargePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 .banner-icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
 .banner-body { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .banner-detail { color: var(--text2); font-size: 12px; }
@@ -592,6 +599,13 @@ a { color: var(--accent); }
 }
 .topnav a:hover { color: var(--text); background: var(--elevated); }
 .topnav a.active { color: var(--accent); background: var(--surface); border-color: var(--border); }
+.nav-next {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 4px;
+  padding: 7px 12px; font-size: 13px; font-weight: 600; color: var(--text2);
+  border: 1px solid var(--border); border-radius: 9px; background: var(--surface);
+  white-space: nowrap;
+}
+.nav-next[hidden] { display: none; }
 
 /* ---- Sessions page ---- */
 .stat-value.cost::before { content: '$'; color: var(--success); }
@@ -658,12 +672,14 @@ a { color: var(--accent); }
 
 /* ---- Tariff: summary, cost breakdown ---- */
 .stat-value.cost::before { content: none; }   /* currency now comes from JS */
+.stat-unset .stat-value { color: var(--text3); font-size: 14px; font-weight: 500; }
 .tariff-summary { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
 .tariff-text { flex: 1; min-width: 160px; font-size: 13px; color: var(--text2); }
 .cost-breakdown { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .cost-breakdown[hidden] { display: none; }
 .cb-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--elevated); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 12px; color: var(--text2); }
 .cb-sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.cb-saved { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.4); color: var(--success); font-weight: 600; }
 
 /* ---- Tariff editor modal ---- */
 .tariff-modal { position: fixed; inset: 0; z-index: 300; padding: 16px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }

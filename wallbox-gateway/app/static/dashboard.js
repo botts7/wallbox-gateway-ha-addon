@@ -64,6 +64,20 @@ const _CO_INFO = {
   none: { icon: '\u{1F590}\u{FE0F}', title: 'Manual control only',
     detail: 'No automation is managing charging — schedules are off; start/stop manually or on plug-in.' },
 };
+// Live "charging now" banner — driven by /api/status charging_now from the
+// firmware's charge-interval tracker. Energy is being recorded at the real
+// time of day, so cost/heatmap land in the right tariff band.
+function updateChargingNow(s) {
+  const el = $('charging-banner');
+  if (!el) return;
+  if (s && s.charging_now) {
+    el.style.display = '';
+    const det = $('charging-detail');
+    if (det) det.textContent = 'Recording this charge at the real time of day for accurate cost.';
+  } else {
+    el.style.display = 'none';
+  }
+}
 function updateControlOwner(s) {
   const el = $('control-owner');
   if (!el) return;
@@ -78,26 +92,55 @@ function updateControlOwner(s) {
 }
 function updateChargeReminder(s) {
   const el = $('charge-reminder');
-  if (!el) return;
+  const nav = $('nav-next');
   // Don't trust plug/schedule state when the charger link is down.
-  if (!s || s.ble !== 'connected') { el.style.display = 'none'; return; }
+  if (!s || s.ble !== 'connected') {
+    if (el) el.style.display = 'none';
+    if (nav) nav.hidden = true;
+    return;
+  }
   const nsc = s.next_scheduled_charge;
-  if (s.plug_reminder) {
-    el.className = 'banner banner-warn';
-    setText('charge-reminder-icon', '\u{1F50C}');
-    setText('charge-reminder-title', 'Not plugged in');
-    setText('charge-reminder-detail',
-      nsc ? `Scheduled charge at ${fmtChargeTime(nsc)} — connect the cable so it can start.`
-          : 'A scheduled charge is due soon — connect the cable so it can start.');
-    el.style.display = '';
-  } else if (nsc) {
-    el.className = 'banner';
-    setText('charge-reminder-icon', '\u{1F5D3}\u{FE0F}');
-    setText('charge-reminder-title', 'Next scheduled charge');
-    setText('charge-reminder-detail', fmtChargeTime(nsc));
-    el.style.display = '';
+  // Nav bar: the routine "next scheduled charge" time (informational).
+  if (nav) {
+    if (nsc) { setText('nav-next-time', fmtChargeTime(nsc)); nav.hidden = false; }
+    else nav.hidden = true;
+  }
+  // Banner: reserved for the plug-in WARNING only (the routine reminder now
+  // lives in the nav bar, so it doesn't take a full banner row).
+  if (el) {
+    if (s.plug_reminder) {
+      el.className = 'banner banner-warn';
+      setText('charge-reminder-icon', '\u{1F50C}');
+      setText('charge-reminder-title', 'Not plugged in');
+      setText('charge-reminder-detail',
+        nsc ? `Scheduled charge at ${fmtChargeTime(nsc)} — connect the cable so it can start.`
+            : 'A scheduled charge is due soon — connect the cable so it can start.');
+      el.style.display = '';
+    } else {
+      el.style.display = 'none';
+    }
+  }
+}
+// Week/month cost tiles — the Sessions page owns the tariff + cost engine and
+// publishes its computed summary to localStorage; we only display it (no
+// duplicated cost math). Hidden until a tariff has been set on Sessions.
+function updateCostTiles() {
+  let sum = null;
+  try { sum = JSON.parse(localStorage.getItem('wb-addon-cost-summary')); } catch (e) {}
+  const wt = $('stat-weekcost-tile'), mt = $('stat-monthcost-tile');
+  // Always show the tiles so the grid never has a hole; when no tariff is set
+  // yet, show a "set on Sessions" hint instead of a number.
+  if (wt) wt.hidden = false;
+  if (mt) mt.hidden = false;
+  if (sum && typeof sum.weekCost === 'number' && typeof sum.monthCost === 'number') {
+    const cur = sum.currency || '$';
+    setText('stat-weekcost', cur + sum.weekCost.toFixed(2));
+    setText('stat-monthcost', cur + sum.monthCost.toFixed(2));
+    [wt, mt].forEach((el) => el && el.classList.remove('stat-unset'));
   } else {
-    el.style.display = 'none';
+    setText('stat-weekcost', 'Set tariff');
+    setText('stat-monthcost', 'on Sessions');
+    [wt, mt].forEach((el) => el && el.classList.add('stat-unset'));
   }
 }
 
@@ -129,7 +172,7 @@ const HERO_STATES = {
 // Grid -> Charger -> Vehicle. cp = charging power (vehicle kW), house =
 // grid kW, conn = car connected (status-code derived, mirrors firmware
 // carConnected()). The Vehicle node swaps to "Plug in" when not connected.
-const _pf = { cp: null, en: null, house: null, conn: null };
+const _pf = { cp: null, en: null, conn: null, green: null, grid: null, charged: null };
 function carConn(st) { return [1, 2, 3, 4, 5, 8, 10, 11, 12, 13, 18].indexOf(st) !== -1; }
 function pfAnimate(el, on, kw) {
   if (!el) return;
@@ -143,17 +186,28 @@ function pfAnimate(el, on, kw) {
   } else if (el._anim) { el._anim.cancel(); el._anim = null; el._animDur = 0; }
 }
 function pfRender() {
-  if (typeof _pf.cp === 'number') setText('pf-veh-kw', _pf.cp.toFixed(2) + ' kW');
-  if (typeof _pf.house === 'number') setText('pf-grid-kw', (_pf.house / 1000).toFixed(2) + ' kW');
-  if (typeof _pf.en === 'number') setText('pf-session', (_pf.en / 100).toFixed(2) + ' kWh');
-  const charging = (typeof _pf.cp === 'number' && _pf.cp > 0.05);
-  const l1 = $('pf-line1'), l2 = $('pf-line2');
-  if (l1) l1.style.opacity = charging ? '1' : '0';
-  if (l2) l2.style.opacity = charging ? '1' : '0';
-  pfAnimate(l1, charging, _pf.cp); pfAnimate(l2, charging, _pf.cp);
-  const plug = $('pf-plugin'), vk = $('pf-veh-kw');
-  if (_pf.conn === false) { if (plug) plug.style.display = ''; if (vk) vk.style.display = 'none'; }
-  else { if (plug) plug.style.display = 'none'; if (vk) vk.style.display = ''; }
+  const g = _pf.green, gr = _pf.grid, cp = _pf.cp;
+  const fmt = (v) => (typeof v === 'number') ? v.toFixed(2) + ' kWh' : '--';
+  const total = (typeof _pf.charged === 'number') ? _pf.charged
+              : ((g || 0) + (gr || 0)) || null;
+  setText('pf-solar-kwh', fmt(g));
+  setText('pf-grid-kwh', fmt(gr));
+  setText('pf-car-kwh', fmt(typeof total === 'number' ? total : null));
+  setText('pf-session', fmt(typeof total === 'number' ? total : null));
+  const charging = (typeof cp === 'number' && cp > 0.05);
+  setText('pf-live', charging ? cp.toFixed(2) + ' kW' : '');
+  // A line is lit when this session drew from that source; grid is the default
+  // source while charging even before any energy has accumulated.
+  const hasSolar = (g || 0) > 0.001;
+  const hasGrid  = (gr || 0) > 0.001 || (charging && !hasSolar);
+  const sl = $('pf-solar-line'), gl = $('pf-grid-line');
+  if (sl) sl.style.opacity = hasSolar ? '1' : '0';
+  if (gl) gl.style.opacity = hasGrid ? '1' : '0';
+  pfAnimate(sl, charging && hasSolar, cp);
+  pfAnimate(gl, charging && hasGrid, cp);
+  const plug = $('pf-plugin'), ck = $('pf-car-kwh');
+  if (_pf.conn === false) { if (plug) plug.style.display = ''; if (ck) ck.style.display = 'none'; }
+  else { if (plug) plug.style.display = 'none'; if (ck) ck.style.display = ''; }
 }
 // Status text under the power-flow + the schedule-paused banner toggle.
 function setStatus(stateCode, schedulePaused) {
@@ -169,14 +223,18 @@ function setOffline() {
   const card = $('card-powerflow');
   if (card) card.className = 'card pf-card is-offline';
   setText('pf-status', 'Cannot reach the gateway');
-  _pf.cp = null; _pf.en = null; _pf.house = null; _pf.conn = null;
-  setText('pf-veh-kw', '--'); setText('pf-grid-kw', '--'); setText('pf-session', '--');
+  _pf.cp = null; _pf.en = null; _pf.conn = null;
+  _pf.green = null; _pf.grid = null; _pf.charged = null;
+  setText('pf-solar-kwh', '--'); setText('pf-grid-kwh', '--');
+  setText('pf-car-kwh', '--'); setText('pf-session', '--'); setText('pf-live', '');
   pfRender();
   ['dot-ble', 'dot-wifi', 'dot-mqtt'].forEach(id => setClass(id, 'conn-dot is-down'));
   const banner = $('paused-banner');
   if (banner) banner.style.display = 'none';
   const cr = $('charge-reminder');
   if (cr) cr.style.display = 'none';
+  const nav = $('nav-next');
+  if (nav) nav.hidden = true;
   const co = $('control-owner');
   if (co) co.hidden = true;
 }
@@ -239,6 +297,21 @@ async function refresh() {
     updateChargeReminder(s);
     applyMeterCapability(s.meter);
     updateControlOwner(s);
+    updateChargingNow(s);
+    updateCostTiles();
+    // Last recorded charge burst (charge-log #141) — surfaces the same datum as
+    // the HA last_burst_energy / charge_log_count entities, for surface parity.
+    const lbRow = $('pf-lastburst-row');
+    if (lbRow) {
+      const lbw = s.last_burst_wh, clc = s.charge_log_count;
+      if (typeof lbw === 'number' && lbw > 0) {
+        lbRow.hidden = false;
+        setText('pf-lastburst', (lbw / 1000).toFixed(2) + ' kWh'
+          + (typeof clc === 'number' && clc > 0 ? ` · ${clc} recorded` : ''));
+      } else {
+        lbRow.hidden = true;
+      }
+    }
   }
 
   // ---- /api/health ---- (we use loop_max_ms for the device info card)
@@ -292,6 +365,17 @@ async function refresh() {
     setText('stat-maxcur', '--');
   }
 
+  // ---- r_lse (live session energy: solar/grid split) for the Energy flow ----
+  const lse = await fetchJSON('api/sess?met=r_lse&par=null&wait=4000');
+  if (lse.ok && lse.body && lse.body.r) {
+    const r = lse.body.r;
+    _pf.green = (typeof r.green_energy === 'number') ? r.green_energy : null;
+    _pf.grid = (typeof r.grid_energy === 'number') ? r.grid_energy : null;
+    _pf.charged = (typeof r.charged_energy === 'number') ? r.charged_energy : null;
+    if (typeof r.charging_power === 'number' && r.charging_power > 0) _pf.cp = r.charging_power;
+    pfRender();
+  }
+
   // ---- /api/meter ---- (BAPI r_dca passthrough: mains voltage + house power)
   // Best-effort: BLE-busy gateway returns nulls, which we display as `--`.
   const meter = await fetchJSON('api/meter');
@@ -301,7 +385,6 @@ async function refresh() {
     if (typeof r.p1 === 'number') {
       const house = (r.p1 || 0) + (r.p2 || 0) + (r.p3 || 0);
       setText('stat-house', house);
-      _pf.house = house; pfRender();   // grid kW on the Power Flow card
     } else {
       setText('stat-house', '--');
     }
