@@ -6,7 +6,7 @@
 <title>Wallbox Gateway &middot; Sessions</title>
 <link rel="stylesheet" href="static/style.css">
 </head>
-<body>
+<body class="page-sessions">
 
 <header>
   <h1>Wallbox Gateway</h1>
@@ -50,6 +50,7 @@
   <!-- Weekly heatmap -->
   <section class="card">
     <h2>Weekly heatmap</h2>
+    <div class="sess-sub">Energy by hour, spread across each session from plug-in.</div>
     <div class="hm-wrap"><div id="heatmap" class="hm-grid"></div></div>
     <div class="hm-legend">
       <span>Low</span>
@@ -61,6 +62,7 @@
   <!-- Recent sessions -->
   <section class="card">
     <h2>Recent sessions</h2>
+    <div class="sess-sub">Time shown = when the car was plugged in.</div>
     <div id="sess-list" class="sess-list"><span class="sched-empty">Loading…</span></div>
     <button type="button" class="ctrl-btn" id="csv-btn" style="margin-top:12px">&#x1F4E5; Export CSV</button>
   </section>
