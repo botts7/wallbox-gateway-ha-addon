@@ -57,8 +57,9 @@ def sessions_page():
 
 
 # Session-history BAPI methods the /sessions page reads: r_ses (last id +
-# ring size), r_log (one session by id), r_dca (lifetime energy counter).
-_ALLOWED_SESS_METS = {"r_ses", "r_log", "r_dca"}
+# ring size), r_log (one session by id), r_dca (lifetime energy counter),
+# g_tzn (charger timezone — so times render in the charger's TZ).
+_ALLOWED_SESS_METS = {"r_ses", "r_log", "r_dca", "g_tzn"}
 
 
 @app.route("/api/sess")

@@ -69,12 +69,12 @@ function updateControlOwner(s) {
   if (!el) return;
   const owner = s && s.control_owner;
   const info = _CO_INFO[owner];
-  if (!info) { el.style.display = 'none'; return; }   // wallbox_schedule / unknown -> hidden
+  if (!info) { el.hidden = true; return; }   // wallbox_schedule / unknown -> hidden
   el.className = 'banner';
   setText('co-icon', info.icon);
   setText('co-title', info.title);
   setText('co-detail', info.detail);
-  el.style.display = '';
+  el.hidden = false;
 }
 function updateChargeReminder(s) {
   const el = $('charge-reminder');
@@ -178,7 +178,7 @@ function setOffline() {
   const cr = $('charge-reminder');
   if (cr) cr.style.display = 'none';
   const co = $('control-owner');
-  if (co) co.style.display = 'none';
+  if (co) co.hidden = true;
 }
 
 async function refresh() {
