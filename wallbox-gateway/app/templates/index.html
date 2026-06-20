@@ -173,6 +173,12 @@
        (s_sch insert-or-update, clr_sch delete) proxied through /api/sched. -->
   <section class="card" id="sched-card">
     <h2>Charge schedules</h2>
+    <!-- Weekly timeline: 7 days x 24h, coloured by which schedule covers each
+         hour (matches the gateway dashboard). Hidden when no schedules. -->
+    <div id="sch-timeline-wrap" class="sch-tl-wrap" hidden>
+      <div id="sch-timeline" class="sch-tl-grid"></div>
+      <div id="sch-legend" class="sch-tl-legend"></div>
+    </div>
     <div id="sched-list" class="sched-list"><div class="sched-empty">Loading…</div></div>
     <button type="button" class="ctrl-btn" id="btn-add-sched">&#x2795; Add schedule</button>
     <div id="sched-form" class="sched-form" hidden>

@@ -547,3 +547,17 @@ a { color: var(--accent); }
 .notif-item { background: var(--elevated); border-radius: 8px; padding: 10px 12px; margin: 6px 0; }
 .notif-msg { font-weight: 500; font-size: 14px; }
 .notif-ts { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+/* ---- Schedule weekly timeline ---- */
+.sch-tl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px 12px; padding: 0 4px; }
+.sch-tl-wrap[hidden] { display: none; }
+.sch-tl-grid {
+  display: grid; grid-template-columns: 34px repeat(24, minmax(10px, 1fr));
+  gap: 1px; font-size: 10px; min-width: 320px;
+}
+.sch-tl-hd { text-align: center; color: var(--text3); line-height: 1; }
+.sch-tl-day { font-weight: 600; color: var(--text2); padding-right: 4px; font-size: 12px; display: flex; align-items: center; }
+.sch-tl-cell { aspect-ratio: 1; background: var(--elevated); border-radius: 2px; min-height: 10px; }
+.sch-tl-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; font-size: 12px; color: var(--text3); }
+.sch-tl-leg-item { display: inline-flex; align-items: center; gap: 5px; }
+.sch-tl-leg-sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }

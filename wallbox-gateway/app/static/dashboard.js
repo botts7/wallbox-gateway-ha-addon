@@ -438,7 +438,74 @@ function daysLabel(bits) {
   return on.join(' ');
 }
 
+// Weekly timeline (7 days x 24h), coloured per schedule — matches the gateway.
+const SCH_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4', '#84cc16', '#f97316'];
+function utcHHMMtoLocalHour(hhmm) {
+  const s = String(hhmm).padStart(4, '0');
+  const d = new Date();
+  d.setUTCHours(+s.slice(0, 2) || 0, +s.slice(2) || 0, 0, 0);
+  return d.getHours() % 24;  // browser-local hour (consistent with utcToLocal)
+}
+function buildScheduleTimeline() {
+  const wrap = $('sch-timeline-wrap'), grid = $('sch-timeline'), legend = $('sch-legend');
+  if (!wrap || !grid || !legend) return;
+  if (!_schedules.length) { wrap.hidden = true; return; }
+  wrap.hidden = false;
+  // cells[day][hour] = list of schedule indexes covering it (Mon..Sun, bit0=Mon)
+  const cells = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => []));
+  _schedules.forEach((s, i) => {
+    if (!s.enabled) return;
+    let fromH = utcHHMMtoLocalHour(s.start);
+    let toH = utcHHMMtoLocalHour(s.stop);
+    if (toH === fromH) toH = (fromH + 24) % 24;  // full-day block
+    for (let d = 0; d < 7; d++) {
+      if (!((s.days >> d) & 1)) continue;
+      let h = fromH;
+      while (h !== toH) { cells[d][h].push(i); h = (h + 1) % 24; }
+    }
+  });
+  grid.textContent = '';
+  const cell = (cls, text, title) => {
+    const e = document.createElement('div');
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    if (title) e.title = title;
+    return e;
+  };
+  // header: corner + hour ticks
+  grid.appendChild(cell('sch-tl-hd'));
+  for (let h = 0; h < 24; h++) grid.appendChild(cell('sch-tl-hd', h % 6 === 0 ? h : ''));
+  // day rows
+  for (let d = 0; d < 7; d++) {
+    grid.appendChild(cell('sch-tl-day', DAY_NAMES[d]));
+    for (let h = 0; h < 24; h++) {
+      const c = cells[d][h];
+      const box = cell('sch-tl-cell', null, `${DAY_NAMES[d]} ${h}:00`);
+      if (c.length === 1) {
+        box.style.background = SCH_COLORS[c[0] % SCH_COLORS.length];
+        box.title += ` — #${_schedules[c[0]].sid}`;
+      } else if (c.length > 1) {
+        box.style.background = `repeating-linear-gradient(45deg,${SCH_COLORS[c[0] % SCH_COLORS.length]} 0 4px,${SCH_COLORS[c[1] % SCH_COLORS.length]} 4px 8px)`;
+        box.title += ` — overlap: #${c.map((i) => _schedules[i].sid).join(', #')}`;
+      }
+      grid.appendChild(box);
+    }
+  }
+  // legend
+  legend.textContent = '';
+  _schedules.forEach((s, i) => {
+    if (!s.enabled) return;
+    const item = document.createElement('span'); item.className = 'sch-tl-leg-item';
+    const sw = document.createElement('span'); sw.className = 'sch-tl-leg-sw';
+    sw.style.background = SCH_COLORS[i % SCH_COLORS.length];
+    item.appendChild(sw);
+    item.appendChild(document.createTextNode(`#${s.sid} ${utcToLocal(s.start)}–${utcToLocal(s.stop)}`));
+    legend.appendChild(item);
+  });
+}
+
 function renderSchedules() {
+  buildScheduleTimeline();
   const list = $('sched-list');
   if (!list) return;
   if (!_schedules.length) {
