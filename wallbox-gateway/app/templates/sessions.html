@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wallbox Gateway &middot; Sessions</title>
+<link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+
+<header>
+  <h1>Wallbox Gateway</h1>
+  <span id="sess-total"></span>
+</header>
+
+<nav class="topnav">
+  <a href=".">&#x1F4CA; Dashboard</a>
+  <a href="sessions" class="active">&#x1F4C8; Sessions</a>
+  <a href="ota">&#x2B06; OTA</a>
+</nav>
+
+<main>
+
+  <section id="not-configured" class="card warn" hidden>
+    <h2>Gateway not configured</h2>
+    <p>Set <code>gateway_ip</code> in the Add-on's Configuration tab and restart the Add-on.</p>
+  </section>
+
+  <!-- Totals -->
+  <section class="card">
+    <h2>Totals</h2>
+    <div class="grid">
+      <div class="stat"><div class="stat-label">All time</div><div class="stat-value"><span id="tile-allt">--</span><span class="unit">kWh</span></div></div>
+      <div class="stat"><div class="stat-label">This week</div><div class="stat-value"><span id="tile-week">--</span><span class="unit">kWh</span></div></div>
+      <div class="stat"><div class="stat-label">This month</div><div class="stat-value"><span id="tile-month">--</span><span class="unit">kWh</span></div></div>
+    </div>
+    <div class="grid" id="cost-row" hidden>
+      <div class="stat"><div class="stat-label">Week cost</div><div class="stat-value cost"><span id="tile-week-cost">--</span></div></div>
+      <div class="stat"><div class="stat-label">Month cost</div><div class="stat-value cost"><span id="tile-month-cost">--</span></div></div>
+    </div>
+    <div class="cost-config">
+      <label>Electricity rate
+        <input type="number" id="rate-input" min="0" step="0.01" placeholder="e.g. 0.30">
+        <span id="rate-cur">/kWh</span>
+      </label>
+      <button type="button" class="ctrl-btn" id="rate-save">Save</button>
+    </div>
+  </section>
+
+  <!-- Weekly heatmap -->
+  <section class="card">
+    <h2>Weekly heatmap</h2>
+    <div class="hm-wrap"><div id="heatmap" class="hm-grid"></div></div>
+    <div class="hm-legend">
+      <span>Low</span>
+      <div class="hm-scale"><i style="background:var(--elevated)"></i><i style="background:rgba(59,130,246,.2)"></i><i style="background:rgba(59,130,246,.5)"></i><i style="background:var(--primary)"></i><i style="background:#1d4ed8"></i></div>
+      <span>High</span>
+    </div>
+  </section>
+
+  <!-- Recent sessions -->
+  <section class="card">
+    <h2>Recent sessions</h2>
+    <div id="sess-list" class="sess-list"><span class="sched-empty">Loading…</span></div>
+    <button type="button" class="ctrl-btn" id="csv-btn" style="margin-top:12px">&#x1F4E5; Export CSV</button>
+  </section>
+
+  <p class="hint">Long-term graphs: use the Home Assistant Energy dashboard.</p>
+
+</main>
+
+<script src="static/sessions.js"></script>
+</body>
+</html>

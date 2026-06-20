@@ -51,6 +51,39 @@ def ota_page():
     return render_template("ota.html")
 
 
+@app.route("/sessions")
+def sessions_page():
+    return render_template("sessions.html")
+
+
+# Session-history BAPI methods the /sessions page reads: r_ses (last id +
+# ring size), r_log (one session by id), r_dca (lifetime energy counter).
+_ALLOWED_SESS_METS = {"r_ses", "r_log", "r_dca"}
+
+
+@app.route("/api/sess")
+def api_sess():
+    """Proxy session-history BAPI reads to the gateway passthrough.
+    met validated against the whitelist; par (the session id for r_log)
+    forwarded verbatim.
+    """
+    cfg = config_from_env()
+    met = (request.args.get("met") or "").strip()
+    if met not in _ALLOWED_SESS_METS:
+        return jsonify({
+            "error": "bad_met",
+            "detail": f"met '{met}' not allowed",
+            "allowed": sorted(_ALLOWED_SESS_METS),
+        }), 400
+    qs = request.query_string.decode("utf-8")
+    path = "/api/command?action=bapi&" + qs
+    try:
+        return jsonify(fetch_json(cfg, path, timeout=10.0))
+    except Exception as e:
+        body, code = _gateway_error(e)
+        return jsonify(body), code
+
+
 @app.route("/api/health")
 def api_health():
     cfg = config_from_env()
