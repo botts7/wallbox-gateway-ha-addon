@@ -168,6 +168,17 @@ const HERO_STATES = {
   18: { text: 'Queued (Eco-Smart)',     cls: '' },
 };
 
+// The original/Zentri Pulsar reports a small status enum that doesn't line up
+// with the MAX 0..18 codes (esp. st4 = charge ramp, not "Paused"). Used in
+// place of HERO_STATES when /api/status reports zentri:true.
+const HERO_STATES_ZENTRI = {
+  0: { text: 'Ready',                 cls: '' },
+  1: { text: 'Charging',              cls: 'is-charging' },
+  2: { text: 'Connected',             cls: '' },
+  3: { text: 'Connected — scheduled', cls: '' },
+  4: { text: 'Starting',              cls: 'is-charging' },
+};
+
 // ---- Power Flow card (matches the gateway's own dashboard) ----
 // Grid -> Charger -> Vehicle. cp = charging power (vehicle kW), house =
 // grid kW, conn = car connected (status-code derived, mirrors firmware
@@ -210,8 +221,8 @@ function pfRender() {
   else { if (plug) plug.style.display = 'none'; if (ck) ck.style.display = ''; }
 }
 // Status text under the power-flow + the schedule-paused banner toggle.
-function setStatus(stateCode, schedulePaused) {
-  const info = HERO_STATES[stateCode];
+function setStatus(stateCode, schedulePaused, zentri) {
+  const info = (zentri && HERO_STATES_ZENTRI[stateCode]) || HERO_STATES[stateCode];
   const card = $('card-powerflow');
   if (card) card.className = 'card pf-card' + (info && info.cls ? ' ' + info.cls : '');
   setText('pf-status', info ? info.text : (stateCode == null ? 'Offline' : `Code ${stateCode}`));
@@ -340,16 +351,24 @@ async function refresh() {
   }
 
   // ---- /api/charger ---- (hero + stats grid)
+  const zentri = !!(status.ok && status.body && status.body.zentri);
   const charger = await fetchJSON('api/charger');
-  if (charger.ok && charger.body && charger.body.realtime && charger.body.realtime.r) {
-    const rt = charger.body.realtime.r;
-    const st = (charger.body.status && charger.body.status.r) || {};
-    const stateCode = (typeof rt.charger_status === 'number') ? rt.charger_status : null;
+  // Gate on status.r (r_dat — present on every charger). realtime.r (r_sta) is
+  // OPTIONAL: the original/Zentri Pulsar doesn't serve it, so gating the whole
+  // hero/stats block on it would blank kW + status on that hardware.
+  if (charger.ok && charger.body && charger.body.status && charger.body.status.r) {
+    const st = charger.body.status.r;
+    const rt = (charger.body.realtime && charger.body.realtime.r) || {};
+    // Status code: r_sta.charger_status when present, else r_dat.st (Zentri,
+    // which the firmware also uses for carConnected()).
+    let stateCode = (typeof rt.charger_status === 'number') ? rt.charger_status
+                  : (typeof st.st === 'number') ? st.st : null;
+    if (zentri && typeof st.st === 'number') stateCode = st.st;
     const kw = (typeof st.cp === 'number') ? st.cp : null;
     const sessionKwh = (typeof st.en === 'number') ? st.en / 100 : null;
     const maxCur = (typeof st.cur === 'number') ? st.cur : null;
     const schedulePaused = (typeof st.gen === 'number') && st.gen !== 0;
-    setStatus(stateCode, schedulePaused);
+    setStatus(stateCode, schedulePaused, zentri);
     _pf.cp = kw;
     _pf.en = (typeof st.en === 'number') ? st.en : null;
     _pf.conn = (typeof stateCode === 'number') ? carConn(stateCode) : null;

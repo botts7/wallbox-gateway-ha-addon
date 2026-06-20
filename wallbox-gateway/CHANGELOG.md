@@ -4,6 +4,16 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.21.2] - 2026-06-21
+
+### Fixed
+- Original/Zentri Pulsar (#12): the dashboard no longer blanks the kW / status /
+  session tiles when the charger doesn't serve `r_sta` — the hero + stats block
+  now keys off `r_dat` (`status.r`) and uses `r_dat.st` for the status code on
+  that hardware. Added a Zentri status-name set (st4 = "Starting", not
+  "Paused"). Charging power comes from the firmware's derived `cp` — needs
+  gateway firmware **v3.2.0-beta.2+**.
+
 ## [0.21.0] - 2026-06-20
 
 The cost-accuracy + charge-log release. The Add-on now bills charging
