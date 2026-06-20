@@ -176,6 +176,23 @@ def api_sched():
         return jsonify(body), code
 
 
+@app.route("/api/notifications")
+def api_notifications():
+    """Proxy the BAPI `r_not` call — active charger notifications/alerts.
+    Best-effort: a BLE-busy gateway returns null/0, rendered as 'none'.
+    """
+    cfg = config_from_env()
+    try:
+        return jsonify(fetch_json(
+            cfg,
+            "/api/command?action=bapi&met=r_not&par=null&wait=4000",
+            timeout=7.0,
+        ))
+    except Exception as e:
+        body, code = _gateway_error(e)
+        return jsonify(body), code
+
+
 @app.route("/api/addon/config")
 def api_addon_config():
     """Surface non-secret Add-on options so the SPA knows whether

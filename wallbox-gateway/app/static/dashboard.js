@@ -363,6 +363,48 @@ function syncCurrentSlider(amps) {
   }
 }
 
+// ---- Charger notifications (r_not) ----
+let _notifs = [];
+async function loadNotifs() {
+  const r = await fetchJSON('api/notifications');
+  const bar = $('notif-bar');
+  if (!bar) return;
+  const v = (r.ok && r.body && Array.isArray(r.body.r)) ? r.body.r : [];
+  _notifs = v;
+  if (v.length) { setText('notif-count', v.length); bar.hidden = false; }
+  else { bar.hidden = true; }
+}
+function showNotifs() {
+  const list = $('notif-list');
+  if (!list) return;
+  list.textContent = '';
+  if (!_notifs.length) {
+    const e = document.createElement('div'); e.className = 'notif-empty'; e.textContent = 'No notifications';
+    list.appendChild(e);
+  } else {
+    _notifs.forEach((n, i) => {
+      const msg = n.message || n.msg || n.text || JSON.stringify(n);
+      const tsv = n.timestamp || n.ts;
+      const row = document.createElement('div'); row.className = 'notif-item';
+      const m = document.createElement('div'); m.className = 'notif-msg'; m.textContent = `#${i + 1} ${msg}`;
+      row.appendChild(m);
+      if (tsv) {
+        const t = document.createElement('div'); t.className = 'notif-ts';
+        try { t.textContent = new Date(tsv * 1000).toLocaleString(); } catch (e) { t.textContent = String(tsv); }
+        row.appendChild(t);
+      }
+      list.appendChild(row);
+    });
+  }
+  $('notif-modal').hidden = false;
+}
+(function initNotifs() {
+  const bar = $('notif-bar'); if (bar) bar.addEventListener('click', showNotifs);
+  const close = $('notif-close'); if (close) close.addEventListener('click', () => { $('notif-modal').hidden = true; });
+  const modal = $('notif-modal');
+  if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) modal.hidden = true; });
+})();
+
 // ---- Charge schedules ----
 //
 // Reads via /api/sched?met=r_schs, writes via s_sch (insert/update, keyed by
@@ -524,7 +566,10 @@ async function deleteSchedule(sid) {
 
 $('poll-s').textContent = POLL_MS / 1000;
 refresh();
-// Stagger the schedule read so it doesn't pile onto refresh()'s request
-// burst and trip the gateway's /api/command rate limiter.
+// Stagger the BAPI-passthrough reads (schedules, notifications) so they
+// don't pile onto refresh()'s request burst and trip the gateway's
+// /api/command rate limiter.
 setTimeout(loadSchedules, 1200);
+setTimeout(loadNotifs, 2400);
 setInterval(refresh, POLL_MS);
+setInterval(loadNotifs, 60_000);   // charger notifications refresh slowly

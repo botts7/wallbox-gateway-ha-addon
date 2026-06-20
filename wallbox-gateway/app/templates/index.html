@@ -27,6 +27,21 @@
        Check it's powered on and on the same network.</p>
   </section>
 
+  <!-- Charger notifications bar (#r_not): tap to view the list -->
+  <section class="notif-bar" id="notif-bar" hidden>
+    <span class="notif-icon">&#x1F514;</span>
+    <span><span id="notif-count">0</span> charger notification(s) — tap to view</span>
+  </section>
+  <div class="notif-modal" id="notif-modal" hidden>
+    <div class="notif-modal-inner">
+      <div class="notif-modal-head">
+        <h3>&#x1F514; Notifications</h3>
+        <button type="button" id="notif-close" class="notif-close">&times;</button>
+      </div>
+      <div id="notif-list"></div>
+    </div>
+  </div>
+
   <!-- Power Flow: Grid -> Charger -> Vehicle, matching the gateway's own
        dashboard (/dashboard on the device) for a consistent look. The
        Vehicle node swaps to "Plug in" when no car is connected. -->
