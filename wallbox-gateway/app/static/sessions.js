@@ -95,7 +95,9 @@ function buildHeatmap() {
   }
 }
 
-// ---- recent session list ----
+// ---- recent session list (collapsed to a few, with expand) ----
+const SESS_COLLAPSED = 5;
+let _sessExpanded = false;
 function renderList() {
   const list = $('sess-list'); if (!list) return;
   list.textContent = '';
@@ -103,8 +105,9 @@ function renderList() {
     const e = document.createElement('span'); e.className = 'sched-empty'; e.textContent = 'No sessions yet.';
     list.appendChild(e); return;
   }
-  const recent = _sessions.slice().sort((a, b) => b.ts - a.ts).slice(0, 30);
-  recent.forEach((s) => {
+  const sorted = _sessions.slice().sort((a, b) => b.ts - a.ts);
+  const shown = _sessExpanded ? sorted : sorted.slice(0, SESS_COLLAPSED);
+  shown.forEach((s) => {
     const row = document.createElement('div'); row.className = 'sess-item';
     const when = document.createElement('div'); when.className = 'sess-when';
     when.textContent = new Date(s.ts * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -114,6 +117,13 @@ function renderList() {
     row.appendChild(when); row.appendChild(meta);
     list.appendChild(row);
   });
+  if (sorted.length > SESS_COLLAPSED) {
+    const btn = document.createElement('button');
+    btn.className = 'sess-toggle';
+    btn.textContent = _sessExpanded ? 'Show less' : `Show all ${sorted.length}`;
+    btn.onclick = () => { _sessExpanded = !_sessExpanded; renderList(); };
+    list.appendChild(btn);
+  }
 }
 
 function renderAll() { recompute(); buildHeatmap(); renderList(); }

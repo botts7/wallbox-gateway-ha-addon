@@ -70,29 +70,28 @@ header span#gw-ip {
   font-size: 12px;
 }
 
+/* Masonry-style layout: cards flow into balanced columns (one column on
+   phones, more as the window widens) with no ragged full-width gaps. Each
+   card stays whole. Uses the desktop width without stranding small cards
+   next to big empty areas. */
 main {
-  max-width: 1360px;
+  max-width: 1320px;
   margin: 0 auto;
-  padding: 18px 18px 40px;
-  display: grid;
-  gap: 14px;
-  grid-template-columns: 1fr;
+  padding: 16px 18px 36px;
+  column-width: 330px;
+  column-gap: 14px;
 }
-/* Use the desktop width: flow cards into 2 then 3 columns on wider screens.
-   Wide/feature cards + banners span the full row. align-items:start so a
-   tall card doesn't stretch its row-mates. */
-@media (min-width: 900px) {
-  main { grid-template-columns: 1fr 1fr; align-items: start; }
-  #card-powerflow, #sched-card, #notif-bar, #notif-modal, #paused-banner,
-  #charge-reminder, #not-configured, #unreachable, main > .grid,
-  .cta-link, .hint { grid-column: 1 / -1; }
+main > * {
+  break-inside: avoid;
+  margin: 0 0 14px;
 }
-@media (min-width: 1300px) {
-  main { grid-template-columns: 1fr 1fr 1fr; }
-  /* Power Flow + schedules keep the full row; everything else flows 3-up. */
-  #card-powerflow, #sched-card, #notif-bar, #notif-modal, #paused-banner,
-  #charge-reminder, #not-configured, #unreachable, main > .grid,
-  .cta-link, .hint { grid-column: 1 / -1; }
+/* The schedule card holds the wide weekly timeline + editor, so let it use a
+   full row on wide screens rather than being squeezed into one column. */
+@media (min-width: 1000px) {
+  main { column-width: auto; column-count: 2; }
+}
+@media (min-width: 1320px) {
+  main { column-count: 3; }
 }
 
 /* ---- Hero: live charging status ---- */
@@ -182,13 +181,11 @@ main {
 .banner-action:disabled { opacity: 0.5; cursor: wait; }
 
 /* ---- Quick-stats grid ---- */
+/* Container-responsive: adapts to the card/column width it sits in. */
 .grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 10px;
-}
-@media (min-width: 540px) {
-  .grid { grid-template-columns: repeat(4, 1fr); }
 }
 .stat {
   background: var(--surface);
@@ -627,3 +624,15 @@ a { color: var(--accent); }
 }
 .sess-when { font-weight: 500; font-size: 14px; }
 .sess-meta { font-size: 13px; color: var(--text2); font-variant-numeric: tabular-nums; }
+
+/* Power Flow svg fills its (now column-sized) card */
+.pf-svg { max-width: 100% !important; }
+
+/* Session list "show all / show less" toggle */
+.sess-toggle {
+  margin-top: 6px; align-self: center;
+  background: var(--surface); color: var(--text2);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 14px; font-size: 13px; cursor: pointer; width: 100%;
+}
+.sess-toggle:hover { color: var(--text); border-color: var(--accent); }
