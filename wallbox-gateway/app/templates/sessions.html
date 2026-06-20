@@ -93,6 +93,12 @@
     </div>
 
     <div id="tm-tou" class="tm-section" hidden>
+      <label class="tm-weekend-same"><input type="checkbox" id="tm-seasonal"> Seasonal rates (summer / winter differ)</label>
+      <div id="tm-seasons" hidden>
+        <div class="tm-season-row"><span class="tm-season-name">Summer</span> <select id="tm-sum-from"></select> to <select id="tm-sum-to"></select></div>
+        <div class="tm-season-row"><span class="tm-season-name">Winter</span> <select id="tm-win-from"></select> to <select id="tm-win-to"></select></div>
+        <div class="sess-sub">Months outside both seasons use the default rate.</div>
+      </div>
       <div class="tm-sub">Rate bands (<span class="tm-per">per kWh</span>)</div>
       <div id="tm-bands" class="tm-bands"></div>
       <button type="button" class="ctrl-btn" id="tm-add-band">&#x2795; Add band</button>

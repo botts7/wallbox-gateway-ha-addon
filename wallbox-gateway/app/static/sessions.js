@@ -51,6 +51,7 @@ const DEFAULT_BANDS = [
   { id: 'sho', name: 'Shoulder', rate: 0.28, color: '#f59e0b' },
   { id: 'pk', name: 'Peak', rate: 0.45, color: '#ef4444' },
 ];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function defaultTariff() {
   return {
     type: 'tou', currency: '$', provider: '', flatRate: 0.30,
@@ -58,7 +59,32 @@ function defaultTariff() {
     weekday: Array(24).fill('off'),
     weekend: Array(24).fill('off'),
     weekendSame: true,
+    // NEM-style seasonal rates: same hour windows, but band rates differ by
+    // season. Months are 0-indexed; ranges wrap the year (e.g. Nov..Feb).
+    seasonal: false,
+    seasons: [
+      { id: 'summer', name: 'Summer', from: 10, to: 1 },  // Nov..Feb
+      { id: 'winter', name: 'Winter', from: 5, to: 7 },   // Jun..Aug
+    ],
   };
+}
+function _monthInSeason(month, season) {
+  const f = season.from, t = season.to;
+  return (f <= t) ? (month >= f && month <= t) : (month >= f || month <= t);
+}
+function _seasonFor(tariff, epoch) {
+  if (!tariff.seasonal || !Array.isArray(tariff.seasons)) return null;
+  let month;
+  try { month = new Date(new Date(epoch * 1000).toLocaleString('en-US', { timeZone: CHARGER_TZ })).getMonth(); }
+  catch (e) { month = new Date(epoch * 1000).getMonth(); }
+  for (const s of tariff.seasons) { if (_monthInSeason(month, s)) return s.id; }
+  return null;  // shoulder months -> default band.rate
+}
+function _bandRate(tariff, band, seasonId) {
+  if (tariff.seasonal && seasonId && band.seasonRates && band.seasonRates[seasonId] != null) {
+    return band.seasonRates[seasonId];
+  }
+  return band.rate || 0;
 }
 function loadTariff() {
   try { const t = JSON.parse(localStorage.getItem(TARIFF_KEY)); if (t && t.type) return t; } catch (e) {}
@@ -83,12 +109,13 @@ function _sessionCost(tariff, s) {
   }
   const dur = s.dur || 3600, step = 300, n = Math.max(1, Math.ceil(dur / step));
   const per = totalKwh / n;
+  const seasonId = _seasonFor(tariff, s.ts);  // season is fixed for the session
   const byBand = {}; let total = 0;
   for (let i = 0; i < n; i++) {
     const t = s.ts + i * step;
     if (t >= s.ts + dur) break;
     const band = _bandFor(tariff, t);
-    const cost = per * (band.rate || 0);
+    const cost = per * _bandRate(tariff, band, seasonId);
     total += cost;
     const k = band.id || 'x';
     byBand[k] = byBand[k] || { kwh: 0, cost: 0, name: band.name, color: band.color };
@@ -152,7 +179,8 @@ function updateTariffSummary(tariff) {
     return;
   }
   const bands = (tariff.bands || []).map((b) => `${b.name} ${cur}${(b.rate || 0).toFixed(2)}`).join(' · ');
-  el.textContent = `Time-of-use: ${bands}${tariff.provider ? ' · ' + tariff.provider : ''}`;
+  const extra = (tariff.seasonal ? ' · seasonal' : '') + (tariff.provider ? ' · ' + tariff.provider : '');
+  el.textContent = `Time-of-use: ${bands}${extra}`;
 }
 
 function renderCostBreakdown(bands, cur) {
@@ -309,15 +337,35 @@ function openTariff() {
   if (!Array.isArray(_edit.bands) || !_edit.bands.length) _edit.bands = DEFAULT_BANDS.map((b) => ({ ...b }));
   if (!Array.isArray(_edit.weekday) || _edit.weekday.length !== 24) _edit.weekday = Array(24).fill(_edit.bands[0].id);
   if (!Array.isArray(_edit.weekend) || _edit.weekend.length !== 24) _edit.weekend = Array(24).fill(_edit.bands[0].id);
+  if (typeof _edit.seasonal !== 'boolean') _edit.seasonal = false;
+  if (!Array.isArray(_edit.seasons) || _edit.seasons.length < 2) _edit.seasons = defaultTariff().seasons;
   $('tm-provider').value = _edit.provider || '';
   $('tm-currency').value = _edit.currency || '$';
   $('tm-flat-rate').value = _edit.flatRate != null ? _edit.flatRate : '';
   document.querySelectorAll('input[name="tm-type"]').forEach((r) => { r.checked = (r.value === _edit.type); });
   $('tm-weekend-same').checked = !!_edit.weekendSame;
+  $('tm-seasonal').checked = !!_edit.seasonal;
   $('tm-paint-hint').textContent = 'Tip: tap an hour repeatedly to cycle through your rate bands.';
-  renderTariffType(); renderBands(); renderHours(); renderWeekendWrap();
+  populateMonthSelects();
+  renderTariffType(); renderSeasons(); renderHours(); renderWeekendWrap();
   $('tariff-modal').hidden = false;
 }
+function _fillMonthSelect(id, selected) {
+  const sel = $(id); if (!sel) return;
+  sel.textContent = '';
+  MONTHS.forEach((m, i) => {
+    const o = document.createElement('option'); o.value = i; o.textContent = m;
+    if (i === selected) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+function populateMonthSelects() {
+  const sum = _edit.seasons.find((s) => s.id === 'summer') || _edit.seasons[0];
+  const win = _edit.seasons.find((s) => s.id === 'winter') || _edit.seasons[1];
+  _fillMonthSelect('tm-sum-from', sum.from); _fillMonthSelect('tm-sum-to', sum.to);
+  _fillMonthSelect('tm-win-from', win.from); _fillMonthSelect('tm-win-to', win.to);
+}
+function renderSeasons() { $('tm-seasons').hidden = !_edit.seasonal; renderBands(); }
 function closeTariff() { $('tariff-modal').hidden = true; _edit = null; }
 function renderTariffType() { $('tm-flat').hidden = _edit.type !== 'flat'; $('tm-tou').hidden = _edit.type !== 'tou'; }
 function renderWeekendWrap() { $('tm-weekend-wrap').hidden = !!_edit.weekendSame; }
@@ -325,12 +373,14 @@ function renderWeekendWrap() { $('tm-weekend-wrap').hidden = !!_edit.weekendSame
 function renderBands() {
   const wrap = $('tm-bands'); wrap.textContent = '';
   _edit.bands.forEach((b, i) => {
+    const cont = document.createElement('div'); cont.className = 'tm-band-wrap';
     const row = document.createElement('div'); row.className = 'tm-band';
     const sw = document.createElement('input'); sw.type = 'color'; sw.value = b.color || '#3b82f6'; sw.className = 'tm-band-color';
     sw.oninput = () => { b.color = sw.value; renderHours(); };
     const name = document.createElement('input'); name.type = 'text'; name.value = b.name || ''; name.placeholder = 'Name'; name.className = 'tm-band-name';
     name.oninput = () => { b.name = name.value; };
-    const rate = document.createElement('input'); rate.type = 'number'; rate.min = '0'; rate.step = '0.01'; rate.placeholder = '0.00'; rate.className = 'tm-band-rate';
+    const rate = document.createElement('input'); rate.type = 'number'; rate.min = '0'; rate.step = '0.01'; rate.className = 'tm-band-rate';
+    rate.placeholder = _edit.seasonal ? 'default' : '0.00';
     rate.value = b.rate != null ? b.rate : '';
     rate.oninput = () => { b.rate = parseFloat(rate.value) || 0; };
     row.appendChild(sw); row.appendChild(name); row.appendChild(rate);
@@ -339,7 +389,23 @@ function renderBands() {
       rm.onclick = () => removeBand(i);
       row.appendChild(rm);
     }
-    wrap.appendChild(row);
+    cont.appendChild(row);
+    if (_edit.seasonal) {
+      b.seasonRates = b.seasonRates || {};
+      const sr = document.createElement('div'); sr.className = 'tm-band-seasons';
+      _edit.seasons.forEach((s) => {
+        const lbl = document.createElement('label'); lbl.className = 'tm-srate-lbl';
+        lbl.appendChild(document.createTextNode(s.name + ' '));
+        const inp = document.createElement('input'); inp.type = 'number'; inp.min = '0'; inp.step = '0.01'; inp.className = 'tm-band-srate';
+        inp.placeholder = String(b.rate != null ? b.rate : '');
+        if (b.seasonRates[s.id] != null) inp.value = b.seasonRates[s.id];
+        inp.oninput = () => { b.seasonRates[s.id] = (inp.value === '') ? undefined : (parseFloat(inp.value) || 0); };
+        lbl.appendChild(inp);
+        sr.appendChild(lbl);
+      });
+      cont.appendChild(sr);
+    }
+    wrap.appendChild(cont);
   });
 }
 function removeBand(i) {
@@ -382,6 +448,13 @@ function saveTariffEdit() {
   _edit.currency = $('tm-currency').value.trim() || '$';
   _edit.flatRate = parseFloat($('tm-flat-rate').value) || 0;
   _edit.weekendSame = $('tm-weekend-same').checked;
+  _edit.seasonal = $('tm-seasonal').checked;
+  const setSeason = (id, f, t) => {
+    const s = _edit.seasons.find((x) => x.id === id);
+    if (s) { s.from = parseInt($(f).value, 10); s.to = parseInt($(t).value, 10); }
+  };
+  setSeason('summer', 'tm-sum-from', 'tm-sum-to');
+  setSeason('winter', 'tm-win-from', 'tm-win-to');
   saveTariff(_edit);
   closeTariff();
   recompute();
@@ -392,6 +465,7 @@ function saveTariffEdit() {
   const modal = $('tariff-modal'); if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeTariff(); });
   document.querySelectorAll('input[name="tm-type"]').forEach((r) => r.addEventListener('change', () => { if (_edit) { _edit.type = r.value; renderTariffType(); } }));
   const ws = $('tm-weekend-same'); if (ws) ws.addEventListener('change', () => { if (_edit) { _edit.weekendSame = ws.checked; renderWeekendWrap(); } });
+  const ssn = $('tm-seasonal'); if (ssn) ssn.addEventListener('change', () => { if (_edit) { _edit.seasonal = ssn.checked; renderSeasons(); } });
   const ab = $('tm-add-band'); if (ab) ab.addEventListener('click', addBand);
   const sv = $('tm-save'); if (sv) sv.addEventListener('click', saveTariffEdit);
   const cl = $('tm-clear'); if (cl) cl.addEventListener('click', () => { clearTariff(); closeTariff(); recompute(); });
