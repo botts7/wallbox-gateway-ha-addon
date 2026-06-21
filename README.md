@@ -26,10 +26,13 @@ it actually happened — solar is free, only grid is billed, and a
 night-shifted (off-peak) charge is no longer billed at the evening
 peak. Cost stays accurate as your rates change over time.
 
-The Add-on doesn't replace the MQTT discovery the gateway
-already publishes — entities you've already set up keep working
-as before. This is for HAOS / HA Supervised users who want a
-sidebar panel for the gateway without leaving Home Assistant.
+The Add-on is a **sidebar panel only — it creates no HA entities**
+(no `homeassistant_api` access), so it never duplicates anything,
+even alongside MQTT discovery or the HACS Integration. Your
+existing entities keep working as before. This is for HAOS / HA
+Supervised users who want a panel for the gateway without leaving
+Home Assistant. (Entities still come from MQTT discovery *or* the
+HACS Integration — pick one of those, not both.)
 
 Roadmap:
 
