@@ -16,6 +16,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   number — so solar-used (kWh) and solar-available (kW) are both visible and
   no longer conflated. The charger exposes no live solar-vs-grid *power*
   split, so the lines approximate it from solar surplus.
+- Grid node shows grid **import** only (clamped to ≥ 0). When you're exporting
+  solar surplus the meter reads negative — that surplus now shows on the Solar
+  node instead of as a confusing negative Grid value.
 
 ## [0.21.2] - 2026-06-21
 

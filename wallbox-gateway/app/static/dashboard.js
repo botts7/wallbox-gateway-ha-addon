@@ -200,7 +200,7 @@ function pfRender() {
   const cp = _pf.cp, h = _pf.house, sp = _pf.surplus;
   const kw = (v) => (typeof v === 'number') ? v.toFixed(2) + ' kW' : '--';
   setText('pf-solar-kwh', kw(sp));                                       // live solar surplus
-  setText('pf-grid-kwh', kw(typeof h === 'number' ? h / 1000 : null));   // live grid/house power
+  setText('pf-grid-kwh', kw(typeof h === 'number' ? Math.max(0, h / 1000) : null));   // live grid IMPORT (>=0; export = surplus, shown on Solar)
   setText('pf-car-kwh', kw(cp));                                         // live charge power
   // Footer: cumulative since-plugged-in split — solar USED (green) vs grid.
   const gp = _pf.green, grp = _pf.grid;
