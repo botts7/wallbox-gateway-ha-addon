@@ -9,10 +9,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 - Energy-flow card now shows **live power (kW)** at each node instead of
   cumulative session energy: Vehicle = live charging power, Grid = live
-  house/grid power (from the Power Meter), Solar = live solar surplus. Flow
-  lines animate only while charging (idle no longer looks like active flow).
-  The session-total kWh stays in the footer. The charger exposes no live
-  solar-vs-grid *power* split, so the lines approximate it from solar surplus.
+  house/grid power (from the Power Meter), Solar = live solar surplus
+  *available*. Flow lines animate only while charging (idle no longer looks
+  like active flow). The **"Since plugged in" footer now shows the cumulative
+  green (solar used) vs grid energy split** — the official app's "green"
+  number — so solar-used (kWh) and solar-available (kW) are both visible and
+  no longer conflated. The charger exposes no live solar-vs-grid *power*
+  split, so the lines approximate it from solar surplus.
 
 ## [0.21.2] - 2026-06-21
 

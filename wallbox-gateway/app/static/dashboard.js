@@ -183,7 +183,7 @@ const HERO_STATES_ZENTRI = {
 // Grid -> Charger -> Vehicle. cp = charging power (vehicle kW), house =
 // grid kW, conn = car connected (status-code derived, mirrors firmware
 // carConnected()). The Vehicle node swaps to "Plug in" when not connected.
-const _pf = { cp: null, en: null, conn: null, house: null, surplus: null };
+const _pf = { cp: null, en: null, conn: null, house: null, surplus: null, green: null, grid: null };
 function carConn(st) { return [1, 2, 3, 4, 5, 8, 10, 11, 12, 13, 18].indexOf(st) !== -1; }
 function pfAnimate(el, on, kw) {
   if (!el) return;
@@ -202,7 +202,10 @@ function pfRender() {
   setText('pf-solar-kwh', kw(sp));                                       // live solar surplus
   setText('pf-grid-kwh', kw(typeof h === 'number' ? h / 1000 : null));   // live grid/house power
   setText('pf-car-kwh', kw(cp));                                         // live charge power
-  setText('pf-session', (typeof _pf.en === 'number') ? (_pf.en / 100).toFixed(2) + ' kWh' : '--');
+  // Footer: cumulative since-plugged-in split — solar USED (green) vs grid.
+  const gp = _pf.green, grp = _pf.grid;
+  setText('pf-session', (typeof gp === 'number' || typeof grp === 'number')
+    ? '☀️ ' + (gp || 0).toFixed(2) + '  🔌 ' + (grp || 0).toFixed(2) + ' kWh' : '--');
   const charging = (typeof cp === 'number' && cp > 0.05);
   setText('pf-live', '');
   // Approximate the live split from solar surplus: solar covers up to its
@@ -234,7 +237,7 @@ function setOffline() {
   if (card) card.className = 'card pf-card is-offline';
   setText('pf-status', 'Cannot reach the gateway');
   _pf.cp = null; _pf.en = null; _pf.conn = null;
-  _pf.house = null; _pf.surplus = null;
+  _pf.house = null; _pf.surplus = null; _pf.green = null; _pf.grid = null;
   setText('pf-solar-kwh', '--'); setText('pf-grid-kwh', '--');
   setText('pf-car-kwh', '--'); setText('pf-session', '--'); setText('pf-live', '');
   pfRender();
@@ -388,6 +391,8 @@ async function refresh() {
   if (lse.ok && lse.body && lse.body.r) {
     const r = lse.body.r;
     if (typeof r.charging_power === 'number') _pf.cp = r.charging_power;
+    if (typeof r.green_energy === 'number') _pf.green = r.green_energy;
+    if (typeof r.grid_energy === 'number') _pf.grid = r.grid_energy;
     const af = r.active_feature;
     _pf.surplus = (af && typeof af.surplus_power === 'number') ? af.surplus_power : null;
     pfRender();
