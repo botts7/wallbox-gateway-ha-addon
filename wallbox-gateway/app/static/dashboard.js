@@ -183,7 +183,7 @@ const HERO_STATES_ZENTRI = {
 // Grid -> Charger -> Vehicle. cp = charging power (vehicle kW), house =
 // grid kW, conn = car connected (status-code derived, mirrors firmware
 // carConnected()). The Vehicle node swaps to "Plug in" when not connected.
-const _pf = { cp: null, en: null, conn: null, green: null, grid: null, charged: null };
+const _pf = { cp: null, en: null, conn: null, house: null, surplus: null };
 function carConn(st) { return [1, 2, 3, 4, 5, 8, 10, 11, 12, 13, 18].indexOf(st) !== -1; }
 function pfAnimate(el, on, kw) {
   if (!el) return;
@@ -197,25 +197,24 @@ function pfAnimate(el, on, kw) {
   } else if (el._anim) { el._anim.cancel(); el._anim = null; el._animDur = 0; }
 }
 function pfRender() {
-  const g = _pf.green, gr = _pf.grid, cp = _pf.cp;
-  const fmt = (v) => (typeof v === 'number') ? v.toFixed(2) + ' kWh' : '--';
-  const total = (typeof _pf.charged === 'number') ? _pf.charged
-              : ((g || 0) + (gr || 0)) || null;
-  setText('pf-solar-kwh', fmt(g));
-  setText('pf-grid-kwh', fmt(gr));
-  setText('pf-car-kwh', fmt(typeof total === 'number' ? total : null));
-  setText('pf-session', fmt(typeof total === 'number' ? total : null));
+  const cp = _pf.cp, h = _pf.house, sp = _pf.surplus;
+  const kw = (v) => (typeof v === 'number') ? v.toFixed(2) + ' kW' : '--';
+  setText('pf-solar-kwh', kw(sp));                                       // live solar surplus
+  setText('pf-grid-kwh', kw(typeof h === 'number' ? h / 1000 : null));   // live grid/house power
+  setText('pf-car-kwh', kw(cp));                                         // live charge power
+  setText('pf-session', (typeof _pf.en === 'number') ? (_pf.en / 100).toFixed(2) + ' kWh' : '--');
   const charging = (typeof cp === 'number' && cp > 0.05);
-  setText('pf-live', charging ? cp.toFixed(2) + ' kW' : '');
-  // A line is lit when this session drew from that source; grid is the default
-  // source while charging even before any energy has accumulated.
-  const hasSolar = (g || 0) > 0.001;
-  const hasGrid  = (gr || 0) > 0.001 || (charging && !hasSolar);
+  setText('pf-live', '');
+  // Approximate the live split from solar surplus: solar covers up to its
+  // available kW, grid makes up the remainder. Lines flow only while charging.
+  const hasSolar = charging && (sp || 0) > 0.05;
+  let hasGrid = charging && ((cp || 0) - (sp || 0) > 0.05);
+  if (charging && !hasSolar && !hasGrid) hasGrid = true;
   const sl = $('pf-solar-line'), gl = $('pf-grid-line');
   if (sl) sl.style.opacity = hasSolar ? '1' : '0';
   if (gl) gl.style.opacity = hasGrid ? '1' : '0';
-  pfAnimate(sl, charging && hasSolar, cp);
-  pfAnimate(gl, charging && hasGrid, cp);
+  pfAnimate(sl, hasSolar, cp);
+  pfAnimate(gl, hasGrid, cp);
   const plug = $('pf-plugin'), ck = $('pf-car-kwh');
   if (_pf.conn === false) { if (plug) plug.style.display = ''; if (ck) ck.style.display = 'none'; }
   else { if (plug) plug.style.display = 'none'; if (ck) ck.style.display = ''; }
@@ -235,7 +234,7 @@ function setOffline() {
   if (card) card.className = 'card pf-card is-offline';
   setText('pf-status', 'Cannot reach the gateway');
   _pf.cp = null; _pf.en = null; _pf.conn = null;
-  _pf.green = null; _pf.grid = null; _pf.charged = null;
+  _pf.house = null; _pf.surplus = null;
   setText('pf-solar-kwh', '--'); setText('pf-grid-kwh', '--');
   setText('pf-car-kwh', '--'); setText('pf-session', '--'); setText('pf-live', '');
   pfRender();
@@ -388,10 +387,9 @@ async function refresh() {
   const lse = await fetchJSON('api/sess?met=r_lse&par=null&wait=4000');
   if (lse.ok && lse.body && lse.body.r) {
     const r = lse.body.r;
-    _pf.green = (typeof r.green_energy === 'number') ? r.green_energy : null;
-    _pf.grid = (typeof r.grid_energy === 'number') ? r.grid_energy : null;
-    _pf.charged = (typeof r.charged_energy === 'number') ? r.charged_energy : null;
-    if (typeof r.charging_power === 'number' && r.charging_power > 0) _pf.cp = r.charging_power;
+    if (typeof r.charging_power === 'number') _pf.cp = r.charging_power;
+    const af = r.active_feature;
+    _pf.surplus = (af && typeof af.surplus_power === 'number') ? af.surplus_power : null;
     pfRender();
   }
 
@@ -404,12 +402,15 @@ async function refresh() {
     if (typeof r.p1 === 'number') {
       const house = (r.p1 || 0) + (r.p2 || 0) + (r.p3 || 0);
       setText('stat-house', house);
+      _pf.house = house; pfRender();          // live grid/house power -> Energy Flow
     } else {
       setText('stat-house', '--');
+      _pf.house = null; pfRender();
     }
   } else {
     setText('stat-voltage', '--');
     setText('stat-house', '--');
+    _pf.house = null; pfRender();
   }
 }
 
