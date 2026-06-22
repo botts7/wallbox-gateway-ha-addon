@@ -773,3 +773,10 @@ setTimeout(loadSchedules, 1200);
 setTimeout(loadNotifs, 2400);
 setInterval(refresh, POLL_MS);
 setInterval(loadNotifs, 60_000);   // charger notifications refresh slowly
+// Recompute the cost tiles from the real charge windows so they stay current
+// without opening the Sessions page (which was the only thing that refreshed
+// them before). Staggered off the boot burst; slow cadence since it pulls a
+// couple of BAPI reads (schedules, g_tzn) — charge windows change rarely.
+function refreshCost() { if (window.WBCost) WBCost.refresh().then(updateCostTiles).catch(function () {}); }
+setTimeout(refreshCost, 3600);
+setInterval(refreshCost, 300_000);  // every 5 min

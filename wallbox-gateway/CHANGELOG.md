@@ -4,6 +4,16 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.21.4] - 2026-06-22
+
+### Changed
+- Dashboard **cost tiles now auto-refresh** — they recompute from the real
+  charge windows (firmware charge-log) + your tariff on load and every 5 min,
+  so they stay current without opening the Sessions page (previously the tiles
+  only updated when you visited Sessions, so they could show a stale figure).
+  New shared `cost.js` engine drives it; the Sessions page remains the
+  authoritative calc.
+
 ## [0.21.3] - 2026-06-21
 
 ### Changed
