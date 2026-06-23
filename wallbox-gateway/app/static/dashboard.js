@@ -144,6 +144,142 @@ function updateCostTiles() {
   }
 }
 
+// ---- Charging savings (cost.js publishes the figures; we display + tune) ----
+const SV_BASELINE_KEY = 'wb-addon-savings-baseline-v1';
+const SV_FEEDBACK_KEY = 'wb-addon-savings-feedback-v1';
+
+function loadSvBaseline() {
+  try { const b = JSON.parse(localStorage.getItem(SV_BASELINE_KEY)); if (b && b.mode) return b; } catch (e) {}
+  return { mode: 'plug_in', fixedTime: '00:00' };
+}
+
+function updateSavings() {
+  const card = $('savings-card');
+  if (!card) return;
+  let sum = null;
+  try { sum = JSON.parse(localStorage.getItem('wb-addon-cost-summary')); } catch (e) {}
+  const hasData = sum && typeof sum.weekSaved === 'number';
+  card.hidden = !hasData;
+  if (!hasData) return;
+  const cur = sum.currency || '$';
+  const week = sum.weekSaved || 0, month = sum.monthSaved || 0;
+  // Annualise from the month, not the rolling 7-day window: a quiet week (no
+  // charging) made this read $0/yr even when the month clearly saved money.
+  // month × 12 tracks "this month" and stays non-zero when the week is empty.
+  const year = month * 12;
+  setText('sv-month', cur + month.toFixed(2));
+  setText('sv-week', cur + week.toFixed(2));
+  setText('sv-year', '~' + cur + year.toFixed(0));
+  const shift = sum.monthShiftSaved || 0, solar = sum.monthSolarSaved || 0;
+  const bd = $('sv-breakdown');
+  if (bd) {
+    bd.textContent = '';
+    const chip = (label, v) => { const d = document.createElement('span'); d.className = 'sv-chip'; d.textContent = label + ' ' + cur + v.toFixed(2); bd.appendChild(d); };
+    if (shift > 0 || solar > 0) { chip('⏱ Time-shift', shift); chip('☀ Solar', solar); }
+    else { const d = document.createElement('span'); d.className = 'sv-chip'; d.textContent = 'Charging already landed in cheap hours'; bd.appendChild(d); }
+  }
+  const cfg = loadSvBaseline();
+  const baseName = cfg.mode === 'fixed_time' ? ('a ' + (cfg.fixedTime || '00:00') + ' start')
+    : cfg.mode === 'flat_avg' ? 'the average rate' : 'charging at plug-in';
+  setText('sv-note', 'Estimated this month vs ' + baseName + ' — measured energy × your tariff. An estimate, not a guarantee.');
+  setText('sv-baseline-pill', 'vs ' + (cfg.mode === 'fixed_time' ? ('fixed ' + (cfg.fixedTime || '00:00')) : cfg.mode === 'flat_avg' ? 'avg rate' : 'plug-in'));
+}
+
+function exportSavingsFeedback() {
+  let sum = null, tariff = null, fb = [];
+  try { sum = JSON.parse(localStorage.getItem('wb-addon-cost-summary')); } catch (e) {}
+  try { tariff = JSON.parse(localStorage.getItem('wb-addon-tariff-v1')); } catch (e) {}
+  try { fb = JSON.parse(localStorage.getItem(SV_FEEDBACK_KEY)) || []; } catch (e) {}
+  // Anonymised: tariff SHAPE + savings figures only. No host / entity / SSID
+  // (those live elsewhere and are never included).
+  const bundle = {
+    kind: 'wb-savings-feedback',
+    baseline: loadSvBaseline(),
+    savings: sum ? {
+      weekSaved: sum.weekSaved, monthSaved: sum.monthSaved,
+      weekShiftSaved: sum.weekShiftSaved, monthShiftSaved: sum.monthShiftSaved,
+      weekSolarSaved: sum.weekSolarSaved, monthSolarSaved: sum.monthSolarSaved,
+      weekCost: sum.weekCost, monthCost: sum.monthCost,
+      weekKwh: sum.weekKwh, monthKwh: sum.monthKwh,
+    } : null,
+    tariff: tariff ? { type: tariff.type, flatRate: tariff.flatRate, seasonal: !!tariff.seasonal, bands: (tariff.bands || []).map((b) => ({ id: b.id, rate: b.rate })) } : null,
+    feedback: fb,
+  };
+  const text = JSON.stringify(bundle, null, 2);
+  const ok = () => setText('sv-fb-status', 'Copied — paste into a GitHub issue to share. Nothing was sent automatically.');
+  const fallback = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    a.download = 'wb-savings-feedback.json'; a.click();
+    setText('sv-fb-status', 'Downloaded wb-savings-feedback.json — attach it to share.');
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(ok).catch(fallback);
+  } else { fallback(); }
+}
+
+// Charge Assistant summary card. Reads the integration's saved config through
+// the HA bridge (api/ha/config) and renders it read-only with the shared
+// ca_summary module. Best-effort: hidden if the bridge or integration isn't
+// available (Container/Core installs, or the integration not added yet).
+let _asstNames = null;   // entity_id -> friendly name, fetched once
+async function loadAssistantCard() {
+  const card = $('assistant-card');
+  if (!card) return;
+  const cfgR = await fetchJSON('api/ha/config');
+  if (!cfgR.ok || !cfgR.body || !cfgR.body.found) { card.hidden = true; return; }
+  const ca = (cfgR.body.options || {}).charge_assistant || { mode: 'off' };
+
+  // Resolve entity ids to friendly names once (so the summary reads nicely).
+  if (_asstNames == null) {
+    const st = await fetchJSON('api/ha/states');
+    _asstNames = {};
+    if (st.ok && st.body && Array.isArray(st.body.entities)) {
+      st.body.entities.forEach((e) => { _asstNames[e.entity_id] = e.name || e.entity_id; });
+    }
+  }
+  const nameOf = (eid) => (eid && _asstNames[eid]) ? _asstNames[eid] : eid;
+
+  const S = window.CASummary;
+  const mode = ca.mode || 'off';
+  setText('assistant-mode', S ? S.modeName(ca) : mode);
+  setText('assistant-summary', S ? S.text(ca, nameOf) : '');
+  const badge = $('assistant-mode');
+  if (badge) badge.className = 'asst-badge asst-' + mode;
+  const btn = $('assistant-edit');
+  if (btn) btn.textContent = (mode === 'off') ? 'Set up assistant →' : 'Edit setup →';
+  card.hidden = false;
+}
+
+function initSavingsUI() {
+  const cfg = loadSvBaseline();
+  const modeSel = $('sv-baseline-mode'), fixed = $('sv-fixed-time'), fixedWrap = $('sv-fixed-wrap');
+  if (modeSel) modeSel.value = cfg.mode;
+  if (fixed) fixed.value = cfg.fixedTime || '00:00';
+  if (fixedWrap) fixedWrap.hidden = cfg.mode !== 'fixed_time';
+  const apply = () => {
+    const m = modeSel ? modeSel.value : 'plug_in';
+    const ft = fixed ? (fixed.value || '00:00') : '00:00';
+    try { localStorage.setItem(SV_BASELINE_KEY, JSON.stringify({ mode: m, fixedTime: ft })); } catch (e) {}
+    if (fixedWrap) fixedWrap.hidden = m !== 'fixed_time';
+    if (window.WBCost) WBCost.refresh().then(() => { updateCostTiles(); updateSavings(); }).catch(() => {});
+  };
+  if (modeSel) modeSel.addEventListener('change', apply);
+  if (fixed) fixed.addEventListener('change', apply);
+
+  const recordFb = (verdict) => {
+    const note = $('sv-fb-note');
+    const entry = { ts: Math.floor(Date.now() / 1000), verdict, note: note ? note.value : '' };
+    let arr = []; try { arr = JSON.parse(localStorage.getItem(SV_FEEDBACK_KEY)) || []; } catch (e) {}
+    arr.push(entry);
+    try { localStorage.setItem(SV_FEEDBACK_KEY, JSON.stringify(arr)); } catch (e) {}
+  };
+  const up = $('sv-fb-up'), down = $('sv-fb-down'), note = $('sv-fb-note'), exp = $('sv-export');
+  if (up) up.addEventListener('click', () => { recordFb('up'); if (note) note.hidden = true; if (exp) exp.hidden = true; setText('sv-fb-status', 'Thanks for the feedback!'); });
+  if (down) down.addEventListener('click', () => { if (note) note.hidden = false; if (exp) exp.hidden = false; setText('sv-fb-status', 'Add a note (optional), then Export to share.'); });
+  if (exp) exp.addEventListener('click', () => { recordFb('down'); exportSavingsFeedback(); });
+}
+
 // Charger-status code -> hero text + state class.
 // Mirrors STATUS_CODES from the gateway firmware (BAPI 0..18).
 const HERO_STATES = {
@@ -222,6 +358,33 @@ function pfRender() {
   if (_pf.conn === false) { if (plug) plug.style.display = ''; if (ck) ck.style.display = 'none'; }
   else { if (plug) plug.style.display = 'none'; if (ck) ck.style.display = ''; }
 }
+// Persist the last good telemetry so navigating back to the dashboard shows
+// the previous values immediately instead of a flash of '--' until the first
+// poll lands. Short TTL so we never show badly-stale data as if it were live.
+const _DASH_CACHE_KEY = 'wb-dash-cache';
+const _DASH_CACHE_TTL_MS = 5 * 60 * 1000;
+function cacheDash() {
+  try {
+    localStorage.setItem(_DASH_CACHE_KEY, JSON.stringify({
+      pf: _pf, ts: Date.now(),
+      statEnergy: $('stat-energy').textContent,
+      statMaxcur: $('stat-maxcur').textContent,
+      statVoltage: $('stat-voltage').textContent,
+      statHouse: $('stat-house').textContent,
+    }));
+  } catch (e) {}
+}
+function hydrateDash() {
+  let c = null;
+  try { c = JSON.parse(localStorage.getItem(_DASH_CACHE_KEY)); } catch (e) {}
+  if (!c || typeof c.ts !== 'number' || Date.now() - c.ts > _DASH_CACHE_TTL_MS) return;
+  if (c.pf) Object.assign(_pf, c.pf);
+  const put = (id, v) => { if (v && v !== '--') setText(id, v); };
+  put('stat-energy', c.statEnergy); put('stat-maxcur', c.statMaxcur);
+  put('stat-voltage', c.statVoltage); put('stat-house', c.statHouse);
+  pfRender();
+}
+
 // Status text under the power-flow + the schedule-paused banner toggle.
 function setStatus(stateCode, schedulePaused, zentri) {
   const info = (zentri && HERO_STATES_ZENTRI[stateCode]) || HERO_STATES[stateCode];
@@ -312,6 +475,7 @@ async function refresh() {
     updateControlOwner(s);
     updateChargingNow(s);
     updateCostTiles();
+    updateSavings();
     // Last recorded charge burst (charge-log #141) — surfaces the same datum as
     // the HA last_burst_energy / charge_log_count entities, for surface parity.
     const lbRow = $('pf-lastburst-row');
@@ -378,8 +542,10 @@ async function refresh() {
     setText('stat-energy', sessionKwh != null ? sessionKwh.toFixed(2) : '--');
     setText('stat-maxcur', maxCur != null ? maxCur : '--');
     syncCurrentSlider(maxCur);
-  } else {
-    // BLE down or charger not responding — show offline on the power flow
+  } else if (!(status.ok && status.body && status.body.ble === 'connected')) {
+    // BLE genuinely down — show offline. A transient BLE-busy poll (gateway
+    // reachable, BLE up) falls through and KEEPS the last good telemetry
+    // instead of flashing everything to '--' on every refresh.
     setStatus(null, false);
     _pf.cp = null; _pf.en = null; _pf.conn = null; pfRender();
     setText('stat-energy', '--');
@@ -412,11 +578,14 @@ async function refresh() {
       setText('stat-house', '--');
       _pf.house = null; pfRender();
     }
-  } else {
+  } else if (!(status.ok && status.body && status.body.ble === 'connected')) {
+    // Same as the charger block: only blank the meter readings when BLE is
+    // actually down; a transient BLE-busy read keeps the last good values.
     setText('stat-voltage', '--');
     setText('stat-house', '--');
     _pf.house = null; pfRender();
   }
+  cacheDash();   // persist last-good telemetry so a page nav doesn't flash '--'
 }
 
 // ---- Controls ----
@@ -765,6 +934,7 @@ async function deleteSchedule(sid) {
 })();
 
 $('poll-s').textContent = POLL_MS / 1000;
+hydrateDash();   // show last-good telemetry instantly, before the first poll
 refresh();
 // Stagger the BAPI-passthrough reads (schedules, notifications) so they
 // don't pile onto refresh()'s request burst and trip the gateway's
@@ -777,6 +947,11 @@ setInterval(loadNotifs, 60_000);   // charger notifications refresh slowly
 // without opening the Sessions page (which was the only thing that refreshed
 // them before). Staggered off the boot burst; slow cadence since it pulls a
 // couple of BAPI reads (schedules, g_tzn) — charge windows change rarely.
-function refreshCost() { if (window.WBCost) WBCost.refresh().then(updateCostTiles).catch(function () {}); }
+function refreshCost() { if (window.WBCost) WBCost.refresh().then(function () { updateCostTiles(); updateSavings(); }).catch(function () {}); }
 setTimeout(refreshCost, 3600);
 setInterval(refreshCost, 300_000);  // every 5 min
+initSavingsUI();
+// Assistant summary card — staggered off the boot burst; re-checked slowly so
+// it reflects edits made on the Assistant page without a manual refresh.
+setTimeout(loadAssistantCard, 1500);
+setInterval(loadAssistantCard, 300_000);

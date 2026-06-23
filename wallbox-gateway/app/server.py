@@ -23,6 +23,7 @@ from proxy import (
     config_from_env,
     fetch_json,
 )
+import ha_bridge
 import ota
 
 
@@ -54,6 +55,11 @@ def ota_page():
 @app.route("/sessions")
 def sessions_page():
     return render_template("sessions.html")
+
+
+@app.route("/charge-assistant")
+def charge_assistant_page():
+    return render_template("charge_assistant.html")
 
 
 # Session-history BAPI methods the /sessions page reads: r_ses (last id +
@@ -317,6 +323,74 @@ def api_ota_upload():
     finally:
         if tmp_path:
             ota.cleanup(tmp_path)
+
+
+# ── HA Core bridge (Charge Assistant config GUI) ──────────────────────
+# These routes use the backend's SUPERVISOR_TOKEN to reach HA Core. The
+# token is NEVER returned to the browser — only the resulting entity list
+# / config object is. The frontend calls these with ingress-relative paths.
+
+
+def _ha_error(exc: Exception) -> Tuple[dict, int]:
+    if isinstance(exc, ha_bridge.CoreUnavailable):
+        return {"error": "ha_unavailable", "detail": str(exc)}, 503
+    if isinstance(exc, ha_bridge.CoreError):
+        return {"error": "ha_error", "detail": str(exc)}, 502
+    return {"error": "unknown", "detail": repr(exc)}, 500
+
+
+@app.route("/api/ha/states")
+def api_ha_states():
+    """List picker-relevant HA entities for the Charge Assistant GUI."""
+    cfg = ha_bridge.config_from_env()
+    try:
+        return jsonify({"entities": ha_bridge.list_states(cfg)})
+    except Exception as e:
+        body, code = _ha_error(e)
+        return jsonify(body), code
+
+
+@app.route("/api/ha/notify_services")
+def api_ha_notify_services():
+    """List the user's notify.* services for the notify-target picker."""
+    cfg = ha_bridge.config_from_env()
+    try:
+        return jsonify({"services": ha_bridge.list_notify_services(cfg)})
+    except Exception as e:
+        body, code = _ha_error(e)
+        return jsonify(body), code
+
+
+@app.route("/api/ha/config")
+def api_ha_get_config():
+    """Read the integration's current options to pre-fill the GUI."""
+    cfg = ha_bridge.config_from_env()
+    host = (request.args.get("host") or "").strip() or None
+    try:
+        return jsonify(ha_bridge.get_config(cfg, host=host))
+    except Exception as e:
+        body, code = _ha_error(e)
+        return jsonify(body), code
+
+
+@app.route("/api/ha/config", methods=["POST"])
+def api_ha_set_config():
+    """Write a partial options object back to the integration (+ reload)."""
+    cfg = ha_bridge.config_from_env()
+    payload = request.get_json(silent=True) or {}
+    options = payload.get("options")
+    if not isinstance(options, dict):
+        return jsonify({
+            "error": "bad_request",
+            "detail": "body must be {\"options\": {...}, \"host\"?: \"...\"}",
+        }), 400
+    host = (payload.get("host") or "").strip() or None
+    try:
+        ha_bridge.set_config(cfg, options, host=host)
+        return jsonify({"ok": True})
+    except Exception as e:
+        body, code = _ha_error(e)
+        return jsonify(body), code
 
 
 if __name__ == "__main__":

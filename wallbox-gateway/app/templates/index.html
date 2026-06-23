@@ -16,6 +16,7 @@
 <nav class="topnav">
   <a href="." class="active">&#x1F4CA; Dashboard</a>
   <a href="sessions">&#x1F4C8; Sessions</a>
+  <a href="charge-assistant">&#x1F916; Assistant</a>
   <a href="ota">&#x2B06; OTA</a>
   <span class="nav-next" id="nav-next" hidden title="Next scheduled charge">&#x1F5D3;&#xFE0F;&nbsp;<span id="nav-next-time">--</span></span>
 </nav>
@@ -186,6 +187,75 @@
     </div>
   </section>
 
+  <!-- Charging savings: the value of letting the assistant time-shift charging
+       into cheaper hours + use solar. An estimate vs a configurable baseline —
+       never shown as a guarantee. Hidden until a tariff is set. -->
+  <section class="card sv-card" id="savings-card" hidden>
+    <div class="sv-head">
+      <h2>&#x1F4B0; Charging savings</h2>
+      <span class="sv-pill" id="sv-baseline-pill"></span>
+    </div>
+    <div class="sv-figs">
+      <div class="sv-fig sv-fig-hero">
+        <div class="sv-fig-label">This month</div>
+        <div class="sv-fig-value" id="sv-month">--</div>
+      </div>
+      <div class="sv-fig">
+        <div class="sv-fig-label">This week</div>
+        <div class="sv-fig-value" id="sv-week">--</div>
+      </div>
+      <div class="sv-fig">
+        <div class="sv-fig-label">Projected / yr</div>
+        <div class="sv-fig-value" id="sv-year">--</div>
+      </div>
+    </div>
+    <div class="sv-breakdown" id="sv-breakdown"></div>
+    <p class="sv-note" id="sv-note"></p>
+
+    <details class="sv-config">
+      <summary>How this is calculated &amp; feedback</summary>
+      <div class="sv-config-body">
+        <p class="sv-hint">Savings = what charging <em>without</em> the assistant
+           would have cost, minus what it actually cost — same energy, same
+           tariff. Only the baseline behaviour is assumed:</p>
+        <label class="sv-field">Without the assistant I'd charge:
+          <select id="sv-baseline-mode">
+            <option value="plug_in">Immediately when I plug in</option>
+            <option value="fixed_time">At a fixed time</option>
+            <option value="flat_avg">Whenever (average rate)</option>
+          </select>
+        </label>
+        <label class="sv-field" id="sv-fixed-wrap" hidden>Fixed start time:
+          <input type="time" id="sv-fixed-time" value="00:00">
+        </label>
+        <div class="sv-feedback">
+          <span>Does this look right?</span>
+          <button type="button" class="sv-fb" id="sv-fb-up" title="Looks right">&#x1F44D;</button>
+          <button type="button" class="sv-fb" id="sv-fb-down" title="Looks off">&#x1F44E;</button>
+          <button type="button" class="ctrl-btn" id="sv-export" hidden>Export feedback</button>
+        </div>
+        <textarea id="sv-fb-note" class="sv-note-input" placeholder="Optional: what looks off?" hidden></textarea>
+        <p class="sv-hint" id="sv-fb-status"></p>
+        <p class="sv-hint">An estimate, not a guarantee. Feedback stays on this
+           device — nothing is sent automatically.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- Charge Assistant summary: what the integration's assistant is currently
+       configured to do. Read-only — reads the saved config via the HA bridge
+       (api/ha/config) and renders it with the shared ca_summary module. Hidden
+       when the bridge / integration isn't available. Edit jumps to the
+       Assistant page, where the existing setup is loaded for editing. -->
+  <section class="card asst-card" id="assistant-card" hidden>
+    <div class="asst-head">
+      <h2>&#x1F916; Charge Assistant</h2>
+      <span class="asst-badge" id="assistant-mode">Off</span>
+    </div>
+    <p class="asst-summary" id="assistant-summary">—</p>
+    <a href="charge-assistant" class="asst-edit" id="assistant-edit">Set up assistant &rarr;</a>
+  </section>
+
   <!-- Connection health -->
   <section class="card">
     <h2>Connections</h2>
@@ -276,6 +346,7 @@
 </main>
 
 <script src="static/cost.js"></script>
+<script src="static/ca_summary.js"></script>
 <script src="static/dashboard.js"></script>
 </body>
 </html>

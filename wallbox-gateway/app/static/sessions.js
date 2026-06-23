@@ -97,7 +97,18 @@ function loadTariff() {  // the CURRENT tariff (latest rates)
   try { const t = JSON.parse(localStorage.getItem(TARIFF_KEY)); if (t && t.type) return t; } catch (e) {}
   return null;
 }
-function saveTariff(t) { localStorage.setItem(TARIFF_KEY, JSON.stringify(t)); }
+function saveTariff(t) {
+  localStorage.setItem(TARIFF_KEY, JSON.stringify(t));
+  // Mirror the tariff to the integration so it can compute cost sensors
+  // (proper HA entities with statistics). Best-effort: the add-on keeps
+  // working from localStorage regardless of whether the bridge is present.
+  try {
+    fetch('api/ha/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ options: { tariff: t } }),
+    }).catch(function () {});
+  } catch (e) {}
+}
 function clearTariff() { localStorage.removeItem(TARIFF_KEY); localStorage.removeItem(TARIFF_HIST_KEY); }
 
 // Tariff history: archived PRIOR tariff versions, each with its own validFrom.

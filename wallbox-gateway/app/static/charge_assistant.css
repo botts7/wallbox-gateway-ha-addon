@@ -1,0 +1,479 @@
+/* ============================================================================
+   Charge Assistant — "energy control panel" redesign.
+   Refined, technical, dark. Layered on style.css (shares --bg/--surface/etc).
+   A guided config surface: one big mode decision up top, then focused cards
+   for that mode in an auto-fit grid (desktop) / single column (mobile), with
+   a blurred sticky action bar. Vanilla CSS, no build step.
+   ============================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&display=swap');
+
+.page-assistant {
+  --ca-accent: #3b82f6;
+  --ca-accent-soft: rgba(59, 130, 246, .14);
+  --ca-green: #22c55e;
+  --ca-radius: 16px;
+  --ca-radius-sm: 11px;
+  --ca-display: "Sora", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Override the dashboard's full-width masonry for this form-heavy page.
+   HA's own config dialogs are a centred single column — mirror that for
+   familiarity, at a comfortable reading width. */
+.page-assistant main {
+  column-count: 1 !important;
+  column-width: auto !important;
+  max-width: 880px;
+  padding-bottom: 96px;            /* clear the sticky action bar */
+}
+.page-assistant main > * { break-inside: auto; }
+
+/* Header pill — current mode badge */
+.ca-pill {
+  font-family: var(--ca-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--ca-accent-soft);
+  color: var(--accent, #3b82f6);
+  border: 1px solid rgba(59, 130, 246, .35);
+}
+
+/* ── Hero ──────────────────────────────────────────────────────── */
+.ca-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border, #2a2f3a);
+  border-radius: var(--ca-radius);
+  padding: 26px 24px 22px;
+  margin: 0 0 22px;
+  background:
+    radial-gradient(120% 140% at 88% -20%, rgba(59,130,246,.18), transparent 60%),
+    radial-gradient(90% 120% at 0% 120%, rgba(34,197,94,.10), transparent 55%),
+    var(--surface, #161a22);
+}
+.ca-hero-title {
+  font-family: var(--ca-display);
+  font-size: clamp(24px, 3vw, 34px);
+  font-weight: 700;
+  letter-spacing: -.01em;
+  margin: 0 0 6px;
+  line-height: 1.05;
+}
+.ca-hero-sub {
+  margin: 0 0 20px;
+  max-width: 62ch;
+  color: var(--text2, #94a3b8);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+/* ── Mode selector (segmented) ─────────────────────────────────── */
+.ca-modes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media (min-width: 720px) {
+  .ca-modes { grid-template-columns: repeat(4, 1fr); }
+}
+.ca-mode {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text, #e6e8ec);
+  border: 1px solid var(--border, #2a2f3a);
+  background: var(--elevated, #1b2029);
+  border-radius: var(--ca-radius-sm);
+  padding: 14px 14px 13px;
+  transition: transform .14s ease, border-color .14s, background .14s, box-shadow .14s;
+}
+.ca-mode:hover { transform: translateY(-2px); border-color: rgba(59,130,246,.5); }
+.ca-mode:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
+.ca-mode.active {
+  border-color: var(--ca-accent);
+  background: linear-gradient(180deg, var(--ca-accent-soft), rgba(59,130,246,.05));
+  box-shadow: 0 0 0 1px var(--ca-accent), 0 8px 24px -12px rgba(59,130,246,.8);
+}
+.ca-mode.active::after {
+  content: "✓";
+  position: absolute;
+  top: 10px; right: 12px;
+  width: 18px; height: 18px;
+  font-size: 11px; font-weight: 700;
+  display: grid; place-items: center;
+  border-radius: 999px;
+  background: var(--ca-accent);
+  color: #fff;
+}
+.ca-mode-icon { font-size: 22px; line-height: 1.2; }
+.ca-mode-name { font-family: var(--ca-display); font-weight: 600; font-size: 15px; margin-top: 4px; }
+.ca-mode-sub { font-size: 12px; color: var(--text2, #94a3b8); }
+
+/* ── Live summary (the "what will happen" panel) ───────────────── */
+.ca-summary {
+  display: flex; gap: 11px; align-items: flex-start;
+  margin-top: 18px; padding: 13px 15px;
+  border-radius: 12px;
+  background: rgba(34,197,94,.08);
+  border: 1px solid rgba(34,197,94,.28);
+}
+.ca-summary-icon { font-size: 17px; line-height: 1.4; flex: 0 0 auto; }
+.ca-summary p {
+  margin: 0; font-size: 14px; line-height: 1.5; color: var(--text, #e2e8f0);
+}
+.ca-summary p b { color: var(--text, #e2e8f0); font-weight: 700; }
+.ca-summary-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ca-summary-tag {
+  font-family: var(--ca-display); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: #f59e0b;
+}
+
+/* ── Active now: the SAVED / running config (distinct from the preview) ──
+   NB: uses .ca-saved, NOT .ca-active — the mode-section toggles a .ca-active
+   class to reveal itself, so styling .ca-active here would bleed onto the
+   card column and break its width stretch. */
+.ca-saved {
+  display: flex; gap: 11px; align-items: baseline;
+  margin-top: 18px; padding: 12px 15px;
+  border-radius: 12px;
+  background: var(--elevated, #1b2029);
+  border: 1px solid var(--border, #2a2f3a);
+}
+.ca-saved-label {
+  flex: 0 0 auto; white-space: nowrap;
+  font-family: var(--ca-display); font-size: 11px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ca-accent);
+}
+.ca-saved-text { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text2, #94a3b8); }
+
+/* Inline warning bar */
+.ca-warnbar {
+  display: flex; gap: 11px; align-items: flex-start;
+  margin: 0 0 22px; padding: 13px 15px;
+  border-radius: 12px;
+  background: rgba(245,158,11,.10);
+  border: 1px solid rgba(245,158,11,.4);
+}
+.ca-warnbar p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text, #e2e8f0); }
+.ca-warnbar strong { color: var(--text, #e2e8f0); }
+
+/* ── Off empty-state ───────────────────────────────────────────── */
+.ca-offstate { display: none; }
+#ca-form[data-mode="off"] .ca-offstate {
+  display: block;
+  text-align: center;
+  padding: 40px 24px;
+  border: 1px dashed var(--border, #2a2f3a);
+  border-radius: var(--ca-radius);
+  background: var(--surface, #161a22);
+  animation: caFade .35s ease both;
+}
+.ca-offstate-icon { font-size: 40px; opacity: .85; }
+.ca-offstate h2 { font-family: var(--ca-display); margin: 10px 0 6px; font-size: 19px; }
+.ca-offstate p { margin: 0 auto; max-width: 46ch; color: var(--text2, #94a3b8); font-size: 14px; }
+
+/* ── Mode sections → auto-fit grid of cards ────────────────────── */
+.ca-mode-section { display: none; }
+.ca-mode-section.ca-active {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Card ──────────────────────────────────────────────────────── */
+.ca-card {
+  border: 1px solid var(--border, #2a2f3a);
+  border-radius: var(--ca-radius);
+  background: var(--surface, #161a22);
+  /* visible so a picker's dropdown can overflow the card instead of being
+     clipped at its rounded edge. */
+  overflow: visible;
+}
+.ca-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 16px 18px 0;
+}
+.ca-card-icon {
+  flex: 0 0 auto;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  font-size: 19px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--chip, #3b82f6) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chip, #3b82f6) 40%, transparent);
+}
+.ca-card-titles { min-width: 0; }
+.ca-card h2 {
+  font-family: var(--ca-display);
+  font-size: 16px; font-weight: 600;
+  margin: 2px 0 2px; line-height: 1.2;
+}
+.ca-card-desc { margin: 0; font-size: 13px; color: var(--text2, #94a3b8); line-height: 1.45; }
+.ca-card-body { padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 14px; }
+
+/* Optional/required tags */
+.ca-opt, .ca-req {
+  font-family: var(--ca-display);
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px; vertical-align: middle;
+  margin-left: 6px;
+}
+.ca-opt { color: #9aa3b2; background: rgba(148,163,184,.14); }
+.ca-req { color: #fca5a5; background: rgba(239,68,68,.15); }
+
+/* ── Fields ────────────────────────────────────────────────────── */
+.ca-field { display: flex; flex-direction: column; gap: 6px; }
+.ca-field > label {
+  font-size: 13px; font-weight: 600; color: var(--text, #e6e8ec);
+}
+.ca-hint { font-size: 12px; color: var(--text2, #94a3b8); line-height: 1.45; }
+.ca-tip { margin-left: 6px; font-size: 12px; color: var(--text2, #94a3b8); cursor: help; opacity: .7; }
+.ca-tip:hover { opacity: 1; color: var(--ca-accent); }
+.ca-hint.hint-ok { color: #16a34a; }
+.ca-hint.hint-warn { color: #d97706; }
+.ca-hint code, .ca-card-desc code {
+  font-size: .9em; padding: 1px 5px; border-radius: 5px;
+  background: var(--elevated, #1b2029); border: 1px solid var(--border, #2a2f3a);
+}
+.ca-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.ca-row > .ca-field { flex: 1 1 150px; min-width: 0; }
+.ca-indent { margin-left: 28px; }
+
+.ca-field input[type="text"],
+.ca-field input[type="number"],
+.ca-field input[type="time"],
+.ca-field input[type="datetime-local"],
+.ca-field input[type="date"],
+.ca-field select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #2a2f3a);
+  background: var(--bg, #0f1218);
+  color: var(--text, #e6e8ec);
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color .12s, box-shadow .12s;
+}
+.ca-field input:hover, .ca-field select:hover { border-color: #3a414f; }
+.ca-field input:focus, .ca-field select:focus {
+  outline: none;
+  border-color: var(--ca-accent);
+  box-shadow: 0 0 0 3px var(--ca-accent-soft);
+}
+.ca-field select { appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239aa3b2' d='M6 8.5 1.5 4h9z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px;
+}
+.ca-field optgroup { font-style: normal; font-weight: 700; color: #9aa3b2; }
+
+/* input with a trailing unit (%, A, kW…) */
+.ca-input-suffix { position: relative; display: flex; align-items: center; }
+.ca-input-suffix input { padding-right: 46px; }
+.ca-input-suffix > span {
+  position: absolute; right: 12px;
+  font-size: 12px; color: var(--text2, #94a3b8); pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Entity picker + live value ────────────────────────────────── */
+/* Type-to-search combobox (single = entities; multi = notify chips) */
+.ca-combo { position: relative; flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.ca-combo-input {
+  width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--border, #2a2f3a); background: var(--bg, #0f1218);
+  color: var(--text, #e2e8f0); font-size: 14px; font-family: inherit;
+}
+.ca-combo-input:focus { outline: none; border-color: var(--ca-accent); box-shadow: 0 0 0 3px var(--ca-accent-soft); }
+.ca-combo-list {
+  position: fixed; z-index: 1000;
+  max-height: 260px; overflow: auto; padding: 4px;
+  background: var(--surface, #161a22); border: 1px solid var(--border, #2a2f3a);
+  border-radius: 10px; box-shadow: 0 14px 34px -12px rgba(0,0,0,.55);
+}
+.ca-combo-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.ca-combo-item:hover { background: var(--elevated, #1b2029); }
+.ci-main { display: flex; flex-direction: column; min-width: 0; }
+.ci-name { color: var(--text, #e2e8f0); font-weight: 500; }
+.ci-sub { color: var(--text2, #94a3b8); font-size: 11px; }
+.ci-val { margin-left: auto; font-size: 12px; color: #16a34a; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ci-val.bad { color: var(--text2, #94a3b8); font-style: italic; }
+.ca-combo-item.unavail { opacity: .55; }
+.ca-combo-item.suggested .ci-name::before { content: "★ "; color: #16a34a; }
+.ca-combo-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ca-combo-chips:empty { display: none; }
+.ca-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 11px;
+  border-radius: 999px; background: var(--ca-accent-soft); border: 1px solid rgba(59,130,246,.35);
+  font-size: 12.5px; color: var(--text, #e2e8f0);
+}
+.ca-chip-x { border: none; background: transparent; color: var(--text2, #94a3b8); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
+.ca-chip-x:hover { color: var(--text, #e2e8f0); }
+.ca-picker { display: flex; gap: 8px; align-items: flex-start; }
+.ca-picker select { flex: 1 1 auto; }
+.ca-live {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  min-width: 58px; justify-content: center;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--elevated, #1b2029);
+  border: 1px solid var(--border, #2a2f3a);
+  font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap;
+  color: var(--text2, #94a3b8);
+}
+.ca-live.live-ok {
+  color: var(--text, #1e293b);
+  border-color: rgba(34,197,94,.5);
+  background: rgba(34,197,94,.12);
+}
+.ca-live.live-bad {
+  color: #d97706;
+  border-color: rgba(217,119,6,.5);
+  background: rgba(217,119,6,.12);
+}
+.ca-hide-unavail {
+  display: flex; align-items: center; gap: 8px; margin-top: 16px;
+  font-size: 13px; color: var(--text2, #94a3b8); cursor: pointer;
+}
+.ca-hide-unavail input { width: 16px; height: 16px; accent-color: var(--ca-accent); }
+.ca-live.live-ok::before {
+  content: ""; width: 7px; height: 7px; border-radius: 999px;
+  background: var(--ca-green); box-shadow: 0 0 8px var(--ca-green);
+  animation: caPulse 2s ease-in-out infinite;
+}
+
+/* ── Checkboxes ────────────────────────────────────────────────── */
+.ca-check {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  padding: 2px 0;
+}
+.ca-check input { width: 18px; height: 18px; accent-color: var(--ca-accent); cursor: pointer; flex: 0 0 auto; }
+
+/* ── Triggers (mini-cards) ─────────────────────────────────────── */
+.ca-trigger {
+  border: 1px solid var(--border, #2a2f3a);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--bg, #0f1218);
+  transition: border-color .14s, background .14s;
+}
+.ca-trigger.on { border-color: rgba(59,130,246,.45); background: var(--ca-accent-soft); }
+.ca-trigger .ca-trigger-body {
+  margin-top: 12px; display: flex; flex-direction: column; gap: 12px;
+  border-top: 1px dashed var(--border, #2a2f3a); padding-top: 12px;
+}
+.ca-trigger:not(.on) .ca-trigger-body { display: none; }
+
+/* ── Advanced / settings expanders (<details>) ─────────────────── */
+.ca-adv { padding: 0; }
+.ca-adv > summary { cursor: pointer; list-style: none; padding-bottom: 16px; align-items: center; position: relative; }
+.ca-adv > summary::-webkit-details-marker { display: none; }
+.ca-adv .ca-adv-chevron {
+  margin-left: auto; color: var(--text2, #94a3b8); transition: transform .2s ease; font-size: 13px;
+}
+.ca-adv[open] .ca-adv-chevron { transform: rotate(180deg); }
+.ca-adv > summary:hover { background: rgba(255,255,255,.02); }
+/* span both grid columns so the expander is a full-width row */
+.ca-mode-section.ca-active > .ca-adv { grid-column: 1 / -1; }
+
+/* owner readout */
+.ca-owner {
+  padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--border, #2a2f3a); background: var(--bg, #0f1218);
+  font-size: 14px; color: var(--text2, #94a3b8);
+}
+
+/* settings card sits on its own full-width row, with breathing room */
+.ca-settings { margin-top: 18px; }
+
+.ca-footnote {
+  margin: 18px 2px 0; font-size: 12.5px; color: var(--text2, #94a3b8);
+  text-align: center; opacity: .8;
+}
+
+/* ── Sticky action bar ─────────────────────────────────────────── */
+.ca-actionbar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 30;
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px max(18px, calc((100% - 880px) / 2 + 18px));
+  background: color-mix(in srgb, var(--bg, #0f1218) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-top: 1px solid var(--border, #2a2f3a);
+}
+.ca-actionbar-btns { margin-left: auto; display: flex; gap: 10px; }
+.ca-save-status { font-size: 13px; color: var(--text2, #94a3b8); }
+.ca-save-status.ok { color: var(--ca-green); }
+.ca-save-status.err { color: #f87171; }
+
+/* Unsaved-changes indicator in the action bar */
+.ca-dirty { font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; }
+.ca-dirty.clean { color: var(--ca-green); }
+.ca-dirty.dirty { color: #f59e0b; }
+.ca-actionbar.has-changes { border-top-color: rgba(245,158,11,.5); }
+.ca-btn-primary:disabled {
+  opacity: .5; cursor: default; box-shadow: none; filter: none;
+}
+/* Narrow screens: the bar holds dirty badge + save-status + two buttons —
+   let it wrap so nothing clips, with the status text on its own line. */
+@media (max-width: 560px) {
+  .ca-actionbar { flex-wrap: wrap; row-gap: 8px; }
+  .ca-dirty { order: 1; }
+  .ca-save-status { order: 2; flex: 1 1 100%; }
+  .ca-actionbar-btns { order: 3; margin-left: auto; }
+}
+.ca-btn {
+  font: inherit; font-weight: 600; font-size: 14px;
+  padding: 10px 18px; border-radius: 11px; cursor: pointer;
+  border: 1px solid transparent; transition: transform .12s, filter .12s, background .12s;
+}
+.ca-btn:active { transform: translateY(1px); }
+.ca-btn-primary { background: var(--ca-accent); color: #fff; box-shadow: 0 6px 18px -8px rgba(59,130,246,.9); }
+.ca-btn-primary:hover { filter: brightness(1.08); }
+.ca-btn-ghost { background: var(--elevated, #1b2029); color: var(--text, #e6e8ec); border-color: var(--border, #2a2f3a); }
+.ca-btn-ghost:hover { border-color: #3a414f; }
+
+/* ── Toast (save feedback) ─────────────────────────────────────── */
+.ca-toast {
+  position: fixed; left: 50%; bottom: 26px;
+  transform: translateX(-50%) translateY(16px);
+  background: var(--surface, #161a22); color: var(--text, #e2e8f0);
+  border: 1px solid var(--border, #2a2f3a); border-left: 4px solid var(--ca-accent);
+  border-radius: 11px; padding: 13px 18px; font-size: 14px; font-weight: 500;
+  box-shadow: 0 16px 40px -12px rgba(0,0,0,.6);
+  opacity: 0; pointer-events: none; z-index: 100;
+  transition: opacity .2s ease, transform .2s ease;
+  max-width: min(520px, calc(100vw - 32px)); line-height: 1.45;
+}
+.ca-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.ca-toast.ok { border-left-color: #22c55e; }
+.ca-toast.err { border-left-color: #f87171; }
+
+/* ── Motion ────────────────────────────────────────────────────── */
+@keyframes caFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes caPulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+.ca-mode-section.ca-active > * { animation: caFade .4s ease both; }
+.ca-mode-section.ca-active > *:nth-child(2) { animation-delay: .06s; }
+.ca-mode-section.ca-active > *:nth-child(3) { animation-delay: .12s; }
+.ca-mode-section.ca-active > *:nth-child(4) { animation-delay: .18s; }
+@media (prefers-reduced-motion: reduce) {
+  .ca-mode-section.ca-active > *, .ca-offstate { animation: none !important; }
+  .ca-mode:hover { transform: none; }
+}

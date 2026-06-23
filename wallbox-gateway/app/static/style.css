@@ -718,3 +718,49 @@ a { color: var(--accent); }
 .tm-band-seasons { display: flex; gap: 10px; flex-wrap: wrap; padding-left: 42px; }
 .tm-srate-lbl { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text3); }
 .tm-band-srate { width: 76px; background: var(--elevated); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 5px 7px; }
+
+/* ---- Charge Assistant summary card ---- */
+.asst-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.asst-head h2 { margin: 0; }
+.asst-badge {
+  font-size: 12px; font-weight: 700; letter-spacing: .02em;
+  border-radius: 999px; padding: 3px 11px; white-space: nowrap;
+  color: var(--text3); background: var(--elevated); border: 1px solid var(--border);
+}
+.asst-badge.asst-reminder { color: #3b82f6; background: rgba(59,130,246,.14); border-color: rgba(59,130,246,.4); }
+.asst-badge.asst-target_soc { color: #16a34a; background: rgba(34,197,94,.14); border-color: rgba(34,197,94,.4); }
+.asst-badge.asst-solar { color: #d97706; background: rgba(245,158,11,.14); border-color: rgba(245,158,11,.4); }
+.asst-summary { margin: 0 0 12px; font-size: 14px; line-height: 1.5; color: var(--text2); }
+.asst-edit {
+  display: inline-block; font-size: 13px; font-weight: 600;
+  color: var(--accent); text-decoration: none;
+}
+.asst-edit:hover { text-decoration: underline; }
+
+/* ---- Charging savings card ---- */
+.sv-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.sv-head h2 { margin: 0; }
+.sv-pill { font-size: 12px; font-weight: 600; color: var(--text3); background: var(--elevated); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+/* minmax(0,1fr) (not plain 1fr) so a wide value can't push its column wider
+   than the others — keeps the three figures equal width. */
+.sv-figs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+/* container-type so the figure font can scale to the column width (cqw) and
+   stay on one line at any width — a wide value like $AU837 no longer wraps. */
+.sv-fig { min-width: 0; container-type: inline-size; background: var(--elevated); border: 1px solid var(--border); border-radius: 12px; padding: 12px 10px; text-align: center; }
+.sv-fig-label { font-size: 12px; color: var(--text3); margin-bottom: 4px; }
+.sv-fig-value { font-size: clamp(13px, 17cqw, 22px); white-space: nowrap; font-weight: 700; font-variant-numeric: tabular-nums; color: #22c55e; }
+.sv-fig-hero .sv-fig-value { font-size: clamp(14px, 19cqw, 26px); }
+.sv-breakdown { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.sv-chip { font-size: 12.5px; color: var(--text2); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; }
+.sv-note { font-size: 12.5px; color: var(--text3); margin: 12px 0 0; line-height: 1.45; }
+.sv-config { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+.sv-config > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text2); }
+.sv-config-body { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+.sv-hint { font-size: 12px; color: var(--text3); margin: 0; line-height: 1.5; }
+.sv-field { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; flex-wrap: wrap; }
+.sv-field select, .sv-field input[type="time"] { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; font-size: 14px; }
+.sv-feedback { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.sv-fb { cursor: pointer; font-size: 16px; background: var(--elevated); border: 1px solid var(--border); border-radius: 9px; padding: 5px 11px; }
+.sv-fb:hover { border-color: var(--primary); }
+.sv-note-input { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 9px; padding: 9px 10px; font: inherit; font-size: 13px; resize: vertical; min-height: 56px; }
+@media (max-width: 520px) { .sv-figs { grid-template-columns: 1fr; } }

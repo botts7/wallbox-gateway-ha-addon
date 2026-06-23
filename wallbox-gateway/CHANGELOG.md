@@ -4,6 +4,105 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.23.0] - 2026-06-23
+
+Saved-state visibility — you can always see what the assistant is set to.
+
+### Added
+- **"Active now" line** on the Charge Assistant page — shows, in plain
+  English, the config currently **saved and running** on the integration,
+  separate from the live preview of what you're editing.
+- **Unsaved-changes indicator** in the action bar (**● Unsaved changes**
+  vs **✓ Up to date**), a *Preview — not saved yet* tag on the live
+  summary, and the **Save** button disables when nothing has changed.
+  Opening the page loads the existing setup for editing.
+- **Charge Assistant card on the dashboard** — a read-only summary of the
+  current setup with an **Edit setup →** link, rendered by a shared
+  `ca_summary` module so the dashboard and the Assistant page always agree.
+
+### Fixed
+- Mode-section cards rendered at different widths (a CSS class-name
+  collision with the new saved-state box); cards are uniform width again.
+
+## [0.22.0] - 2026-06-22
+
+The Charge Assistant release — Phase 1. The Add-on becomes the rich,
+primary place to configure the integration's Charge Assistant, so you
+never need the native options-flow wizard again.
+
+### Added
+- **Charge Assistant page** (new **🤖 Assistant** nav entry) — a full GUI
+  for the integration's Charge Assistant: pick **Off / Reminder / Smart
+  charge / Solar**, then configure each mode with **live entity pickers**
+  (battery level, presence, price, solar-surplus) that show the entity's
+  **current value inline** so you pick the right one. Covers all the
+  reminder triggers (arrival / nightly / lead-time / price), conditions
+  (SOC skip, quiet hours, only-if-scheduled), and the notification
+  (service, title, message, actionable buttons, re-remind). Save applies
+  immediately — the integration reloads the assistant with the new config.
+- **Works without Wallbox accessories** — every input is a free choice of
+  **any** Home Assistant sensor (device-class matches are suggested first,
+  but the full list is always selectable, so template/non-standard sensors
+  work too). Battery level, solar surplus, electricity price, presence, and
+  the house/grid-power source for load-limiting can all come from your
+  existing HA entities — no Power Boost meter required.
+- **Tariff now feeds the integration** — saving your tariff also mirrors it to
+  the Wallbox Gateway integration (via the config bridge), so the integration
+  can publish native **Charging cost** sensors (with HA long-term statistics).
+  The Add-on keeps working from its own copy regardless; best-effort, nothing
+  changes if the integration isn't installed. Needs integration **0.15.0+**.
+- **Surplus source wizard** (Solar mode) — no ready-made "surplus" sensor? Pick
+  **grid power** (export = surplus) or **solar − house load** and the assistant
+  derives it. The live summary updates to match your source.
+- **Battery care & limits** (Smart-charge) — the target is your everyday ceiling
+  (80% is kind to the battery); set a higher **trip target** that applies only
+  until a date/time (then reverts), and a **price cap** so it never charges
+  above a price you set (your departure time still wins).
+- **Dynamic current control** (Solar mode, advanced) — modulate the charge
+  current to follow available solar surplus instead of plain on/off, within
+  configurable min/max amps, with a supply voltage/phases setting to convert
+  power to current. Optional **house-load limit** trims charge current so
+  total draw stays under a cap (reads your chosen grid-power sensor, or the
+  charger's own meter).
+- **Integration settings** section on the same page — poll interval (editable)
+  and the current charge-control owner (read-only; changed on the gateway's
+  own Settings page).
+
+- **Cheapest-hours charging** in Smart-charge — pick a price-forecast sensor and
+  the assistant charges only in the cheapest hours that still reach your target
+  by departure. The picker **detects whether the sensor actually has a forecast**
+  and says so (✓ / ⚠), since cheapest-hours is impossible without one.
+- **Capability-aware** — the page reads your charger model from the gateway and
+  **disables features it can't do** (live dynamic-current is hidden on the
+  original Pulsar, and labelled experimental everywhere) instead of offering
+  things that silently won't work.
+- **Charging savings** card on the dashboard — what time-shifting into cheaper
+  hours (+ using solar) is worth, as week / month / projected-per-year. It's an
+  honest **estimate vs a baseline you choose** ("without the assistant I'd
+  charge: immediately at plug-in / at a fixed time / whenever") — measured
+  energy × your real tariff, only the baseline behaviour is assumed; never shown
+  as a guarantee. Includes 👍/👎 feedback with an **Export** that copies an
+  anonymised bundle for you to share — **stored on-device, nothing is ever sent
+  automatically**.
+
+### Changed
+- The Charge Assistant page got a full **redesign** — a familiar HA-style
+  single-column flow with a mode selector, **live plain-English summary** of
+  what the assistant will do, smart defaults, inline live entity values, and a
+  sticky action bar. Responsive desktop + mobile.
+- **HA bridge** — the Add-on backend now reads HA entity states and the
+  integration's current config (and writes it back) using the
+  `homeassistant_api` permission (the same grant ESPHome / Node-RED use).
+  The Supervisor token stays in the backend and is never exposed to the
+  browser; new `/api/ha/states` + `/api/ha/config` routes proxy it.
+
+### Notes
+- The integration remains the single automation brain — this page only
+  *configures* it. Basic charger setup (host, credentials) still lives in
+  the integration; everything here writes back to it.
+- Requires the **Wallbox BLE Gateway** integration **0.15.0+** (adds the
+  `get_config` / `set_config` services this page calls).
+
 ## [0.21.4] - 2026-06-22
 
 ### Changed

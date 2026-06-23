@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wallbox Gateway &middot; Charge Assistant</title>
+<link rel="stylesheet" href="static/style.css">
+<link rel="stylesheet" href="static/charge_assistant.css">
+</head>
+<body class="page-assistant">
+
+<header>
+  <h1>Wallbox Gateway</h1>
+  <span id="ca-mode-pill" class="ca-pill" hidden></span>
+</header>
+
+<nav class="topnav">
+  <a href=".">&#x1F4CA; Dashboard</a>
+  <a href="sessions">&#x1F4C8; Sessions</a>
+  <a href="charge-assistant" class="active">&#x1F916; Assistant</a>
+  <a href="ota">&#x2B06; OTA</a>
+</nav>
+
+<main>
+
+  <section id="ca-no-bridge" class="card warn" hidden>
+    <h2>Home Assistant link unavailable</h2>
+    <p>The Add-on couldn't reach Home Assistant's API. The Charge Assistant
+       configuration needs the <code>homeassistant_api</code> permission — it's
+       granted automatically when the Add-on is installed from the store.
+       If you sideloaded it, reinstall/restart the Add-on. (Detail:
+       <span id="ca-bridge-detail">—</span>)</p>
+  </section>
+
+  <section id="ca-no-integration" class="card warn" hidden>
+    <h2>Wallbox Gateway integration not found</h2>
+    <p>Add the <strong>Wallbox Gateway</strong> integration in Home Assistant
+       (Settings &rarr; Devices &amp; Services) first. The Charge Assistant runs
+       inside the integration; this page just configures it.</p>
+  </section>
+
+  <section id="ca-no-gateway" class="card warn" hidden>
+    <h2>Gateway not configured</h2>
+    <p>Set <code>gateway_ip</code> in this Add-on's <strong>Configuration</strong>
+       tab (your Wallbox gateway's IP) and restart the Add-on. Without it the
+       assistant can't read charger state or drive charging.</p>
+  </section>
+
+  <div id="ca-form" hidden>
+
+  <!-- ── Hero: the one decision that drives everything ──────────── -->
+  <section class="ca-hero">
+    <div class="ca-hero-head">
+      <h1 class="ca-hero-title">Charge&nbsp;Assistant</h1>
+      <p class="ca-hero-sub">Choose how it helps. It runs inside the integration
+         and only ever acts when it owns charge control — it never fights you.</p>
+    </div>
+    <div class="ca-modes" id="ca-modes" role="tablist" aria-label="Assistant mode">
+      <button type="button" class="ca-mode" data-mode="off" role="tab">
+        <span class="ca-mode-icon">&#x23FB;</span>
+        <span class="ca-mode-name">Off</span>
+        <span class="ca-mode-sub">Do nothing</span>
+      </button>
+      <button type="button" class="ca-mode" data-mode="reminder" role="tab">
+        <span class="ca-mode-icon">&#x1F514;</span>
+        <span class="ca-mode-name">Reminder</span>
+        <span class="ca-mode-sub">Nudge to plug in</span>
+      </button>
+      <button type="button" class="ca-mode" data-mode="target_soc" role="tab">
+        <span class="ca-mode-icon">&#x1F3AF;</span>
+        <span class="ca-mode-name">Smart charge</span>
+        <span class="ca-mode-sub">Charge to a target</span>
+      </button>
+      <button type="button" class="ca-mode" data-mode="solar" role="tab">
+        <span class="ca-mode-icon">&#x2600;&#xFE0F;</span>
+        <span class="ca-mode-name">Solar</span>
+        <span class="ca-mode-sub">Use excess solar</span>
+      </button>
+    </div>
+
+    <label class="ca-hide-unavail">
+      <input type="checkbox" id="ca-hide-unavail">
+      <span>Only show available entities in the pickers</span>
+    </label>
+
+    <!-- Active now: what's currently SAVED and running on the integration.
+         Snapshotted at load and after each save — distinct from the live
+         preview below so you can always see saved-vs-being-edited. -->
+    <div class="ca-saved" id="ca-active" hidden>
+      <span class="ca-saved-label">Active&nbsp;now</span>
+      <p class="ca-saved-text" id="ca-active-text"></p>
+    </div>
+
+    <!-- Live plain-English PREVIEW of what the current form would do. Updates as
+         you configure — the thing HA's native options flow can't show. -->
+    <div class="ca-summary" id="ca-summary" hidden>
+      <span class="ca-summary-icon" id="ca-summary-icon">&#x1F4A1;</span>
+      <div class="ca-summary-body">
+        <span class="ca-summary-tag" id="ca-summary-tag" hidden>Preview &middot; not saved yet</span>
+        <p id="ca-summary-text"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Inline warning: acting mode won't run unless the gateway hands it control. -->
+  <div class="ca-warnbar" id="ca-owner-warn" hidden>
+    <span>&#x26A0;&#xFE0F;</span>
+    <p>This mode controls charging, but the gateway's charge-control owner is
+       <strong id="ca-owner-cur">—</strong>. The assistant <strong>won't act</strong>
+       until you set it to <strong>Home Assistant Integration</strong> on the
+       gateway's own Settings page. (Reminder mode still works — it only notifies.)</p>
+  </div>
+
+  <!-- Empty-state shown only when mode = off -->
+  <div class="ca-offstate" data-section="off">
+    <div class="ca-offstate-icon">&#x1F50C;</div>
+    <h2>Assistant is off</h2>
+    <p>Pick a mode above to set it up. Nothing is automated until you do —
+       your charger keeps working exactly as it does now.</p>
+  </div>
+
+  <!-- ── Reminder mode ──────────────────────────────────────────── -->
+  <div class="ca-mode-section" data-section="reminder">
+    <section class="ca-card">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#3b82f6">&#x1F514;</span>
+        <div class="ca-card-titles">
+          <h2>Triggers</h2>
+          <p class="ca-card-desc">When should we remind you? Enable any combination.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <div class="ca-trigger" data-trigger="arrival">
+          <label class="ca-check"><input type="checkbox" id="trig-arrival"> <span>&#x1F3E0; When I arrive home</span></label>
+          <div class="ca-trigger-body">
+            <div class="ca-field">
+              <label>Presence entity</label>
+              <div class="ca-picker">
+                <select id="arrival_entity" data-domains="person,device_tracker"></select>
+                <span class="ca-live" data-live-for="arrival_entity">—</span>
+              </div>
+              <div class="ca-hint">Reminds when this turns <code>home</code>.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ca-trigger" data-trigger="nightly">
+          <label class="ca-check"><input type="checkbox" id="trig-nightly"> <span>&#x1F319; Every night at a set time</span></label>
+          <div class="ca-trigger-body">
+            <div class="ca-field">
+              <label>Time</label>
+              <input type="time" id="nightly_time">
+            </div>
+          </div>
+        </div>
+
+        <div class="ca-trigger" data-trigger="lead">
+          <label class="ca-check"><input type="checkbox" id="trig-lead"> <span>&#x23F1;&#xFE0F; Before the next scheduled charge</span></label>
+          <div class="ca-trigger-body">
+            <div class="ca-field">
+              <label>Hours before</label>
+              <input type="number" id="lead_hours" min="0.25" step="0.25" placeholder="2">
+              <div class="ca-hint">Uses the charger's own next-scheduled-charge time.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ca-trigger" data-trigger="tariff">
+          <label class="ca-check"><input type="checkbox" id="trig-tariff"> <span>&#x1F4B0; When electricity price drops</span></label>
+          <div class="ca-trigger-body">
+            <div class="ca-field">
+              <label>Price entity</label>
+              <div class="ca-picker">
+                <select id="tariff_entity" data-domains="sensor"></select>
+                <span class="ca-live" data-live-for="tariff_entity">—</span>
+              </div>
+            </div>
+            <div class="ca-field">
+              <label>Notify when at/below</label>
+              <input type="number" id="tariff_below" step="0.01" placeholder="0.20">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ca-card">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#f59e0b">&#x1F6E1;&#xFE0F;</span>
+        <div class="ca-card-titles">
+          <h2>Conditions</h2>
+          <p class="ca-card-desc">Don't nag when these say it's pointless.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <div class="ca-field">
+          <label>Battery level entity <span class="ca-opt">optional</span></label>
+          <div class="ca-picker">
+            <select id="soc_entity" data-domains="sensor" data-device-class="battery"></select>
+            <span class="ca-live" data-live-for="soc_entity">—</span>
+          </div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Skip if already above</label>
+            <div class="ca-input-suffix"><input type="number" id="skip_above_pct" min="0" max="100" placeholder="80"><span>%</span></div>
+          </div>
+          <div class="ca-field">
+            <label>Ignore SOC older than</label>
+            <div class="ca-input-suffix"><input type="number" id="soc_max_age_min" min="0" placeholder="120"><span>min</span></div>
+          </div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Quiet hours start</label>
+            <input type="time" id="quiet_start">
+          </div>
+          <div class="ca-field">
+            <label>Quiet hours end</label>
+            <input type="time" id="quiet_end">
+          </div>
+        </div>
+        <label class="ca-check"><input type="checkbox" id="only_if_scheduled"> <span>Only if a charge is scheduled soon</span></label>
+        <div class="ca-field ca-indent" id="scheduled_within_wrap" hidden>
+          <label>Within</label>
+          <div class="ca-input-suffix"><input type="number" id="scheduled_within_h" min="1" placeholder="12"><span>hours</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ca-card">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#22c55e">&#x1F4F2;</span>
+        <div class="ca-card-titles">
+          <h2>Notification</h2>
+          <p class="ca-card-desc">How the nudge reaches you.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <div class="ca-field">
+          <label>Notify service</label>
+          <input type="text" id="notify_service" data-notify placeholder="notify.mobile_app_my_phone">
+          <datalist id="ca-notify-list"></datalist>
+          <div class="ca-hint">The HA notify service that pushes to your phone.</div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Title</label>
+            <input type="text" id="title" placeholder="Plug in your car">
+          </div>
+          <div class="ca-field">
+            <label>Tap opens (path)</label>
+            <input type="text" id="tap_path" placeholder="/lovelace/energy">
+          </div>
+        </div>
+        <div class="ca-field">
+          <label>Message</label>
+          <input type="text" id="message" placeholder="Don't forget to plug in tonight.">
+        </div>
+        <label class="ca-check"><input type="checkbox" id="actionable"> <span>Add Start / Snooze / Skip buttons (mobile app)</span></label>
+        <div class="ca-field">
+          <label>Re-remind if still unplugged after</label>
+          <div class="ca-input-suffix"><input type="number" id="escalate_min" min="0" placeholder="0"><span>min</span></div>
+          <div class="ca-hint">0 = don't re-remind.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ── Smart-charge (target SOC) mode ─────────────────────────── -->
+  <div class="ca-mode-section" data-section="target_soc">
+    <section class="ca-card">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#3b82f6">&#x1F3AF;</span>
+        <div class="ca-card-titles">
+          <h2>Charge to a target</h2>
+          <p class="ca-card-desc">Charge up to a battery level, then stop —
+             optionally timed to be ready by a departure.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <div class="ca-field">
+          <label>Battery level entity <span class="ca-req">required</span></label>
+          <div class="ca-picker">
+            <select id="soc_entity_t" data-domains="sensor" data-device-class="battery"></select>
+            <span class="ca-live" data-live-for="soc_entity_t">—</span>
+          </div>
+          <div class="ca-hint">The assistant reads this to know when to stop.</div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Target level</label>
+            <div class="ca-input-suffix"><input type="number" id="target_soc_pct" min="1" max="100" placeholder="80"><span>%</span></div>
+          </div>
+          <div class="ca-field">
+            <label>Ready by <span class="ca-opt">optional</span></label>
+            <input type="time" id="departure_time">
+          </div>
+        </div>
+        <label class="ca-check"><input type="checkbox" id="target_autostart"> <span>Also start charging when below target &amp; plugged in</span></label>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Battery capacity</label>
+            <div class="ca-input-suffix"><input type="number" id="battery_kwh" min="1" step="0.1" placeholder="60"><span>kWh</span></div>
+            <div class="ca-hint">For the ready-by estimate.</div>
+          </div>
+          <div class="ca-field">
+            <label>Typical charge power</label>
+            <div class="ca-input-suffix"><input type="number" id="charge_power_kw" min="0.5" step="0.1" placeholder="7.4"><span>kW</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ca-card">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#16a34a">&#x1F4B0;</span>
+        <div class="ca-card-titles">
+          <h2>Cheapest hours <span class="ca-opt">price-aware</span></h2>
+          <p class="ca-card-desc">Charge only during the cheapest forecast hours
+             that still reach your target by departure.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <label class="ca-check"><input type="checkbox" id="cheapest_window"> <span>&#x1F4B0; Charge during the cheapest hours</span></label>
+        <div class="ca-field ca-indent" id="cheapest-wrap" hidden>
+          <label>Price forecast entity</label>
+          <div class="ca-picker">
+            <select id="price_entity" data-domains="sensor" data-device-class="monetary"></select>
+            <span class="ca-live" data-live-for="price_entity">—</span>
+          </div>
+          <div class="ca-hint" id="price-forecast-hint">Needs a sensor that
+             publishes a price forecast (Amber, Nord Pool, Tibber…).</div>
+          <div class="ca-hint">Always still ready by your departure time — if cheap
+             hours run short, it charges anyway.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ca-card">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#14b8a6">&#x1F50B;</span>
+        <div class="ca-card-titles">
+          <h2>Battery care &amp; limits <span class="ca-opt">optional</span></h2>
+          <p class="ca-card-desc">The target above is your everyday ceiling
+             (80% is kind to the battery). Raise it just for a trip, and cap the
+             price you'll pay.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Trip target</label>
+            <div class="ca-input-suffix"><input type="number" id="trip_target_pct" min="1" max="100" placeholder="100"><span>%</span></div>
+            <div class="ca-hint">Higher target for an upcoming trip.</div>
+          </div>
+          <div class="ca-field">
+            <label>…until</label>
+            <input type="datetime-local" id="trip_until">
+            <div class="ca-hint">After this, it reverts to the everyday target automatically.</div>
+          </div>
+        </div>
+        <div class="ca-field">
+          <label>Never charge above</label>
+          <input type="number" id="price_cap" step="0.01" placeholder="e.g. 0.40">
+          <div class="ca-hint">Hard price ceiling (your price entity's units).
+             Your departure time still wins — it'll charge anyway if needed to be ready.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ca-card">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#22c55e">&#x1F4F2;</span>
+        <div class="ca-card-titles">
+          <h2>Notification <span class="ca-opt">optional</span></h2>
+          <p class="ca-card-desc">Get a heads-up when charging starts / completes.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <div class="ca-field">
+          <label>Notify service</label>
+          <input type="text" id="notify_service_t" data-notify placeholder="notify.mobile_app_my_phone">
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ── Solar mode ─────────────────────────────────────────────── -->
+  <div class="ca-mode-section" data-section="solar">
+    <section class="ca-card">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#f59e0b">&#x2600;&#xFE0F;</span>
+        <div class="ca-card-titles">
+          <h2>Charge from excess solar</h2>
+          <p class="ca-card-desc">Start when surplus is available, stop when it's
+             not. Hysteresis + a hold time ride out passing clouds.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <div class="ca-field">
+          <label>Surplus source</label>
+          <select id="surplus_source">
+            <option value="entity">I have a surplus sensor</option>
+            <option value="grid">Compute from grid power</option>
+            <option value="solar_load">Compute from solar − house load</option>
+          </select>
+          <div class="ca-hint">No ready-made surplus sensor? Derive it from what you have.</div>
+        </div>
+        <div class="ca-field ss-block" data-ss="entity">
+          <label>Solar surplus entity</label>
+          <div class="ca-picker">
+            <select id="surplus_entity" data-domains="sensor" data-device-class="power"></select>
+            <span class="ca-live" data-live-for="surplus_entity">—</span>
+          </div>
+          <div class="ca-hint">Power available to divert (your own units — W or kW).</div>
+        </div>
+        <div class="ss-block" data-ss="grid" hidden>
+          <div class="ca-field">
+            <label>Grid power entity</label>
+            <div class="ca-picker">
+              <select id="grid_entity" data-domains="sensor" data-device-class="power"></select>
+              <span class="ca-live" data-live-for="grid_entity">—</span>
+            </div>
+          </div>
+          <label class="ca-check"><input type="checkbox" id="grid_export_negative"> <span>Grid reads negative when exporting</span></label>
+          <div class="ca-hint">Most whole-home meters do. Surplus = exported power.</div>
+        </div>
+        <div class="ss-block" data-ss="solar_load" hidden>
+          <div class="ca-row">
+            <div class="ca-field">
+              <label>Solar production</label>
+              <div class="ca-picker">
+                <select id="solar_entity" data-domains="sensor" data-device-class="power"></select>
+                <span class="ca-live" data-live-for="solar_entity">—</span>
+              </div>
+            </div>
+            <div class="ca-field">
+              <label>House load</label>
+              <div class="ca-picker">
+                <select id="load_entity" data-domains="sensor" data-device-class="power"></select>
+                <span class="ca-live" data-live-for="load_entity">—</span>
+              </div>
+            </div>
+          </div>
+          <div class="ca-hint">Surplus = solar − house load (same units).</div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Start at/above</label>
+            <input type="number" id="surplus_start" step="0.1" placeholder="1.4">
+          </div>
+          <div class="ca-field">
+            <label>Stop at/below</label>
+            <input type="number" id="surplus_stop" step="0.1" placeholder="0.6">
+          </div>
+          <div class="ca-field">
+            <label>Hold for</label>
+            <div class="ca-input-suffix"><input type="number" id="surplus_debounce_min" min="0" placeholder="3"><span>min</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <details class="ca-card ca-adv">
+      <summary class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#8b5cf6">&#x1F4C8;</span>
+        <div class="ca-card-titles">
+          <h2>Dynamic current <span class="ca-opt">advanced</span></h2>
+          <p class="ca-card-desc">Modulate the charge current to follow surplus
+             and cap house draw, instead of plain on/off.</p>
+        </div>
+        <span class="ca-adv-chevron" aria-hidden="true">&#x25BE;</span>
+      </summary>
+      <div class="ca-card-body">
+        <div class="ca-hint hint-warn" id="ca-dyn-warn" hidden>
+          &#x26A0;&#xFE0F; Your charger doesn't support live current control over BLE
+          (original Pulsar). This feature is disabled for it — solar on/off above
+          still works. Dynamic current is <strong>experimental</strong> on all
+          chargers and needs validation on real hardware.
+        </div>
+        <label class="ca-check"><input type="checkbox" id="solar_dynamic"> <span>&#x1F4C8; Follow surplus by adjusting charge current</span> <span class="ca-opt">experimental</span></label>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Min current</label>
+            <div class="ca-input-suffix"><input type="number" id="min_current_a" min="6" max="32" placeholder="6"><span>A</span></div>
+          </div>
+          <div class="ca-field">
+            <label>Max current</label>
+            <div class="ca-input-suffix"><input type="number" id="max_current_a" min="6" max="32" placeholder="32"><span>A</span></div>
+          </div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Supply voltage</label>
+            <div class="ca-input-suffix"><input type="number" id="supply_voltage" min="100" max="500" placeholder="230"><span>V</span></div>
+          </div>
+          <div class="ca-field">
+            <label>Phases</label>
+            <input type="number" id="supply_phases" min="1" max="3" placeholder="1">
+          </div>
+          <div class="ca-field">
+            <label>House load limit <span class="ca-opt">optional</span></label>
+            <div class="ca-input-suffix"><input type="number" id="load_limit_w" min="0" step="100" placeholder="0"><span>W</span></div>
+          </div>
+        </div>
+        <div class="ca-field">
+          <label>House/grid power source</label>
+          <div class="ca-picker">
+            <select id="load_power_entity" data-domains="sensor" data-device-class="power"></select>
+            <span class="ca-live" data-live-for="load_power_entity">—</span>
+          </div>
+          <div class="ca-hint">For the load limit. Leave as <em>none</em> to use the
+             charger's own Power Boost meter (if fitted). Voltage &amp; phases
+             convert surplus power to amps.</div>
+        </div>
+      </div>
+    </details>
+
+    <section class="ca-card">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#22c55e">&#x1F4F2;</span>
+        <div class="ca-card-titles">
+          <h2>Notification <span class="ca-opt">optional</span></h2>
+          <p class="ca-card-desc">Get a heads-up when solar charging starts / stops.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <div class="ca-field">
+          <label>Notify service</label>
+          <input type="text" id="notify_service_s" data-notify placeholder="notify.mobile_app_my_phone">
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ── Integration settings (always shown) ───────────────────── -->
+  <details class="ca-card ca-adv ca-settings">
+    <summary class="ca-card-head">
+      <span class="ca-card-icon" style="--chip:#64748b">&#x2699;&#xFE0F;</span>
+      <div class="ca-card-titles">
+        <h2>Integration settings</h2>
+        <p class="ca-card-desc">Tunables that apply in every mode. Saved with Save.</p>
+      </div>
+      <span class="ca-adv-chevron" aria-hidden="true">&#x25BE;</span>
+    </summary>
+    <div class="ca-card-body">
+      <div class="ca-row">
+        <div class="ca-field">
+          <label>Poll interval</label>
+          <div class="ca-input-suffix"><input type="number" id="poll_interval" min="5" max="300" placeholder="10"><span>sec</span></div>
+          <div class="ca-hint">How often the integration reads the gateway (5–300).</div>
+        </div>
+        <div class="ca-field">
+          <label>Charge-control owner</label>
+          <div class="ca-owner" id="ctrl-owner-live">—</div>
+          <div class="ca-hint">Who may drive charging. Change it on the gateway's
+             own <strong>Settings</strong> page. The assistant acts only when this
+             is <code>integration</code>.</div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  </div><!-- /ca-form -->
+
+  <p class="ca-footnote">Basic charger setup (host, credentials) lives in the
+     integration. Everything here writes back to it and applies immediately.</p>
+
+  <!-- Sticky action bar -->
+  <div class="ca-actionbar" id="ca-actionbar" hidden>
+    <span class="ca-dirty clean" id="ca-dirty">✓ Up to date</span>
+    <span class="ca-save-status" id="ca-save-status"></span>
+    <div class="ca-actionbar-btns">
+      <button type="button" class="ca-btn ca-btn-ghost" id="ca-reload">Reload</button>
+      <button type="button" class="ca-btn ca-btn-primary" id="ca-save" disabled>Save changes</button>
+    </div>
+  </div>
+
+</main>
+
+<script src="static/ca_summary.js"></script>
+<script src="static/charge_assistant.js"></script>
+</body>
+</html>

@@ -16,6 +16,7 @@ window.WBCost = (function () {
   const TARIFF_HIST_KEY = 'wb-addon-tariff-history-v1';
   const SESSIONS_KEY = 'wb-addon-sessions-v2';
   const SUMMARY_KEY = 'wb-addon-cost-summary';
+  const BASELINE_KEY = 'wb-addon-savings-baseline-v1';
   const DEFAULT_BANDS = [
     { id: 'off', name: 'Off-peak', rate: 0.18, color: '#22c55e' },
     { id: 'sho', name: 'Shoulder', rate: 0.28, color: '#f59e0b' },
@@ -189,6 +190,65 @@ window.WBCost = (function () {
     return { total, green, saved, byBand };
   }
 
+  // What "without the assistant" means, per the user. Lets the savings number
+  // match their real alternative instead of an assumption.
+  //   plug_in   — charge immediately at plug-in (default)
+  //   fixed_time— charge from a fixed clock time (e.g. an old timer)
+  //   flat_avg  — no time-awareness: grid kWh at the day's average rate
+  function loadBaseline() {
+    try { const b = JSON.parse(localStorage.getItem(BASELINE_KEY)); if (b && b.mode) return b; } catch (e) {}
+    return { mode: 'plug_in', fixedTime: '00:00' };
+  }
+  function _hhmmToMin(v) {
+    const m = String(v || '').split(':');
+    return (parseInt(m[0], 10) || 0) * 60 + (parseInt(m[1], 10) || 0);
+  }
+  function _localMidnight(epoch) {
+    try {
+      const l = new Date(new Date(epoch * 1000).toLocaleString('en-US', { timeZone: CHARGER_TZ }));
+      return epoch - (l.getHours() * 3600 + l.getMinutes() * 60 + l.getSeconds());
+    } catch (e) { return Math.floor(epoch / 86400) * 86400; }
+  }
+  function _fixedStart(ts, hhmm) {
+    let start = _localMidnight(ts) + _hhmmToMin(hhmm) * 60;
+    if (start < ts) start += 86400;       // next occurrence at/after plug-in
+    return start;
+  }
+
+  // Counterfactual baseline: the SAME grid kWh, charged per the chosen baseline
+  // mode, costed on the same tariff. Savings = baseline − actual is the value of
+  // time-shifting. An estimate vs a stated baseline — measured energy + real
+  // tariff; only the start-time is assumed. Flat tariffs yield zero time-shift.
+  function _baselineCost(tariff, s) {
+    const en = (s.en || 0) / 1000, gen = (s.gen || 0) / 1000;
+    const green = Math.max(0, Math.min(en, gen));
+    const gridKwh = Math.max(0, en - green);
+    if (gridKwh <= 0) return 0;
+    if (tariff.type === 'flat') return gridKwh * (tariff.flatRate || 0);
+    const seasonId = _seasonFor(tariff, s.ts);
+    const cfg = loadBaseline();
+
+    if (cfg.mode === 'flat_avg') {
+      // No time preference: average of the day's 24 hourly band rates.
+      const mid = _localMidnight(s.ts);
+      let rate = 0;
+      for (let h = 0; h < 24; h++) rate += _bandRate(tariff, _bandFor(tariff, mid + h * 3600), seasonId);
+      return gridKwh * (rate / 24);
+    }
+
+    const segs = _chargeSegments(s);
+    const dur = segs.reduce((a, sg) => a + (sg.dur || 0), 0) || (s.dur || 3600);
+    const startTs = (cfg.mode === 'fixed_time') ? _fixedStart(s.ts, cfg.fixedTime) : s.ts;
+    const step = 300, n = Math.max(1, Math.ceil(dur / step)), per = gridKwh / n;
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+      const t = startTs + i * step;
+      if (t >= startTs + dur) break;
+      sum += per * _bandRate(tariff, _bandFor(tariff, t), seasonId);
+    }
+    return sum;
+  }
+
   // ---- data loaders (mirror sessions.js) ----
   async function loadChargeLog() {
     const r = await fetchJSON('api/charge_log');
@@ -223,24 +283,46 @@ window.WBCost = (function () {
     const weekAgo = now - 7 * 86400;
     const d = new Date(); const monthStart = new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000;
     let wk = 0, mo = 0, wkCost = 0, moCost = 0;
+    let wkShift = 0, moShift = 0, wkSolar = 0, moSolar = 0;
     sessions.forEach((s) => {
       const kwh = (s.en || 0) / 1000;
       const inWeek = s.ts >= weekAgo, inMonth = s.ts >= monthStart;
       if (inWeek) wk += kwh;
       if (inMonth) mo += kwh;
       if (inWeek || inMonth) {
-        const bd = _sessionCost(_tariffForSession(s), s);
-        if (inWeek) wkCost += bd.total;
-        if (inMonth) moCost += bd.total;
+        const t = _tariffForSession(s);
+        const bd = _sessionCost(t, s);
+        // Time-shift saving = what charging-at-plug-in would have cost minus the
+        // actual cost. Solar saving = grid cost the green kWh avoided.
+        const shift = Math.max(0, _baselineCost(t, s) - bd.total);
+        if (inWeek) { wkCost += bd.total; wkShift += shift; wkSolar += bd.saved; }
+        if (inMonth) { moCost += bd.total; moShift += shift; moSolar += bd.saved; }
       }
     });
     const summary = {
       weekCost: wkCost, monthCost: moCost, weekKwh: wk, monthKwh: mo,
+      // Savings (estimates vs a "charged at plug-in" baseline — see _baselineCost).
+      weekShiftSaved: wkShift, monthShiftSaved: moShift,
+      weekSolarSaved: wkSolar, monthSolarSaved: moSolar,
+      weekSaved: wkShift + wkSolar, monthSaved: moShift + moSolar,
+      savingsBaseline: 'plug-in',
       currency: (tariff.currency || '$'), ts: Math.floor(Date.now() / 1000),
     };
     try { localStorage.setItem(SUMMARY_KEY, JSON.stringify(summary)); } catch (e) {}
     return summary;
   }
 
-  return { refresh: refresh };
+  // Test hook: lets a headless/browser test inject the windows that are
+  // normally fetched, then exercise the pure cost/baseline math directly.
+  const _debug = {
+    setData: (chargeLog, scheduleWindows, tz) => {
+      _chargeLog = chargeLog || [];
+      _scheduleWindows = scheduleWindows || [];
+      if (tz) CHARGER_TZ = tz;
+    },
+    sessionCost: (tariff, s) => _sessionCost(tariff, s),
+    baselineCost: (tariff, s) => _baselineCost(tariff, s),
+  };
+
+  return { refresh: refresh, _debug: _debug };
 })();
