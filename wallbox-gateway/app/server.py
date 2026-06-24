@@ -22,6 +22,7 @@ from proxy import (
     GatewayUnreachable,
     config_from_env,
     fetch_json,
+    post_form,
 )
 import ha_bridge
 import ota
@@ -191,6 +192,25 @@ def api_command():
     path = "/api/command" + (("?" + qs) if qs else "")
     try:
         return jsonify(fetch_json(cfg, path, timeout=8.0))
+    except Exception as e:
+        body, code = _gateway_error(e)
+        return jsonify(body), code
+
+
+_OWNERS = {"wallbox_schedule", "integration", "addon", "none"}
+
+
+@app.route("/api/control_owner", methods=["POST"])
+def api_control_owner():
+    """Set the gateway's charge-control owner from the Add-on, so the user
+    never has to open the gateway's own Settings page. Forwards to the
+    gateway's auth-only /api/control_owner (persists to NVS, no reboot)."""
+    cfg = config_from_env()
+    owner = (request.values.get("owner") or "").strip()
+    if owner not in _OWNERS:
+        return jsonify({"error": "bad_owner", "allowed": sorted(_OWNERS)}), 400
+    try:
+        return jsonify(post_form(cfg, "/api/control_owner", {"owner": owner}, timeout=8.0))
     except Exception as e:
         body, code = _gateway_error(e)
         return jsonify(body), code

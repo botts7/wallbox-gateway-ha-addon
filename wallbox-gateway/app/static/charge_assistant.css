@@ -77,7 +77,7 @@
   gap: 10px;
 }
 @media (min-width: 720px) {
-  .ca-modes { grid-template-columns: repeat(4, 1fr); }
+  .ca-modes { grid-template-columns: repeat(5, 1fr); }
 }
 .ca-mode {
   position: relative;
@@ -400,6 +400,8 @@
 
 /* settings card sits on its own full-width row, with breathing room */
 .ca-settings { margin-top: 18px; }
+/* shared acting-mode cards (charging window, …) — same breathing room */
+.ca-acting-card { margin-top: 18px; }
 
 .ca-footnote {
   margin: 18px 2px 0; font-size: 12.5px; color: var(--text2, #94a3b8);
@@ -449,6 +451,30 @@
 .ca-btn-primary:hover { filter: brightness(1.08); }
 .ca-btn-ghost { background: var(--elevated, #1b2029); color: var(--text, #e6e8ec); border-color: var(--border, #2a2f3a); }
 .ca-btn-ghost:hover { border-color: #3a414f; }
+
+/* ── Owner confirm modal ───────────────────────────────────────── */
+.ca-modal {
+  position: fixed; inset: 0; z-index: 200;
+  display: grid; place-items: center;
+  background: rgba(0,0,0,.5);
+  backdrop-filter: blur(2px);
+  animation: caFade .15s ease both;
+}
+.ca-modal-box {
+  background: var(--surface, #161a22);
+  border: 1px solid var(--border, #2a2f3a);
+  border-radius: var(--ca-radius);
+  padding: 22px 22px 18px;
+  max-width: min(440px, calc(100vw - 32px));
+  box-shadow: 0 24px 60px -16px rgba(0,0,0,.6);
+}
+.ca-modal-box h3 {
+  font-family: var(--ca-display); font-size: 17px; margin: 0 0 8px;
+  color: var(--text, #e6e8ec);
+}
+.ca-modal-box p { margin: 0 0 18px; font-size: 14px; line-height: 1.5; color: var(--text2, #94a3b8); }
+.ca-modal-box p b { color: var(--text, #e6e8ec); }
+.ca-modal-btns { display: flex; justify-content: flex-end; gap: 10px; }
 
 /* ── Toast (save feedback) ─────────────────────────────────────── */
 .ca-toast {

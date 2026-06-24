@@ -4,6 +4,33 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.24.0] - 2026-06-24
+
+Composable Charge Assistant — mix behaviours instead of picking one mode.
+
+### Added
+- **Plug-in reminders as a layer** — enable plug-in nudges *on top of* Smart
+  charge or Solar (not just as a standalone mode). Charge-event alerts and
+  reminder nudges can target different notify services.
+- **Smart + Solar** strategy — charge from excess solar whenever it's
+  available (free), and top up from grid only inside your cheap window or just
+  in time to reach the target by departure.
+- **Charging window** — restrict charging to cheap hours (e.g. 00:00–06:00),
+  with *pre-start* (begin early to be ready by departure), *overrun* (finish
+  past the window if the target isn't reached), and a notification when a
+  charge runs outside the window.
+- Live summary + the dashboard card describe the whole composed setup in one
+  sentence. Native HA options flow brought to parity (new Smart + Solar step,
+  window + reminder-layer fields).
+- **Charge-control owner is now settable from the Add-on** — a dropdown on the
+  Assistant page writes straight to the gateway (no need to open its own
+  Settings page). After saving an acting mode while the owner isn't Home
+  Assistant, a prompt offers to hand control over so the assistant actually
+  runs.
+
+Requires Wallbox Gateway integration ≥ 0.16.0 and gateway firmware with the
+`/api/control_owner` endpoint (v3.2.0-beta.6+).
+
 ## [0.23.0] - 2026-06-23
 
 Saved-state visibility — you can always see what the assistant is set to.

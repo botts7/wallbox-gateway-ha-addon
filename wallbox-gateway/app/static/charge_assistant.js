@@ -60,6 +60,19 @@
     supply_phases: "supply_phases",
     load_limit_w: "load_limit_w",
     load_power_entity: "load_power_entity",
+    // smart_solar — combined (target fields + surplus fields), own field ids
+    soc_entity_ss: "soc_entity",
+    target_soc_pct_ss: "target_soc_pct",
+    departure_time_ss: "departure_time",
+    battery_kwh_ss: "battery_kwh",
+    charge_power_kw_ss: "charge_power_kw",
+    surplus_source_ss: "surplus_source",
+    surplus_entity_ss: "surplus_entity",
+    grid_entity_ss: "grid_entity",
+    solar_entity_ss: "solar_entity",
+    load_entity_ss: "load_entity",
+    surplus_start_ss: "surplus_start",
+    notify_service_ss: "notify_service",
   };
   const CHECKS = {
     only_if_scheduled: "only_if_scheduled",
@@ -68,6 +81,7 @@
     cheapest_window: "cheapest_window",
     solar_dynamic: "solar_dynamic",
     grid_export_negative: "grid_export_negative",
+    grid_export_negative_ss: "grid_export_negative",
   };
   const NUM_KEYS = new Set([
     "lead_hours", "tariff_below", "skip_above_pct", "soc_max_age_min",
@@ -98,9 +112,37 @@
       "solar_dynamic", "min_current_a", "max_current_a", "supply_voltage",
       "supply_phases", "load_limit_w", "load_power_entity",
     ],
+    smart_solar: [
+      "soc_entity", "target_soc_pct", "departure_time", "battery_kwh",
+      "charge_power_kw", "surplus_source", "surplus_entity", "grid_entity",
+      "grid_export_negative", "solar_entity", "load_entity", "surplus_start",
+      "notify_service",
+    ],
     off: [],
   };
   const TRIGGERS = ["arrival", "nightly", "lead", "tariff"];
+
+  // Acting strategies drive charging (vs reminder which only notifies). The
+  // shared "Charging window" card is shown for these. Window fields live in a
+  // card outside the per-mode sections, so they're gathered/applied explicitly
+  // (like poll_interval) rather than via the section-scoped FIELDS loop.
+  const ACTING_MODES = ["target_soc", "solar", "smart_solar"];
+  const WINDOW_FIELDS = { window_start: "window_start", window_end: "window_end" };
+  const WINDOW_CHECKS = {
+    window_enabled: "window_enabled", window_overrun: "window_overrun",
+    window_prestart: "window_prestart", window_cost_warn: "window_cost_warn",
+  };
+
+  // Plug-in reminder LAYER — saved as a nested `reminder` sub-dict so it can
+  // ride on top of an acting strategy. Distinct field ids (…_l) so they don't
+  // collide with the standalone Reminder mode's fields.
+  const RL_TRIGGERS = ["arrival", "nightly", "lead", "tariff"];
+  const RL_FIELDS = {   // layer field id -> reminder sub-dict key
+    arrival_entity_l: "arrival_entity", nightly_time_l: "nightly_time",
+    lead_hours_l: "lead_hours", tariff_entity_l: "tariff_entity",
+    tariff_below_l: "tariff_below", notify_service_l: "notify_service",
+  };
+  const RL_NUM = new Set(["lead_hours", "tariff_below"]);
 
   // Smart defaults — filled the moment a mode is picked (only into empty
   // fields), so the user starts from a sensible config instead of a blank form.
@@ -114,6 +156,9 @@
     solar: {
       surplus_start: 1.4, surplus_stop: 0.4, surplus_debounce_min: 3,
       min_current_a: 6, max_current_a: 32, supply_voltage: 230, supply_phases: 1,
+    },
+    smart_solar: {
+      target_soc_pct: 80, battery_kwh: 60, charge_power_kw: 7.4, surplus_start: 1.4,
     },
   };
   const OWNER_NAMES = {
@@ -464,6 +509,19 @@
     load_power_entity: "House/grid power sensor for the load limit (else the charger's own meter is used).",
     notify_service_s: "HA notify service(s) for solar charge start/stop alerts. Optional.",
     poll_interval: "How often the integration reads the gateway (5–300 s).",
+    window_enabled: "Only let the assistant charge during a set window — e.g. midnight–6am — so it never runs when power is expensive.",
+    window_start: "Start of the cheap window (local time). Can be later than the end to cross midnight.",
+    window_end: "End of the cheap window (local time).",
+    window_overrun: "If the target isn't reached by the window end, keep charging past it until it is.",
+    window_prestart: "If a departure is set and the cheap window is too short, start before it so you're still ready in time.",
+    window_cost_warn: "Send a notification whenever a charge runs outside the cheap window (a pricier period), so you can stop it if you'd rather wait.",
+    rl_enabled: "Also send plug-in reminders on top of this charging strategy. Notifications only — never controls charging.",
+    arrival_entity_l: "Remind me to plug in when this person/device gets home.",
+    nightly_time_l: "Remind me to plug in at this time every evening.",
+    lead_hours_l: "Remind me this many hours before the charger's next scheduled charge.",
+    tariff_entity_l: "Price sensor that triggers a reminder when the rate drops.",
+    tariff_below_l: "Remind me when the price entity is at/below this value.",
+    notify_service_l: "HA notify service for the plug-in reminders (can differ from the charge-event alerts).",
   };
   function applyTooltips() {
     Object.entries(TOOLTIPS).forEach(([id, tip]) => {
@@ -544,21 +602,38 @@
     loadOwner();
   }
 
-  // Charge-control owner is a gateway-side setting (read-only here) — surface
-  // the current value from the gateway status the Add-on already proxies.
+  // Charge-control owner — read the gateway's current value and reflect it in
+  // the dropdown. Settable here (writes straight to the gateway via the
+  // /api/control_owner proxy) so the user never opens the gateway's own page.
   async function loadOwner() {
-    const span = $("ctrl-owner-live");
-    if (!span) return;
+    const sel = $("ctrl-owner-select");
     const r = await fetchJSON("api/status");
     const owner = r.ok && r.body ? (r.body.control_owner || "") : "";
     ownerState = owner || null;
-    span.textContent = owner ? (OWNER_NAMES[owner] || owner) : "unknown";
-    span.classList.toggle("live-ok", owner === "integration");
+    if (sel && owner) sel.value = owner;
     // Capability gating: the original Zentri Pulsar can't do live current
     // control over BLE — disable dynamic-current for it.
     applyCapabilities(r.ok && r.body ? !!r.body.zentri : false);
     updateOwnerWarn();
     updateSummary();
+  }
+
+  // Write the owner to the gateway. Returns true on success.
+  async function setOwner(owner) {
+    const r = await fetchJSON("api/control_owner", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "owner=" + encodeURIComponent(owner),
+    });
+    if (r.ok && r.body && r.body.ok) {
+      ownerState = owner;
+      const sel = $("ctrl-owner-select");
+      if (sel) sel.value = owner;
+      updateOwnerWarn();
+      updateSummary();
+      return true;
+    }
+    return false;
   }
 
   function applyCapabilities(isZentri) {
@@ -599,13 +674,37 @@
     if (!$("surplus_source").value) $("surplus_source").value = "entity";
     $("grid_export_negative").checked = ca.grid_export_negative !== false;
     toggleSurplusSource();
+    // smart_solar surplus source mirrors the solar one (own fields).
+    if ($("surplus_source_ss") && !$("surplus_source_ss").value) $("surplus_source_ss").value = "entity";
+    if ($("grid_export_negative_ss")) $("grid_export_negative_ss").checked = ca.grid_export_negative !== false;
+    toggleSurplusSourceSS();
+    // Charging window (shared acting-mode card).
+    Object.entries(WINDOW_FIELDS).forEach(([fid, key]) => {
+      const el = $(fid); if (el) el.value = ca[key] == null ? "" : ca[key];
+    });
+    Object.entries(WINDOW_CHECKS).forEach(([fid, key]) => {
+      const el = $(fid); if (el) el.checked = !!ca[key];
+    });
+    toggleWindow();
+    // Plug-in reminder layer (nested `reminder` sub-dict).
+    const rl = (ca.reminder && typeof ca.reminder === "object") ? ca.reminder : {};
+    if ($("rl_enabled")) $("rl_enabled").checked = !!rl.enabled;
+    RL_TRIGGERS.forEach((t) => {
+      const cb = $(`rl-trig-${t}`);
+      if (cb) cb.checked = Array.isArray(rl.triggers) && rl.triggers.includes(t);
+    });
+    Object.entries(RL_FIELDS).forEach(([fid, key]) => {
+      const el = $(fid); if (el) el.value = rl[key] == null ? "" : rl[key];
+    });
+    toggleReminderLayer();
+    refreshRLTriggerBodies();
     refreshAllCombos();   // sync combobox displays/chips to the loaded values
     pickerSelects().forEach((s) => updateLive(s.id));
     selectMode(ca.mode || "off", { fromLoad: true });
   }
 
   // ── mode + conditional UI ───────────────────────────────────────
-  const MODE_NAMES = { off: "Off", reminder: "Reminder", target_soc: "Smart charge", solar: "Solar" };
+  const MODE_NAMES = { off: "Off", reminder: "Reminder", target_soc: "Smart charge", solar: "Solar", smart_solar: "Smart + Solar" };
 
   function selectMode(mode, opts) {
     if (!MODE_KEYS[mode]) mode = "off";
@@ -616,6 +715,10 @@
     document.querySelectorAll(".ca-mode-section").forEach((el) => {
       el.classList.toggle("ca-active", el.dataset.section === mode);
     });
+    // Shared acting-mode cards (charging window, etc.) — only for strategies
+    // that actually drive charging.
+    const acting = ACTING_MODES.includes(mode);
+    document.querySelectorAll("[data-acting]").forEach((el) => { el.hidden = !acting; });
     const form = $("ca-form");
     if (form) form.dataset.mode = mode;
     const pill = $("ca-mode-pill");
@@ -760,7 +863,7 @@
       } else {
         s += " I'll stop at the target but won't auto-start.";
       }
-      return s;
+      return s + windowClause() + reminderLayerClause();
     }
 
     if (currentMode === "solar") {
@@ -786,7 +889,23 @@
         s += $("load_limit_w").value && Number($("load_limit_w").value) > 0
           ? `, keeping total house draw under ${b($("load_limit_w").value + " W")}.` : ".";
       }
-      return s;
+      return s + windowClause() + reminderLayerClause();
+    }
+
+    if (currentMode === "smart_solar") {
+      const soc = $("soc_entity_ss").value;
+      if (!soc) return "Pick a battery-level entity so I know when to stop.";
+      let s = `I'll charge up to ${b(($("target_soc_pct_ss").value || "80") + "%")} on ${b(nameOf(soc))}`;
+      const live = liveOf(soc);
+      if (live) s += ` (now ${b(live)})`;
+      s += ", from <b>solar surplus</b> whenever it's available";
+      if ($("departure_time_ss").value) {
+        s += `, topping up from grid only as needed to be ready by ${b($("departure_time_ss").value)}`;
+      } else {
+        s += ", topping up from grid inside your window";
+      }
+      s += ".";
+      return s + windowClause() + reminderLayerClause();
     }
     return "";
   }
@@ -818,6 +937,63 @@
   function toggleSurplusSource() {
     const src = ($("surplus_source") || {}).value || "entity";
     document.querySelectorAll(".ss-block").forEach((el) => { el.hidden = el.dataset.ss !== src; });
+  }
+  function toggleSurplusSourceSS() {
+    const src = ($("surplus_source_ss") || {}).value || "entity";
+    document.querySelectorAll(".ss-block-ss").forEach((el) => { el.hidden = el.dataset.ssx !== src; });
+  }
+
+  function toggleWindow() {
+    const w = $("window-wrap");
+    if (w) w.hidden = !($("window_enabled") && $("window_enabled").checked);
+  }
+
+  function toggleReminderLayer() {
+    const w = $("rl-wrap");
+    if (w) w.hidden = !($("rl_enabled") && $("rl_enabled").checked);
+  }
+  function refreshRLTriggerBodies() {
+    document.querySelectorAll("[data-rl-trigger]").forEach((el) => {
+      const cb = $(`rl-trig-${el.dataset.rlTrigger}`);
+      el.classList.toggle("on", !!(cb && cb.checked));
+    });
+  }
+
+  // Plain-English clause for the plug-in reminder layer, appended to acting
+  // strategies' summaries.
+  function reminderLayerClause() {
+    const en = $("rl_enabled");
+    if (!en || !en.checked) return "";
+    const on = RL_TRIGGERS.filter((t) => { const cb = $(`rl-trig-${t}`); return cb && cb.checked; });
+    if (!on.length) return " It'll also remind you to plug in (pick when).";
+    const b = (s) => `<b>${esc(s)}</b>`;
+    const parts = on.map((t) => {
+      if (t === "arrival") return "you get home";
+      if (t === "nightly") { const v = $("nightly_time_l").value; return v ? `nightly at ${b(v)}` : "nightly"; }
+      if (t === "lead") return "before a scheduled charge";
+      if (t === "tariff") return "the price drops";
+      return "";
+    });
+    let s = " It'll also remind you to plug in when " + joinList(parts);
+    const svc = $("notify_service_l").value;
+    s += svc ? ` via ${b(svc)}.` : ".";
+    return s;
+  }
+
+  // Plain-English clause for the allowed charging window, appended to acting
+  // strategies' summaries.
+  function windowClause() {
+    const en = $("window_enabled");
+    if (!en || !en.checked) return "";
+    const a = $("window_start").value, b = $("window_end").value;
+    if (!a || !b) return " Charging is limited to a set window (set the times).";
+    let s = ` Charges only between <b>${esc(a)}–${esc(b)}</b>`;
+    const extra = [];
+    if ($("window_prestart").checked) extra.push("starting earlier if needed for departure");
+    if ($("window_overrun").checked) extra.push("finishing late if the target isn't reached");
+    if (extra.length) s += ", " + extra.join(" and ");
+    s += ".";
+    return s;
   }
 
   // Be honest about forecast availability — cheapest-window is impossible
@@ -877,12 +1053,44 @@
       const v = readField(fid);
       if (v !== undefined) ca[key] = v;
     });
-    // checkboxes for this mode
+    // checkboxes for this mode — section-scoped, since some keys (e.g.
+    // grid_export_negative) have a distinct field id per mode.
     Object.entries(CHECKS).forEach(([fid, key]) => {
       if (!wanted.has(key)) return;
       const el = $(fid);
-      if (el) ca[key] = !!el.checked;
+      if (!el) return;
+      if (activeSection && !activeSection.contains(el)) return;
+      ca[key] = !!el.checked;
     });
+    // Shared acting-mode cards (not section-scoped): charging window + the
+    // plug-in reminder layer (nested `reminder` sub-dict).
+    if (ACTING_MODES.includes(currentMode)) {
+      Object.entries(WINDOW_FIELDS).forEach(([fid, key]) => {
+        const el = $(fid); if (el && el.value) ca[key] = el.value;
+      });
+      Object.entries(WINDOW_CHECKS).forEach(([fid, key]) => {
+        const el = $(fid); if (el) ca[key] = !!el.checked;
+      });
+      if ($("rl_enabled") && $("rl_enabled").checked) {
+        const rl = {
+          enabled: true,
+          triggers: RL_TRIGGERS.filter((t) => { const cb = $(`rl-trig-${t}`); return cb && cb.checked; }),
+        };
+        Object.entries(RL_FIELDS).forEach(([fid, key]) => {
+          const el = $(fid);
+          if (!el || el.value === "" || el.value == null) return;
+          if (RL_NUM.has(key)) {
+            const n = Number(el.value);
+            if (Number.isFinite(n)) rl[key] = n;
+          } else {
+            rl[key] = el.value;
+          }
+        });
+        ca.reminder = rl;
+      } else {
+        ca.reminder = { enabled: false };
+      }
+    }
     return ca;
   }
 
@@ -911,12 +1119,52 @@
       snapshotSaved();   // this config is now the saved one → Active-now + clean
       const overview = (buildSummary() || "").replace(/<[^>]+>/g, "").trim();
       showToast("✓ Saved. " + (overview || "Assistant is off — nothing automated."), "ok");
+      maybePromptOwner();   // offer to hand control to HA if an acting mode needs it
     } else {
       const msg = "Save failed: " + (r.body.detail || r.body.error || `HTTP ${r.status}`);
       status.className = "ca-save-status err";
       status.textContent = msg;
       showToast("⚠ " + msg, "err");
     }
+  }
+
+  // After saving an acting mode, if the gateway owner isn't the integration,
+  // the assistant won't actually control charging — offer to fix that here so
+  // the user never has to open the gateway's own settings page.
+  function maybePromptOwner() {
+    if (!ACTING_MODES.includes(currentMode)) return;
+    if (ownerState === "integration") return;
+    showOwnerPrompt();
+  }
+
+  function showOwnerPrompt() {
+    const old = $("ca-owner-prompt");
+    if (old) old.remove();
+    const cur = ownerState ? (OWNER_NAMES[ownerState] || ownerState) : "not set";
+    const m = document.createElement("div");
+    m.id = "ca-owner-prompt";
+    m.className = "ca-modal";
+    m.innerHTML =
+      '<div class="ca-modal-box" role="dialog" aria-modal="true">' +
+      '<h3>Let Home Assistant control charging?</h3>' +
+      '<p>This mode drives charging, but the gateway’s control owner is ' +
+      '<b>' + esc(cur) + '</b> — so the assistant won’t act yet. ' +
+      'Hand charge control to Home Assistant now?</p>' +
+      '<div class="ca-modal-btns">' +
+      '<button type="button" class="ca-btn ca-btn-ghost" data-act="no">Not now</button>' +
+      '<button type="button" class="ca-btn ca-btn-primary" data-act="yes">Enable HA control</button>' +
+      '</div></div>';
+    document.body.appendChild(m);
+    m.addEventListener("click", async (e) => {
+      if (e.target === m || e.target.dataset.act === "no") { m.remove(); return; }
+      if (e.target.dataset.act === "yes") {
+        e.target.disabled = true;
+        const ok = await setOwner("integration");
+        m.remove();
+        showToast(ok ? "✓ Home Assistant now controls charging."
+                     : "⚠ Couldn’t set the owner on the gateway.", ok ? "ok" : "err");
+      }
+    });
   }
 
   let _toastTimer = null;
@@ -945,6 +1193,23 @@
     $("only_if_scheduled").addEventListener("change", () => { toggleScheduledWithin(); updateSummary(); });
     $("cheapest_window").addEventListener("change", () => { toggleCheapest(); updateSummary(); });
     $("surplus_source").addEventListener("change", () => { toggleSurplusSource(); updateSummary(); });
+    const sss = $("surplus_source_ss");
+    if (sss) sss.addEventListener("change", () => { toggleSurplusSourceSS(); updateSummary(); });
+    const os = $("ctrl-owner-select");
+    if (os) os.addEventListener("change", async () => {
+      const v = os.value;
+      const ok = await setOwner(v);
+      if (ok) showToast("✓ Charge-control owner set to " + (OWNER_NAMES[v] || v), "ok");
+      else { showToast("⚠ Couldn't set the owner on the gateway.", "err"); if (ownerState) os.value = ownerState; }
+    });
+    const we = $("window_enabled");
+    if (we) we.addEventListener("change", () => { toggleWindow(); updateSummary(); });
+    const rle = $("rl_enabled");
+    if (rle) rle.addEventListener("change", () => { toggleReminderLayer(); updateSummary(); });
+    RL_TRIGGERS.forEach((t) => {
+      const cb = $(`rl-trig-${t}`);
+      if (cb) cb.addEventListener("change", () => { refreshRLTriggerBodies(); updateSummary(); });
+    });
     const hu = $("ca-hide-unavail");
     if (hu) hu.addEventListener("change", (e) => { hideUnavailable = e.target.checked; });
     // Any field edit re-renders the live summary — the always-on feedback that

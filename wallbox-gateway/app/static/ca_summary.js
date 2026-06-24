@@ -13,7 +13,30 @@
   "use strict";
 
   const TRIGGERS = ["arrival", "nightly", "lead", "tariff"];
-  const MODE_NAMES = { off: "Off", reminder: "Reminder", target_soc: "Smart charge", solar: "Solar" };
+  const MODE_NAMES = {
+    off: "Off", reminder: "Reminder", target_soc: "Smart charge",
+    solar: "Solar", smart_solar: "Smart + Solar",
+  };
+  const ACTING = ["target_soc", "solar", "smart_solar"];
+
+  // Suffix describing the allowed charging window, if enabled.
+  function windowText(ca) {
+    if (!ca.window_enabled) return "";
+    if (!ca.window_start || !ca.window_end) return " Limited to a set window.";
+    let s = ` Only between ${ca.window_start}–${ca.window_end}`;
+    const extra = [];
+    if (ca.window_prestart) extra.push("starting earlier for departure");
+    if (ca.window_overrun) extra.push("finishing late if needed");
+    if (extra.length) s += " (" + extra.join(", ") + ")";
+    return s + ".";
+  }
+
+  // Suffix describing the plug-in reminder layer, if enabled with triggers.
+  function reminderLayerText(ca) {
+    const rem = (ca.reminder && typeof ca.reminder === "object" && ca.reminder.enabled) ? ca.reminder : null;
+    if (!rem || !Array.isArray(rem.triggers) || !rem.triggers.length) return "";
+    return " Also reminds you to plug in.";
+  }
 
   function joinList(parts) {
     if (parts.length === 1) return parts[0];
@@ -61,7 +84,16 @@
       }
       if (has(ca.price_cap)) s += ", never above " + ca.price_cap;
       s += ".";
-      return s;
+      return s + windowText(ca) + reminderLayerText(ca);
+    }
+
+    if (mode === "smart_solar") {
+      let s = "Charges from solar surplus first, topping up from grid to reach " +
+        (has(ca.target_soc_pct) ? ca.target_soc_pct : 80) + "%";
+      if (has(ca.soc_entity)) s += " (reading " + n(ca.soc_entity) + ")";
+      if (has(ca.departure_time)) s += " by " + ca.departure_time;
+      s += ".";
+      return s + windowText(ca) + reminderLayerText(ca);
     }
 
     if (mode === "solar") {
@@ -79,7 +111,7 @@
         if (has(ca.load_limit_w) && Number(ca.load_limit_w) > 0) s += " under a " + ca.load_limit_w + " W house limit";
       }
       s += ".";
-      return s;
+      return s + windowText(ca) + reminderLayerText(ca);
     }
     return "";
   }
