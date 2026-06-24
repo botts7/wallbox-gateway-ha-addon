@@ -662,6 +662,25 @@
     </section>
   </div>
 
+  <!-- ── Auto-start grace (acting strategies only — shown by JS) ──── -->
+  <section class="ca-card ca-acting-card" data-acting hidden>
+    <div class="ca-card-head">
+      <span class="ca-card-icon" style="--chip:#f59e0b">&#x23F3;</span>
+      <div class="ca-card-titles">
+        <h2>Auto-start grace <span class="ca-opt">optional</span></h2>
+        <p class="ca-card-desc">When the assistant decides to auto-start, wait this
+           long first and send a "starting in N min — tap to cancel" notification,
+           so you can hold off. 0 = start immediately.</p>
+      </div>
+    </div>
+    <div class="ca-card-body">
+      <div class="ca-field" style="max-width:220px">
+        <label>Grace before auto-start (minutes)</label>
+        <input type="number" id="autostart_grace_min" min="0" max="60" step="1" value="0">
+      </div>
+    </div>
+  </section>
+
   <!-- ── Charging window (acting strategies only — shown by JS) ──── -->
   <section class="ca-card ca-acting-card" data-acting hidden>
     <div class="ca-card-head">

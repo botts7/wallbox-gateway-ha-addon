@@ -678,7 +678,8 @@
     if ($("surplus_source_ss") && !$("surplus_source_ss").value) $("surplus_source_ss").value = "entity";
     if ($("grid_export_negative_ss")) $("grid_export_negative_ss").checked = ca.grid_export_negative !== false;
     toggleSurplusSourceSS();
-    // Charging window (shared acting-mode card).
+    // Auto-start grace + charging window (shared acting-mode card).
+    if ($("autostart_grace_min")) $("autostart_grace_min").value = ca.autostart_grace_min || 0;
     Object.entries(WINDOW_FIELDS).forEach(([fid, key]) => {
       const el = $(fid); if (el) el.value = ca[key] == null ? "" : ca[key];
     });
@@ -1065,6 +1066,8 @@
     // Shared acting-mode cards (not section-scoped): charging window + the
     // plug-in reminder layer (nested `reminder` sub-dict).
     if (ACTING_MODES.includes(currentMode)) {
+      const gm = $("autostart_grace_min");
+      if (gm) ca.autostart_grace_min = Math.max(0, Number(gm.value) || 0);
       Object.entries(WINDOW_FIELDS).forEach(([fid, key]) => {
         const el = $(fid); if (el && el.value) ca[key] = el.value;
       });

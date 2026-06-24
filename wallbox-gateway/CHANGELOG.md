@@ -4,6 +4,23 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.25.1] - 2026-06-24
+
+### Fixed
+- Dashboard status now reads **"Connected — not charging"** for an idle charger
+  (status 4 with `gen=0`) instead of "Paused", reserving "Paused" for a real
+  Schedule/Solar override — matching the integration's charger-status sensor.
+
+## [0.25.0] - 2026-06-24
+
+### Added
+- **Auto-start grace period** field on the acting (Smart charge / Solar / Smart +
+  Solar) config — when set, the assistant notifies "charging will start in N min
+  — tap to cancel" before it begins, so you can hold off. 0 = start immediately.
+  (Backed by the integration's managed-override session, which also suppresses
+  the charger's Eco-Smart Solar-Only pause during a grid charge and restores it
+  + resumes native schedule control when the charge finishes.)
+
 ## [0.24.0] - 2026-06-24
 
 Composable Charge Assistant — mix behaviours instead of picking one mode.

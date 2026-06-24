@@ -390,7 +390,12 @@ function setStatus(stateCode, schedulePaused, zentri) {
   const info = (zentri && HERO_STATES_ZENTRI[stateCode]) || HERO_STATES[stateCode];
   const card = $('card-powerflow');
   if (card) card.className = 'card pf-card' + (info && info.cls ? ' ' + info.cls : '');
-  setText('pf-status', info ? info.text : (stateCode == null ? 'Offline' : `Code ${stateCode}`));
+  // Wallbox status 4 ("Paused") means an active override only when gen != 0
+  // (schedulePaused). When idle (gen == 0) it's just connected-and-not-charging
+  // — match the integration's disambiguation so all surfaces agree.
+  let text = info ? info.text : (stateCode == null ? 'Offline' : `Code ${stateCode}`);
+  if (stateCode === 4 && !zentri && !schedulePaused) text = 'Connected — not charging';
+  setText('pf-status', text);
   const banner = $('paused-banner');
   if (banner) banner.style.display = schedulePaused ? '' : 'none';
 }
