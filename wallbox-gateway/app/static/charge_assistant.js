@@ -306,6 +306,11 @@
         C.list.hidden = true;
         if (!cfg.multi) syncSingle(holder); else inp.value = "";
       }, 160));
+      // Selecting/clearing a value dispatches "change" on the hidden control.
+      // Run the combo's own onChange (live preview + summary) — previously only
+      // the form-level summary listener caught it, so the live value never
+      // refreshed when you PICKED an entity (only on initial load).
+      holder.addEventListener("change", () => { if (C.cfg.onChange) C.cfg.onChange(); });
     }
     refreshCombo(holder);
   }
@@ -716,10 +721,20 @@
     document.querySelectorAll(".ca-mode-section").forEach((el) => {
       el.classList.toggle("ca-active", el.dataset.section === mode);
     });
-    // Shared acting-mode cards (charging window, etc.) — only for strategies
-    // that actually drive charging.
+    // Shared acting-mode cards. data-acting = ANY acting strategy (e.g. the
+    // plug-in reminder layer). data-modes = only the listed strategies (the
+    // grace + window cards: pure Solar uses neither, so they hide there).
     const acting = ACTING_MODES.includes(mode);
     document.querySelectorAll("[data-acting]").forEach((el) => { el.hidden = !acting; });
+    document.querySelectorAll("[data-modes]").forEach((el) => {
+      el.hidden = !el.dataset.modes.split(",").map((s) => s.trim()).includes(mode);
+    });
+    // The window only gates GRID charging in Smart+Solar — solar still charges
+    // on surplus anytime — so a night window must not read as "blocks solar".
+    const wd = $("window-desc");
+    if (wd) wd.textContent = (mode === "smart_solar")
+      ? "Limits GRID top-up to cheap hours (e.g. midnight–6am). Solar still charges anytime there's surplus."
+      : "Restrict charging to cheap hours (e.g. midnight–6am) so it never runs when power is expensive.";
     const form = $("ca-form");
     if (form) form.dataset.mode = mode;
     const pill = $("ca-mode-pill");

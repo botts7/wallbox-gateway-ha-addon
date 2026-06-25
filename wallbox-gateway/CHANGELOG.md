@@ -4,6 +4,21 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.25.2] - 2026-06-25
+
+### Fixed
+- Entity pickers show the **live value** of the selected entity again — picking
+  an entity wasn't refreshing the side preview (only the initial page load did),
+  so it stuck on "—".
+
+### Changed
+- **Charging window + Auto-start grace** now show only for **Smart charge** and
+  **Smart + Solar** (they gate *grid* charging) and are **hidden for pure Solar**,
+  where neither applies. In **Smart + Solar** the window description makes clear
+  it limits only **grid top-up** — *solar still charges anytime there's surplus*
+  (a night window does not block daytime solar). Mirrored in the integration's
+  options flow.
+
 ## [0.25.1] - 2026-06-24
 
 ### Fixed

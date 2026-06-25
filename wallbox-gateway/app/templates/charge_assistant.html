@@ -662,8 +662,8 @@
     </section>
   </div>
 
-  <!-- ── Auto-start grace (acting strategies only — shown by JS) ──── -->
-  <section class="ca-card ca-acting-card" data-acting hidden>
+  <!-- ── Auto-start grace (Smart charge / Smart+Solar only — shown by JS) ──── -->
+  <section class="ca-card ca-acting-card" data-modes="target_soc,smart_solar" hidden>
     <div class="ca-card-head">
       <span class="ca-card-icon" style="--chip:#f59e0b">&#x23F3;</span>
       <div class="ca-card-titles">
@@ -681,13 +681,13 @@
     </div>
   </section>
 
-  <!-- ── Charging window (acting strategies only — shown by JS) ──── -->
-  <section class="ca-card ca-acting-card" data-acting hidden>
+  <!-- ── Charging window (Smart charge / Smart+Solar only — shown by JS) ──── -->
+  <section class="ca-card ca-acting-card" data-modes="target_soc,smart_solar" hidden>
     <div class="ca-card-head">
       <span class="ca-card-icon" style="--chip:#0ea5e9">&#x23F0;</span>
       <div class="ca-card-titles">
         <h2>Charging window <span class="ca-opt">optional</span></h2>
-        <p class="ca-card-desc">Restrict charging to cheap hours (e.g. midnight–6am)
+        <p class="ca-card-desc" id="window-desc">Restrict charging to cheap hours (e.g. midnight–6am)
            so it never runs when power is expensive.</p>
       </div>
     </div>
