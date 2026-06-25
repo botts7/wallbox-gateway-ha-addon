@@ -381,6 +381,18 @@ def api_ha_notify_services():
         return jsonify(body), code
 
 
+@app.route("/api/ha/pages")
+def api_ha_pages():
+    """List Lovelace dashboard/view paths for the 'Tap opens' field.
+    Best-effort (WS API) — returns [] on any failure; the GUI falls back to
+    free-text, so this never blocks the page."""
+    cfg = ha_bridge.config_from_env()
+    try:
+        return jsonify({"pages": ha_bridge.list_pages(cfg)})
+    except Exception:
+        return jsonify({"pages": []})
+
+
 @app.route("/api/ha/config")
 def api_ha_get_config():
     """Read the integration's current options to pre-fill the GUI."""

@@ -4,6 +4,15 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.25.3] - 2026-06-25
+
+### Added
+- **"Tap opens (path)"** in the plug-in reminder is now a **dropdown of your
+  actual Lovelace dashboards + views** (fetched over the HA WebSocket API), while
+  still accepting any free-text path. Falls back to free-text if the list can't
+  be fetched. (Adds the `websocket-client` dependency — installed best-effort so
+  the build never fails on it.)
+
 ## [0.25.2] - 2026-06-25
 
 ### Fixed

@@ -1244,6 +1244,20 @@
     notifyServices = (r.ok && r.body.services) || [];
   }
 
+  // Best-effort: fill the "Tap opens (path)" datalist with the user's Lovelace
+  // dashboard/view paths (WS-only — server returns [] on any failure, so the
+  // field always works as free-text).
+  async function loadPages() {
+    try {
+      const r = await fetchJSON("api/ha/pages");
+      const pages = (r.ok && r.body && r.body.pages) || [];
+      const dl = $("ca-pages");
+      if (dl && pages.length) {
+        dl.innerHTML = pages.map((p) => `<option value="${esc(p)}"></option>`).join("");
+      }
+    } catch (e) { /* free-text fallback */ }
+  }
+
   // Warn (and explain) when the Add-on has no gateway IP configured — the
   // assistant can't read charger state or drive charging without it.
   async function loadAddonConfig() {
@@ -1261,6 +1275,7 @@
     if (!ok) return;
     await loadNotifyServices();   // before combobox setup so notify list is ready
     setupComboboxes();
+    loadPages();                  // best-effort: fill the "Tap opens" page datalist
     applyTooltips();
     loadAddonConfig();            // best-effort gateway-config warning
     await loadConfig();
