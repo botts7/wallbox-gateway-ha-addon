@@ -284,3 +284,20 @@ def set_config(
         raise CoreUnavailable(str(e)) from e
     if r.status_code >= 400:
         raise CoreError(f"set_config HTTP {r.status_code}: {r.text[:200]}")
+
+
+def call_test_reminder(cfg: CoreConfig, timeout: float = 10.0) -> None:
+    """Fire wallbox_gateway.test_reminder (sends the reminder notification now,
+    using the saved config) so the user can verify their notify + message."""
+    _ensure(cfg)
+    try:
+        r = requests.post(
+            f"{cfg.base_url}/services/{_INTEGRATION_DOMAIN}/test_reminder",
+            headers=_headers(cfg),
+            json={},
+            timeout=timeout,
+        )
+    except requests.RequestException as e:
+        raise CoreUnavailable(str(e)) from e
+    if r.status_code >= 400:
+        raise CoreError(f"test_reminder HTTP {r.status_code}: {r.text[:200]}")

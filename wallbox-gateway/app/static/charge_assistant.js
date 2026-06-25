@@ -962,6 +962,22 @@
   function toggleWindow() {
     const w = $("window-wrap");
     if (w) w.hidden = !($("window_enabled") && $("window_enabled").checked);
+    updateWindowDur();
+  }
+
+  // Show the window length (handles midnight wrap) + warn if start == end.
+  function updateWindowDur() {
+    const el = $("window-dur");
+    if (!el) return;
+    const a = $("window_start") && $("window_start").value;
+    const b = $("window_end") && $("window_end").value;
+    el.classList.remove("ca-warn");
+    if (!a || !b) { el.textContent = ""; return; }
+    if (a === b) { el.textContent = "⚠ Start and end are the same — set a real window."; el.classList.add("ca-warn"); return; }
+    const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+    let d = toMin(b) - toMin(a);
+    if (d < 0) d += 1440;
+    el.textContent = `Window length: ${Math.floor(d / 60)}h ${d % 60}m`;
   }
 
   function toggleReminderLayer() {
@@ -1146,6 +1162,29 @@
     }
   }
 
+  // Save the current config, then fire the integration's test_reminder so the
+  // user sees the actual notification (message + tap-path + notify service).
+  async function sendTest() {
+    const hasReminder = currentMode === "reminder" ||
+      ($("rl_enabled") && $("rl_enabled").checked);
+    if (!hasReminder) {
+      showToast("Enable a plug-in reminder first, then test it.", "err");
+      return;
+    }
+    const btn = $("ca-test");
+    if (btn) btn.disabled = true;
+    showToast("Saving + sending a test…", "info");
+    await save();                                        // test uses the saved config
+    await new Promise((r) => setTimeout(r, 1800));       // let the entry reload settle
+    const r = await fetchJSON("api/ha/test_reminder", { method: "POST" });
+    if (r.ok && r.body.ok) {
+      showToast("✓ Test reminder sent — check your phone / notifications.", "ok");
+    } else {
+      showToast("⚠ Test failed: " + (r.body.detail || r.body.error || `HTTP ${r.status}`), "err");
+    }
+    if (btn) btn.disabled = false;
+  }
+
   // After saving an acting mode, if the gateway owner isn't the integration,
   // the assistant won't actually control charging — offer to fix that here so
   // the user never has to open the gateway's own settings page.
@@ -1222,6 +1261,10 @@
     });
     const we = $("window_enabled");
     if (we) we.addEventListener("change", () => { toggleWindow(); updateSummary(); });
+    ["window_start", "window_end"].forEach((id) => {
+      const el = $(id);
+      if (el) el.addEventListener("input", () => { updateWindowDur(); updateSummary(); });
+    });
     const rle = $("rl_enabled");
     if (rle) rle.addEventListener("change", () => { toggleReminderLayer(); updateSummary(); });
     RL_TRIGGERS.forEach((t) => {
@@ -1236,6 +1279,7 @@
     form.addEventListener("input", updateSummary);
     form.addEventListener("change", updateSummary);
     $("ca-save").addEventListener("click", save);
+    if ($("ca-test")) $("ca-test").addEventListener("click", sendTest);
     $("ca-reload").addEventListener("click", () => init());
   }
 

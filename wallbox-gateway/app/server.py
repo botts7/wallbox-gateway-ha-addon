@@ -405,6 +405,18 @@ def api_ha_get_config():
         return jsonify(body), code
 
 
+@app.route("/api/ha/test_reminder", methods=["POST"])
+def api_ha_test_reminder():
+    """Fire the integration's test_reminder so the user sees the notification."""
+    cfg = ha_bridge.config_from_env()
+    try:
+        ha_bridge.call_test_reminder(cfg)
+        return jsonify({"ok": True})
+    except Exception as e:
+        body, code = _ha_error(e)
+        return jsonify(body), code
+
+
 @app.route("/api/ha/config", methods=["POST"])
 def api_ha_set_config():
     """Write a partial options object back to the integration (+ reload)."""

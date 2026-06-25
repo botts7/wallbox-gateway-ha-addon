@@ -4,6 +4,15 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.25.4] - 2026-06-25
+
+### Added
+- **"Send test reminder"** button — saves the current config and fires the
+  reminder notification immediately, so you can check the message + tap-path +
+  notify service on your phone without waiting for a trigger.
+- The **charging window** now shows its **length** (e.g. "6h 0m", handling
+  midnight wrap) and warns when start == end.
+
 ## [0.25.3] - 2026-06-25
 
 ### Added

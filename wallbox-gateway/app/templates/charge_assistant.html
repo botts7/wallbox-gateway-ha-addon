@@ -705,6 +705,7 @@
             <input type="time" id="window_end">
           </div>
         </div>
+        <div class="ca-hint" id="window-dur"></div>
         <label class="ca-check"><input type="checkbox" id="window_overrun"> <span>Keep charging past the window until the target is reached</span></label>
         <label class="ca-check"><input type="checkbox" id="window_prestart"> <span>Start before the window if needed to be ready by departure</span></label>
         <label class="ca-check"><input type="checkbox" id="window_cost_warn"> <span>Notify me when a charge runs outside the window</span></label>
@@ -816,6 +817,7 @@
     <span class="ca-dirty clean" id="ca-dirty">✓ Up to date</span>
     <span class="ca-save-status" id="ca-save-status"></span>
     <div class="ca-actionbar-btns">
+      <button type="button" class="ca-btn ca-btn-ghost" id="ca-test" title="Save, then send the reminder notification now so you can check it on your phone">Send test reminder</button>
       <button type="button" class="ca-btn ca-btn-ghost" id="ca-reload">Reload</button>
       <button type="button" class="ca-btn ca-btn-primary" id="ca-save" disabled>Save changes</button>
     </div>
