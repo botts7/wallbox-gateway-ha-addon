@@ -709,8 +709,12 @@
         <label class="ca-check"><input type="checkbox" id="window_overrun"> <span>Keep charging past the window until the target is reached</span></label>
         <label class="ca-check"><input type="checkbox" id="window_prestart"> <span>Start before the window if needed to be ready by departure</span></label>
         <label class="ca-check"><input type="checkbox" id="window_cost_warn"> <span>Notify me when a charge runs outside the window</span></label>
-        <div class="ca-hint">The window can cross midnight (e.g. 23:00 → 07:00).
-           Your departure time always wins — the car is still ready in time.</div>
+        <div class="ca-hint">The window <strong>bounds the charge</strong>: it starts just-in-time to finish
+           by the <em>end</em> of the window and <strong>stops at the window end</strong>. The window can cross
+           midnight (e.g. 23:00 → 07:00). To let a departure deadline push charging
+           <em>outside</em> the cheap window, turn on “keep charging past the window” (overrun) and/or
+           “start before the window” (pre-start) above — otherwise the window wins and the car may not
+           reach target if the cheap hours are too short.</div>
       </div>
     </div>
   </section>

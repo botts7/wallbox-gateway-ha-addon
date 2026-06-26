@@ -4,6 +4,21 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.26.0] - 2026-06-27
+
+### Changed
+- **Charging-window help text** now reflects that the window *bounds* the charge:
+  it starts just-in-time to finish by the window end and **stops at the window
+  end**, and a departure deadline only pushes charging outside the cheap hours if
+  you enable overrun / pre-start. (Previously it implied "your departure time
+  always wins", which is no longer how the integration behaves — the window wins
+  by default.)
+
+### Notes
+- Pairs with integration **0.18.0b1**, which makes the window govern grid
+  charging, re-asserts a forced start against Eco-Smart, and adds a
+  **Next charge start** sensor (shows when a just-in-time charge will begin).
+
 ## [0.25.4] - 2026-06-25
 
 ### Added
