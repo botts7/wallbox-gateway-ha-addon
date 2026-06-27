@@ -4,6 +4,15 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.28.0] - 2026-06-27
+
+### Added
+- **"Solar can fill up to %" field** in the Smart + Solar config — the ceiling
+  for free solar charging past the SOC target (`solar_max_soc`, default 100% =
+  grab all available solar). Lower it (e.g. 90%) to protect the battery while
+  still letting solar charge beyond the grid target. Dev-tested: field renders,
+  defaults to 100, saves under `solar_max_soc`.
+
 ## [0.27.0] - 2026-06-27
 
 ### Added

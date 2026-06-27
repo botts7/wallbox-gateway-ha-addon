@@ -72,6 +72,7 @@
     solar_entity_ss: "solar_entity",
     load_entity_ss: "load_entity",
     surplus_start_ss: "surplus_start",
+    solar_max_soc: "solar_max_soc",
     notify_service_ss: "notify_service",
   };
   const CHECKS = {
@@ -88,7 +89,7 @@
     "scheduled_within_h", "escalate_min", "target_soc_pct", "battery_kwh",
     "charge_power_kw", "surplus_start", "surplus_stop", "surplus_debounce_min",
     "min_current_a", "max_current_a", "supply_voltage", "supply_phases",
-    "load_limit_w", "trip_target_pct", "price_cap",
+    "load_limit_w", "trip_target_pct", "price_cap", "solar_max_soc",
   ]);
   // Which CA keys belong to each mode — only these are written on save, so
   // switching modes doesn't carry stale fields from another mode.
@@ -116,7 +117,7 @@
       "soc_entity", "target_soc_pct", "departure_time", "battery_kwh",
       "charge_power_kw", "surplus_source", "surplus_entity", "grid_entity",
       "grid_export_negative", "solar_entity", "load_entity", "surplus_start",
-      "notify_service",
+      "solar_max_soc", "notify_service",
     ],
     off: [],
   };
@@ -159,6 +160,7 @@
     },
     smart_solar: {
       target_soc_pct: 80, battery_kwh: 60, charge_power_kw: 7.4, surplus_start: 1.4,
+      solar_max_soc: 100,
     },
   };
   const OWNER_NAMES = {

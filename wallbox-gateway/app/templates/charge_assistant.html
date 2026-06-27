@@ -573,6 +573,15 @@
         </div>
         <div class="ca-row">
           <div class="ca-field">
+            <label>Solar can fill up to <span class="ca-opt">optional</span></label>
+            <div class="ca-input-suffix"><input type="number" id="solar_max_soc" min="1" max="100" placeholder="100"><span>%</span></div>
+            <div class="ca-hint">The target above caps <strong>grid</strong> top-up. Free solar keeps
+               charging past it, up to this — default 100% (grab all available solar). Lower it to
+               protect the battery (e.g. 90%).</div>
+          </div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field">
             <label>Battery capacity</label>
             <div class="ca-input-suffix"><input type="number" id="battery_kwh_ss" min="1" step="0.1" placeholder="60"><span>kWh</span></div>
             <div class="ca-hint">For the ready-by / pre-start estimate.</div>
