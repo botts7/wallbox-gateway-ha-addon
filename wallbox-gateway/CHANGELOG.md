@@ -4,6 +4,28 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.29.0] - 2026-06-27
+
+### Fixed
+- **Charging cost was wildly over-stated** (e.g. a month showing ~$105 — closer
+  to a whole-house bill than EV charging). Two causes, both fixed:
+  - Cost was computed from the browser **session cache**, which could go **stale**
+    (frozen whenever the Sessions page wasn't open — so recent cheap overnight
+    charging was missing) and, worse, **mis-recorded daytime solar charges with
+    green = 0**, so free solar got billed as grid at peak rates.
+  - Cost (week + month, the dashboard tiles **and** the savings card) now comes
+    from the firmware **charge-log** — the ground-truth cp-based charge windows,
+    each carrying its real green share (`gwh`). Solar is never billed; each burst
+    is costed at the rate of the hours it actually ran. Reloaded fresh every time,
+    so it can't go stale. Applied in both the dashboard (cost.js) and the Sessions
+    page (sessions.js) so neither overwrites the other.
+
+### Known follow-up
+- The session **history list** still reflects the gateway's own per-session
+  records, some of which logged green = 0 for solar charges (a firmware
+  `green_energy` issue). Cost no longer depends on those, but the session-list
+  kWh totals can still look high until the firmware recording is fixed.
+
 ## [0.28.0] - 2026-06-27
 
 ### Added

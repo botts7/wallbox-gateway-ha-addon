@@ -276,35 +276,100 @@ function _sessionCost(tariff, s) {
 function readCache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch (e) { return {}; } }
 function writeCache(c) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch (e) {} }
 
+// Savings baseline (mirrors cost.js) — what "without the assistant" would cost.
+const BASELINE_KEY = 'wb-addon-savings-baseline-v1';
+function loadBaseline() {
+  try { const b = JSON.parse(localStorage.getItem(BASELINE_KEY)); if (b && b.mode) return b; } catch (e) {}
+  return { mode: 'plug_in', fixedTime: '00:00' };
+}
+function _hhmmToMin(v) { const m = String(v || '').split(':'); return (parseInt(m[0], 10) || 0) * 60 + (parseInt(m[1], 10) || 0); }
+function _localMidnightS(epoch) {
+  try {
+    const l = new Date(new Date(epoch * 1000).toLocaleString('en-US', { timeZone: CHARGER_TZ }));
+    return epoch - (l.getHours() * 3600 + l.getMinutes() * 60 + l.getSeconds());
+  } catch (e) { return Math.floor(epoch / 86400) * 86400; }
+}
+function _fixedStart(ts, hhmm) { let s = _localMidnightS(ts) + _hhmmToMin(hhmm) * 60; if (s < ts) s += 86400; return s; }
+function _baselineCost(tariff, s) {
+  const en = (s.en || 0) / 1000, gen = (s.gen || 0) / 1000;
+  const green = Math.max(0, Math.min(en, gen));
+  const gridKwh = Math.max(0, en - green);
+  if (gridKwh <= 0) return 0;
+  if (tariff.type === 'flat') return gridKwh * (tariff.flatRate || 0);
+  const seasonId = _seasonFor(tariff, s.ts);
+  const cfg = loadBaseline();
+  if (cfg.mode === 'flat_avg') {
+    const mid = _localMidnightS(s.ts);
+    let rate = 0;
+    for (let h = 0; h < 24; h++) rate += _bandRate(tariff, _bandFor(tariff, mid + h * 3600), seasonId);
+    return gridKwh * (rate / 24);
+  }
+  const segs = _chargeSegments(s);
+  const dur = segs.reduce((a, sg) => a + (sg.dur || 0), 0) || (s.dur || 3600);
+  const startTs = (cfg.mode === 'fixed_time') ? _fixedStart(s.ts, cfg.fixedTime) : s.ts;
+  const step = 300, n = Math.max(1, Math.ceil(dur / step)), per = gridKwh / n;
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    const t = startTs + i * step;
+    if (t >= startTs + dur) break;
+    sum += per * _bandRate(tariff, _bandFor(tariff, t), seasonId);
+  }
+  return sum;
+}
+
+// Cost + savings from the firmware CHARGE-LOG (ground truth: real cp-based
+// charge windows with per-burst green=gwh) rather than the session cache — the
+// cache can mis-record daytime solar as grid (green=0), which inflated the cost.
+// Each burst is billed as a mini-session at the rate of the hours it ran.
+function _summarizeFromLog(tariff) {
+  const now = Date.now() / 1000;
+  const weekAgo = now - 7 * 86400;
+  const d = new Date();
+  const monthStart = new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000;
+  let wkCost = 0, moCost = 0, wkK = 0, moK = 0, wkSaved = 0, moSaved = 0,
+    wkShift = 0, moShift = 0, moGrid = 0, moGreen = 0;
+  const monthBands = {};
+  (_chargeLog || []).forEach((iv) => {
+    const st = iv.start || 0;
+    if (st < weekAgo && st < monthStart) return;
+    const stop = (iv.stop && iv.stop > st) ? iv.stop : st;
+    const bs = { ts: st, stop, en: iv.wh || 0, gen: iv.gwh || 0, dur: Math.max(60, stop - st) };
+    const t = _tariffForSession(bs);
+    const bd = _sessionCost(t, bs);
+    const kwh = (iv.wh || 0) / 1000, green = bd.green || 0;
+    const shift = Math.max(0, _baselineCost(t, bs) - bd.total);
+    if (st >= weekAgo) { wkCost += bd.total; wkK += kwh; wkSaved += bd.saved || 0; wkShift += shift; }
+    if (st >= monthStart) {
+      moCost += bd.total; moK += kwh; moSaved += bd.saved || 0; moShift += shift;
+      moGreen += green; moGrid += Math.max(0, kwh - green);
+      for (const [k, v] of Object.entries(bd.byBand)) {
+        monthBands[k] = monthBands[k] || { kwh: 0, cost: 0, name: v.name, color: v.color };
+        monthBands[k].kwh += v.kwh; monthBands[k].cost += v.cost;
+      }
+    }
+  });
+  return { wkCost, moCost, wkK, moK, wkSaved, moSaved, wkShift, moShift, moGrid, moGreen, monthBands };
+}
+
 // ---- totals + cost ----
 function recompute() {
   const now = Date.now() / 1000;
   const weekAgo = now - 7 * 86400;
   const d = new Date(); const monthStart = new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000;
   const tariff = loadTariff();
-  let wk = 0, mo = 0, wkCost = 0, moCost = 0, moGreen = 0, moGrid = 0, moSaved = 0;
-  const monthBands = {};
+  // Session-list kWh totals (the cached session history). COST + grid/solar
+  // split come from the charge-log (_summarizeFromLog) so a stale / solar-as-grid
+  // session record can't inflate the cost.
+  let wk = 0, mo = 0;
   _sessions.forEach((s) => {
     const kwh = (s.en || 0) / 1000;
-    const green = Math.max(0, Math.min(kwh, (s.gen || 0) / 1000));
-    const inWeek = s.ts >= weekAgo, inMonth = s.ts >= monthStart;
-    if (inWeek) wk += kwh;
-    if (inMonth) { mo += kwh; moGreen += green; moGrid += (kwh - green); }
-    if (tariff && (inWeek || inMonth)) {
-      // Bill at the tariff that was in effect WHEN this session happened, not
-      // necessarily the current one (historically-accurate cost).
-      const bd = _sessionCost(_tariffForSession(s), s);
-      if (inWeek) wkCost += bd.total;
-      if (inMonth) {
-        moCost += bd.total;
-        moSaved += bd.saved || 0;
-        for (const [k, v] of Object.entries(bd.byBand)) {
-          monthBands[k] = monthBands[k] || { kwh: 0, cost: 0, name: v.name, color: v.color };
-          monthBands[k].kwh += v.kwh; monthBands[k].cost += v.cost;
-        }
-      }
-    }
+    if (s.ts >= weekAgo) wk += kwh;
+    if (s.ts >= monthStart) mo += kwh;
   });
+  const L = tariff ? _summarizeFromLog(tariff) : null;
+  const wkCost = L ? L.wkCost : 0, moCost = L ? L.moCost : 0;
+  const moGreen = L ? L.moGreen : 0, moGrid = L ? L.moGrid : 0, moSaved = L ? L.moSaved : 0;
+  const monthBands = L ? L.monthBands : {};
   if (_lifetimeKwh != null) setText('tile-allt', _lifetimeKwh.toFixed(0));
   setText('tile-week', wk.toFixed(1));
   setText('tile-month', mo.toFixed(1));
@@ -324,10 +389,13 @@ function recompute() {
   // Publish the cost summary so the Dashboard can show week/month cost tiles
   // without duplicating the tariff/cost engine (single source of truth here).
   try {
-    if (tariff) {
+    if (tariff && L) {
       localStorage.setItem('wb-addon-cost-summary', JSON.stringify({
-        weekCost: wkCost, monthCost: moCost, weekKwh: wk, monthKwh: mo,
-        currency: cur, ts: Math.floor(Date.now() / 1000),
+        weekCost: L.wkCost, monthCost: L.moCost, weekKwh: L.wkK, monthKwh: L.moK,
+        weekShiftSaved: L.wkShift, monthShiftSaved: L.moShift,
+        weekSolarSaved: L.wkSaved, monthSolarSaved: L.moSaved,
+        weekSaved: L.wkShift + L.wkSaved, monthSaved: L.moShift + L.moSaved,
+        source: 'charge-log', currency: cur, ts: Math.floor(Date.now() / 1000),
       }));
     } else {
       localStorage.removeItem('wb-addon-cost-summary');
