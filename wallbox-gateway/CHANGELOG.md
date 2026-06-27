@@ -4,6 +4,25 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.30.0] - 2026-06-27
+
+### Added
+- **Clearly-defined "Charging breakdown" on the Sessions page** — every charging
+  metric, each labelled with a hover definition, all from the accurate charge-log
+  (charging only, never whole-house):
+  - **Energy charged** (total kWh this month)
+  - **⚡ Grid (billed)** — kWh + % of charging that came from the grid (the part
+    you pay for)
+  - **☀️ Solar (free)** — kWh + % from your solar (never billed)
+  - **Charging cost** — grid energy × your tariff; explicitly "charging only, not
+    your whole-house bill"
+  - **Solar value** — what that solar charging would have cost at grid rates
+
+### Changed
+- Week/month **kWh tiles** on the Sessions page now also come from the charge-log,
+  so the tiles, the breakdown and the cost are one consistent figure (no more a
+  session-cache total that disagrees with the cost).
+
 ## [0.29.0] - 2026-06-27
 
 ### Fixed

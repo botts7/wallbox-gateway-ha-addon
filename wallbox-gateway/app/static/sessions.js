@@ -357,15 +357,24 @@ function recompute() {
   const weekAgo = now - 7 * 86400;
   const d = new Date(); const monthStart = new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000;
   const tariff = loadTariff();
-  // Session-list kWh totals (the cached session history). COST + grid/solar
-  // split come from the charge-log (_summarizeFromLog) so a stale / solar-as-grid
-  // session record can't inflate the cost.
+  // Week/month kWh come from the charge-log (real metered charge windows) so the
+  // tiles, the breakdown and the cost are all the SAME, consistent figure — not
+  // a stale / solar-as-grid session total. Falls back to the session cache only
+  // if the firmware has no charge-log.
   let wk = 0, mo = 0;
-  _sessions.forEach((s) => {
-    const kwh = (s.en || 0) / 1000;
-    if (s.ts >= weekAgo) wk += kwh;
-    if (s.ts >= monthStart) mo += kwh;
-  });
+  if (_chargeLog && _chargeLog.length) {
+    _chargeLog.forEach((iv) => {
+      const st = iv.start || 0, k = (iv.wh || 0) / 1000;
+      if (st >= weekAgo) wk += k;
+      if (st >= monthStart) mo += k;
+    });
+  } else {
+    _sessions.forEach((s) => {
+      const kwh = (s.en || 0) / 1000;
+      if (s.ts >= weekAgo) wk += kwh;
+      if (s.ts >= monthStart) mo += kwh;
+    });
+  }
   const L = tariff ? _summarizeFromLog(tariff) : null;
   const wkCost = L ? L.wkCost : 0, moCost = L ? L.moCost : 0;
   const moGreen = L ? L.moGreen : 0, moGrid = L ? L.moGrid : 0, moSaved = L ? L.moSaved : 0;
@@ -373,7 +382,7 @@ function recompute() {
   if (_lifetimeKwh != null) setText('tile-allt', _lifetimeKwh.toFixed(0));
   setText('tile-week', wk.toFixed(1));
   setText('tile-month', mo.toFixed(1));
-  renderSourceSplit(moGrid, moGreen, tariff ? moSaved : 0, tariff && tariff.currency || '$');
+  renderSourceSplit(moGrid, moGreen, tariff ? moSaved : 0, tariff && tariff.currency || '$', tariff && L ? L.moCost : null);
   updateTariffSummary(tariff);
   const row = $('cost-row'), cb = $('cost-breakdown');
   const cur = (tariff && tariff.currency) || '$';
@@ -437,30 +446,41 @@ function renderCostBreakdown(bands, cur) {
 
 // This-month grid vs solar (green) energy split. Solar is free; only grid is
 // billed. Hidden until sessions carry the green field (cache v2).
-function renderSourceSplit(grid, green, saved, cur) {
+// Clearly-defined charging breakdown for THIS MONTH, all from the charge-log
+// (charging only — never whole-house). Each row is what it says + a hover note.
+function renderSourceSplit(grid, green, saved, cur, cost) {
   const el = $('src-split');
   if (!el) return;
   const total = grid + green;
-  if (total <= 0 || green <= 0) { el.hidden = true; return; }  // no solar -> nothing to split
+  if (total <= 0) { el.hidden = true; return; }   // no charging logged yet
   el.hidden = false;
   el.textContent = '';
-  const pct = Math.round((green / total) * 100);
-  const chip = (label, kwh, color) => {
-    const c = document.createElement('div'); c.className = 'cb-chip';
-    const sw = document.createElement('span'); sw.className = 'cb-sw'; sw.style.background = color;
-    c.appendChild(sw);
-    const t = document.createElement('span'); t.textContent = `${label}: ${kwh.toFixed(1)} kWh`;
-    c.appendChild(t);
-    return c;
+  const gPct = Math.round((grid / total) * 100), sPct = 100 - gPct;
+  const head = document.createElement('div');
+  head.className = 'cbrk-head';
+  head.textContent = 'Charging breakdown · this month';
+  el.appendChild(head);
+  const row = (label, value, def, cls) => {
+    const r = document.createElement('div'); r.className = 'cbrk-row' + (cls ? ' ' + cls : '');
+    const l = document.createElement('span'); l.className = 'cbrk-label'; l.textContent = label;
+    if (def) { l.title = def; const i = document.createElement('span'); i.className = 'cbrk-i'; i.textContent = ' ⓘ'; l.appendChild(i); }
+    const v = document.createElement('span'); v.className = 'cbrk-val'; v.textContent = value;
+    r.appendChild(l); r.appendChild(v);
+    el.appendChild(r);
   };
-  el.appendChild(chip('⚡ Grid (paid)', grid, 'var(--primary)'));
-  el.appendChild(chip('☀️ Solar (free)', green, 'var(--success)'));
-  const p = document.createElement('div'); p.className = 'cb-chip'; p.textContent = `${pct}% solar this month`;
-  el.appendChild(p);
-  if (saved > 0) {  // dollar value the free solar saved at the current tariff
-    const sv = document.createElement('div'); sv.className = 'cb-chip cb-saved';
-    sv.textContent = `💰 Solar saved ${cur}${saved.toFixed(2)} this month`;
-    el.appendChild(sv);
+  row('Energy charged', `${total.toFixed(1)} kWh`,
+    'All energy delivered to the car this month (grid + solar).');
+  row('⚡ Grid (billed)', `${grid.toFixed(1)} kWh · ${gPct}%`,
+    'Energy charged from the grid — the only part you pay for.');
+  row('☀️ Solar (free)', `${green.toFixed(1)} kWh · ${sPct}%`,
+    'Energy charged from your solar — free, never billed.');
+  if (cost != null) {
+    row('Charging cost', `${cur}${(cost || 0).toFixed(2)}`,
+      'Grid energy used for charging × your tariff. Solar is excluded — this is charging only, not your whole-house bill.', 'cbrk-cost');
+  }
+  if (saved > 0) {
+    row('Solar value', `${cur}${saved.toFixed(2)}`,
+      'What that free solar charging WOULD have cost at grid rates — your saving.', 'cbrk-saved');
   }
 }
 
