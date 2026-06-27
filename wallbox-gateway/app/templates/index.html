@@ -209,7 +209,26 @@
         <div class="sv-fig-value" id="sv-year">--</div>
       </div>
     </div>
-    <div class="sv-breakdown" id="sv-breakdown"></div>
+    <!-- Baseline toggle: what "savings" is measured against. Hover the ⓘ for
+         what each comparison means. Fixed-time + feedback live in the details. -->
+    <div class="sv-toggle" role="group" aria-label="Compare savings against">
+      <span class="sv-toggle-cap">Compared to</span>
+      <button type="button" class="sv-tog" id="sv-tog-plug_in" data-mode="plug_in"
+        title="What it would have cost to charge the moment you plugged in, with no time-shifting — the realistic 'if I did nothing' baseline. Usually the smaller, more conservative number.">vs&nbsp;plug-in <span class="sv-info" aria-hidden="true">&#9432;</span></button>
+      <button type="button" class="sv-tog" id="sv-tog-flat_avg" data-mode="flat_avg"
+        title="What it would have cost at your tariff's all-day average rate (peak and off-peak blended). Shows the full value of charging off-peak — usually a bigger number.">vs&nbsp;avg&nbsp;rate <span class="sv-info" aria-hidden="true">&#9432;</span></button>
+    </div>
+    <!-- Where the savings came from: shifting to cheap hours vs free solar. -->
+    <div class="sv-split">
+      <div class="sv-split-item">
+        <span class="sv-split-label">&#9201;&#65039; Time-shift</span>
+        <span class="sv-split-val" id="sv-shift">--</span>
+      </div>
+      <div class="sv-split-item">
+        <span class="sv-split-label">&#9728;&#65039; Solar saved</span>
+        <span class="sv-split-val" id="sv-solar">--</span>
+      </div>
+    </div>
     <p class="sv-note" id="sv-note"></p>
 
     <details class="sv-config">

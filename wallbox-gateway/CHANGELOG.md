@@ -4,6 +4,23 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.27.0] - 2026-06-27
+
+### Added
+- **Charging-savings clarity.** The savings card now shows an explicit
+  **☀️ Solar saved** figure alongside **⏱️ Time-shift**, so the solar number
+  lines up with the official Wallbox app's "green" value (the two were measuring
+  different things — solar vs time-of-use shifting — which was confusing).
+- **Baseline toggle with tooltips.** A quick **"Compared to: vs plug-in /
+  vs avg rate"** toggle on the savings card, each with a hover tooltip explaining
+  what it means:
+  - *vs plug-in* — what charging the moment you plugged in would have cost (no
+    time-shifting); the realistic "if I did nothing" baseline, usually smaller.
+  - *vs avg rate* — what it would have cost at your tariff's all-day average rate
+    (peak + off-peak blended); shows the full value of charging off-peak.
+  The toggle mirrors (and stays in sync with) the advanced selector, which still
+  offers the third "fixed time" baseline.
+
 ## [0.26.0] - 2026-06-27
 
 ### Changed

@@ -153,6 +153,15 @@ function loadSvBaseline() {
   return { mode: 'plug_in', fixedTime: '00:00' };
 }
 
+// Reflect the active comparison on the quick toggle (fixed_time → neither lit,
+// it lives only in the advanced select).
+function setSvToggleActive(mode) {
+  ['plug_in', 'flat_avg'].forEach((m) => {
+    const b = $('sv-tog-' + m);
+    if (b) b.classList.toggle('sv-tog-active', m === mode);
+  });
+}
+
 function updateSavings() {
   const card = $('savings-card');
   if (!card) return;
@@ -170,15 +179,13 @@ function updateSavings() {
   setText('sv-month', cur + month.toFixed(2));
   setText('sv-week', cur + week.toFixed(2));
   setText('sv-year', '~' + cur + year.toFixed(0));
+  // Where the savings came from — always shown so "Solar saved" is explicit
+  // (matches the official app's green figure), not buried in a chip.
   const shift = sum.monthShiftSaved || 0, solar = sum.monthSolarSaved || 0;
-  const bd = $('sv-breakdown');
-  if (bd) {
-    bd.textContent = '';
-    const chip = (label, v) => { const d = document.createElement('span'); d.className = 'sv-chip'; d.textContent = label + ' ' + cur + v.toFixed(2); bd.appendChild(d); };
-    if (shift > 0 || solar > 0) { chip('⏱ Time-shift', shift); chip('☀ Solar', solar); }
-    else { const d = document.createElement('span'); d.className = 'sv-chip'; d.textContent = 'Charging already landed in cheap hours'; bd.appendChild(d); }
-  }
+  setText('sv-shift', cur + shift.toFixed(2));
+  setText('sv-solar', cur + solar.toFixed(2));
   const cfg = loadSvBaseline();
+  setSvToggleActive(cfg.mode);
   const baseName = cfg.mode === 'fixed_time' ? ('a ' + (cfg.fixedTime || '00:00') + ' start')
     : cfg.mode === 'flat_avg' ? 'the average rate' : 'charging at plug-in';
   setText('sv-note', 'Estimated this month vs ' + baseName + ' — measured energy × your tariff. An estimate, not a guarantee.');
@@ -266,6 +273,17 @@ function initSavingsUI() {
   };
   if (modeSel) modeSel.addEventListener('change', apply);
   if (fixed) fixed.addEventListener('change', apply);
+
+  // Quick toggle: vs plug-in / vs avg rate (mirrors the advanced select).
+  ['plug_in', 'flat_avg'].forEach((m) => {
+    const b = $('sv-tog-' + m);
+    if (b) b.addEventListener('click', () => {
+      if (modeSel) modeSel.value = m;   // keep the advanced select in sync
+      apply();                          // persist + recompute + redraw
+      setSvToggleActive(m);
+    });
+  });
+  setSvToggleActive(cfg.mode);
 
   const recordFb = (verdict) => {
     const note = $('sv-fb-note');
