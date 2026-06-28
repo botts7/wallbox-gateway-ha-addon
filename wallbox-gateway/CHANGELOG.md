@@ -4,6 +4,18 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.39.1] - 2026-06-28
+
+### Fixed
+- **Collapsible cards no longer corrupt the native `<details>` "Dynamic current"
+  / "Integration settings" cards** (was adding a second chevron and breaking their
+  keyboard toggle).
+- **Commute defaults (20% / 10% / 1 day / 7 days / 18 kWh/100km) now seed** when
+  you pick Smart charge / Smart + Solar (the relocated card was outside the scope
+  the default-seeder scanned).
+- Vehicle-picker dropdowns are cleaned up when a row is removed (no orphaned DOM);
+  a loaded vehicle's live battery/odometer value shows immediately.
+
 ## [0.39.0] - 2026-06-28
 
 ### Added

@@ -793,14 +793,25 @@
 
   function applyDefaults(mode) {
     const d = DEFAULTS[mode];
-    if (!d) return;
     const section = document.querySelector(`.ca-mode-section[data-section="${mode}"]`);
-    Object.entries(FIELDS).forEach(([fid, key]) => {
-      if (!(key in d)) return;
-      const el = $(fid);
-      if (!el || (section && !section.contains(el))) return;
-      if (el.value === "" || el.value == null) el.value = d[key];
-    });
+    if (d) {
+      Object.entries(FIELDS).forEach(([fid, key]) => {
+        if (!(key in d)) return;
+        const el = $(fid);
+        if (!el || (section && !section.contains(el))) return;
+        if (el.value === "" || el.value == null) el.value = d[key];
+      });
+    }
+    // Commute fields live in the relocated (shared) card, outside the mode
+    // section, so the section-scoped loop above skips them — seed by id here.
+    if (COMMUTE_MODES.includes(mode)) {
+      const cd = { commute_reserve_pct: 20, commute_margin_pct: 10,
+                   commute_cover_days: 1, commute_window_days: 7, commute_efficiency: 18 };
+      Object.entries(cd).forEach(([fid, val]) => {
+        const el = $(fid);
+        if (el && (el.value === "" || el.value == null)) el.value = val;
+      });
+    }
   }
 
   // Acting modes (target/solar) only run when the gateway hands us control.
@@ -1071,7 +1082,7 @@
     if (enab) enab.addEventListener("change", () => { sync(); updateSummary(); });
     if (src) src.addEventListener("change", () => { sync(); updateSummary(); });
     const rm = row.querySelector("[data-car-remove]");
-    if (rm) rm.addEventListener("click", () => { row.remove(); updateCarEmptyHint(); updateSummary(); });
+    if (rm) rm.addEventListener("click", () => { destroyRowCombos(row); row.remove(); updateCarEmptyHint(); updateSummary(); });
     sync();
   }
   function addCarRow(data) {
@@ -1084,12 +1095,19 @@
     updateCarEmptyHint();
     return row;
   }
+  function destroyRowCombos(scope) {
+    // The combobox dropdown list is parented on <body>, so it must be removed
+    // explicitly when a row is removed/re-rendered or it orphans on the page.
+    scope.querySelectorAll("[data-picker]").forEach((sel) => {
+      if (sel._combo && sel._combo.list) sel._combo.list.remove();
+    });
+  }
   function fillCarRow(row, data) {
     row.querySelectorAll("[data-k]").forEach((el) => {
       const v = data[el.dataset.k];
       if (el.type === "checkbox") el.checked = !!v;
       else el.value = v == null ? "" : v;
-      if (el.hasAttribute("data-picker") && el._combo) refreshCombo(el);
+      if (el.hasAttribute("data-picker") && el._combo) { refreshCombo(el); updateLive(el.id); }
     });
     const enab = row.querySelector('[data-k="commute_enabled"]');
     const src = row.querySelector("[data-commute-source]");
@@ -1098,7 +1116,7 @@
   }
   function renderCars(list) {
     const host = $("car-list");
-    if (host) host.innerHTML = "";
+    if (host) { carRows().forEach(destroyRowCombos); host.innerHTML = ""; }
     (Array.isArray(list) ? list : []).forEach((c) => addCarRow(c));
     updateCarEmptyHint();
   }
@@ -1139,6 +1157,10 @@
   // fields. Click or keyboard (Enter/Space) on the header; chevron shows state.
   function setupCollapsible() {
     document.querySelectorAll(".ca-card").forEach((card) => {
+      // Native <details> cards (Dynamic current, Integration settings) already
+      // collapse via the browser; wrapping them would double-toggle and break
+      // their keyboard handling.
+      if (card.tagName === "DETAILS") return;
       const head = card.querySelector(":scope > .ca-card-head");
       const body = card.querySelector(":scope > .ca-card-body");
       if (!head || !body || head._collap) return;
