@@ -32,6 +32,27 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("wallbox-addon")
 
+# Cache-busting: templates append `?v={{ ASSET_V }}` to their JS/CSS so a new
+# build (which changes the file mtime) is fetched fresh instead of the browser
+# serving a stale copy of the same-named asset. Static files are also given a
+# short max-age so a missed ?v can't pin an old asset for long.
+import os as _os
+_STATIC_DIR = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "static")
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 300
+
+
+@app.context_processor
+def _inject_asset_v():
+    try:
+        v = max(
+            int(_os.path.getmtime(_os.path.join(_STATIC_DIR, f)))
+            for f in _os.listdir(_STATIC_DIR)
+            if f.endswith((".js", ".css"))
+        )
+    except (OSError, ValueError):
+        v = 0
+    return {"ASSET_V": v}
+
 
 def _gateway_error(exc: Exception) -> Tuple[dict, int]:
     if isinstance(exc, GatewayNotConfigured):

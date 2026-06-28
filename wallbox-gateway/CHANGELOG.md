@@ -4,6 +4,13 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.37.1] - 2026-06-28
+
+### Fixed
+- **Static assets are cache-busted** (`?v=<mtime>` on JS/CSS + 5-min max-age), so
+  a new build no longer serves a stale cached page — you see the new UI on reload
+  without a manual hard-refresh.
+
 ## [0.37.0] - 2026-06-28
 
 ### Added
