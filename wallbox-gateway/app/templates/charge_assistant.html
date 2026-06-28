@@ -778,6 +778,24 @@
             <div class="ca-field"><label>Notify when at/below</label><input type="number" id="tariff_below_l" step="0.01" placeholder="0.20"></div>
           </div>
         </div>
+        <div class="ca-trigger" data-rl-trigger="solar">
+          <label class="ca-check"><input type="checkbox" id="rl-trig-solar"> <span>&#x2600;&#xFE0F; When solar is available (plug in for free solar)</span></label>
+          <div class="ca-trigger-body">
+            <div class="ca-field">
+              <label>Nudge when surplus reaches</label>
+              <input type="number" id="solar_remind_kw_l" step="0.1" placeholder="1.4">
+              <div class="ca-hint">Uses your solar / surplus source. Blank = your charge-start level. Only fires while the car is unplugged.</div>
+            </div>
+          </div>
+        </div>
+        <div class="ca-field">
+          <label>Only when home <span class="ca-opt">optional</span></label>
+          <div class="ca-picker">
+            <select id="home_entity_l" data-domains="person,device_tracker"></select>
+            <span class="ca-live" data-live-for="home_entity_l">—</span>
+          </div>
+          <div class="ca-hint">If set, reminders only fire when this person/device is home.</div>
+        </div>
         <div class="ca-field">
           <label>Notify service</label>
           <input type="text" id="notify_service_l" data-notify placeholder="notify.mobile_app_my_phone">

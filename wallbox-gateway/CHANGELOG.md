@@ -4,6 +4,14 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.31.0] - 2026-06-27
+
+### Added
+- **"Solar available" plug-in reminder** in the reminder layer — nudges you to
+  plug in when there's spare solar and the car's unplugged (with a surplus
+  threshold), plus an **"Only when home"** presence picker so it only fires when
+  you're home. Pairs with integration 0.18.0b4.
+
 ## [0.30.0] - 2026-06-27
 
 ### Added

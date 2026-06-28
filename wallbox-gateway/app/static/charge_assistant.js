@@ -137,13 +137,14 @@
   // Plug-in reminder LAYER — saved as a nested `reminder` sub-dict so it can
   // ride on top of an acting strategy. Distinct field ids (…_l) so they don't
   // collide with the standalone Reminder mode's fields.
-  const RL_TRIGGERS = ["arrival", "nightly", "lead", "tariff"];
+  const RL_TRIGGERS = ["arrival", "nightly", "lead", "tariff", "solar"];
   const RL_FIELDS = {   // layer field id -> reminder sub-dict key
     arrival_entity_l: "arrival_entity", nightly_time_l: "nightly_time",
     lead_hours_l: "lead_hours", tariff_entity_l: "tariff_entity",
-    tariff_below_l: "tariff_below", notify_service_l: "notify_service",
+    tariff_below_l: "tariff_below", solar_remind_kw_l: "solar_remind_kw",
+    home_entity_l: "home_entity", notify_service_l: "notify_service",
   };
-  const RL_NUM = new Set(["lead_hours", "tariff_below"]);
+  const RL_NUM = new Set(["lead_hours", "tariff_below", "solar_remind_kw"]);
 
   // Smart defaults — filled the moment a mode is picked (only into empty
   // fields), so the user starts from a sensible config instead of a blank form.
@@ -527,6 +528,8 @@
     nightly_time_l: "Remind me to plug in at this time every evening.",
     lead_hours_l: "Remind me this many hours before the charger's next scheduled charge.",
     tariff_entity_l: "Price sensor that triggers a reminder when the rate drops.",
+    solar_remind_kw_l: "Nudge me to plug in when solar surplus reaches this (your surplus source's units). Blank = your charge-start level.",
+    home_entity_l: "Only send reminders when this person/device is home. Leave blank for no home check.",
     tariff_below_l: "Remind me when the price entity is at/below this value.",
     notify_service_l: "HA notify service for the plug-in reminders (can differ from the charge-event alerts).",
   };
@@ -1006,9 +1009,10 @@
       if (t === "nightly") { const v = $("nightly_time_l").value; return v ? `nightly at ${b(v)}` : "nightly"; }
       if (t === "lead") return "before a scheduled charge";
       if (t === "tariff") return "the price drops";
+      if (t === "solar") return "there's spare solar";
       return "";
     });
-    let s = " It'll also remind you to plug in when " + joinList(parts);
+    let s = " It'll also remind you to plug in when " + joinList(parts.filter(Boolean));
     const svc = $("notify_service_l").value;
     s += svc ? ` via ${b(svc)}.` : ".";
     return s;
