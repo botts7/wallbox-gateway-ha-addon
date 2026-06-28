@@ -4,6 +4,13 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.36.0] - 2026-06-28
+
+### Changed
+- Commute card now points at the new **Projected SOC after a day's driving**
+  sensor (integration 0.18.0b9) alongside Daily use / Commute target, so you can
+  see at a glance whether you'll make it without charging.
+
 ## [0.35.0] - 2026-06-28
 
 ### Added
