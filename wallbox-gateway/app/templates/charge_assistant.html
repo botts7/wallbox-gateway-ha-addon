@@ -277,6 +277,96 @@
   <div class="ca-mode-section" data-section="target_soc">
     <section class="ca-card">
       <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#6366f1">&#x1F697;</span>
+        <div class="ca-card-titles">
+          <h2>Vehicles <span class="ca-opt">optional · for sharing one charger</span></h2>
+          <p class="ca-card-desc">Add the cars that share this charger, each with
+             its own battery, target and commute settings. Leave empty to use the
+             single Battery settings below. The car on the cable is picked
+             automatically (confirmed by a notification when it plugs in).</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <div id="car-list"></div>
+        <button type="button" class="ca-btn ca-btn-ghost" id="car-add">&#x2795; Add vehicle</button>
+        <div class="ca-hint" id="car-empty-hint">No vehicles added — the single
+           Battery settings below are used (one-car mode).</div>
+      </div>
+    </section>
+
+    <template id="car-row-tmpl">
+      <div class="ca-car-row" data-car-row>
+        <div class="ca-row">
+          <div class="ca-field" style="flex:2">
+            <label>Name</label>
+            <input type="text" data-k="name" placeholder="e.g. BYD Sealion 7">
+          </div>
+          <div class="ca-field">
+            <label>Battery capacity</label>
+            <div class="ca-input-suffix"><input type="number" data-k="battery_kwh" data-num min="1" step="0.1" placeholder="80"><span>kWh</span></div>
+          </div>
+          <button type="button" class="ca-icon-btn" data-car-remove title="Remove vehicle">&#x1F5D1;</button>
+        </div>
+        <div class="ca-field">
+          <label>Battery level entity <span class="ca-req">required</span></label>
+          <div class="ca-picker">
+            <select data-k="soc_entity" data-picker data-domains="sensor" data-device-class="battery"></select>
+            <span class="ca-live">&mdash;</span>
+          </div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Target level</label>
+            <div class="ca-input-suffix"><input type="number" data-k="target_soc_pct" data-num min="1" max="100" placeholder="80"><span>%</span></div>
+          </div>
+          <div class="ca-field">
+            <label>Ready by <span class="ca-opt">optional</span></label>
+            <input type="time" data-k="departure">
+          </div>
+        </div>
+        <label class="ca-check"><input type="checkbox" data-k="commute_enabled" data-bool> <span>&#x1F698; Charge for this car's commute (learned)</span></label>
+        <div class="ca-indent" data-commute-wrap hidden>
+          <div class="ca-field">
+            <label>Learn from</label>
+            <select data-k="commute_source" data-commute-source>
+              <option value="charger">Charger energy delivered</option>
+              <option value="odometer">Car odometer (km) + efficiency</option>
+              <option value="soc">Car battery-level drop (SOC)</option>
+            </select>
+          </div>
+          <div class="ca-row" data-odo-wrap hidden>
+            <div class="ca-field">
+              <label>Odometer entity</label>
+              <div class="ca-picker">
+                <select data-k="commute_odometer_entity" data-picker data-domains="sensor" data-device-class="distance"></select>
+                <span class="ca-live">&mdash;</span>
+              </div>
+            </div>
+            <div class="ca-field">
+              <label>Efficiency</label>
+              <div class="ca-input-suffix"><input type="number" data-k="commute_efficiency" data-num min="5" max="50" step="0.5" placeholder="18"><span>kWh/100km</span></div>
+            </div>
+          </div>
+          <div class="ca-row">
+            <div class="ca-field">
+              <label>Always keep at least</label>
+              <div class="ca-input-suffix"><input type="number" data-k="commute_reserve_pct" data-num min="0" max="100" placeholder="20"><span>%</span></div>
+            </div>
+            <div class="ca-field">
+              <label>Safety margin</label>
+              <div class="ca-input-suffix"><input type="number" data-k="commute_margin_pct" data-num min="0" max="100" placeholder="10"><span>%</span></div>
+            </div>
+            <div class="ca-field">
+              <label>Cover</label>
+              <div class="ca-input-suffix"><input type="number" data-k="commute_cover_days" data-num min="1" max="14" step="1" placeholder="1"><span>days</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <section class="ca-card">
+      <div class="ca-card-head">
         <span class="ca-card-icon" style="--chip:#3b82f6">&#x1F3AF;</span>
         <div class="ca-card-titles">
           <h2>Charge to a target</h2>

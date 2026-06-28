@@ -245,7 +245,10 @@
 
   function setupComboboxes() {
     // Entity pickers: single-select, value held in the (hidden) <select>.
+    // Skip already-wired pickers so re-running this (e.g. after adding a vehicle
+    // row) doesn't rebuild their <option>s and wipe the selected value.
     pickerSelects().forEach((sel) => {
+      if (sel._combo) return;
       const domains = (sel.dataset.domains || "").split(",").map((s) => s.trim());
       const dc = sel.dataset.deviceClass || "";
       let matches = entities.filter((e) => domains.includes(e.domain));
@@ -277,6 +280,7 @@
     });
     // Notify fields: multi-select chips, value = comma-joined services.
     notifyInputs().forEach((inp) => {
+      if (inp._combo) return;
       inp.style.display = "none";
       attachCombobox(inp, {
         multi: true,
@@ -711,6 +715,7 @@
       const cb = $(`trig-${t}`);
       if (cb) cb.checked = trigs.includes(t);
     });
+    renderCars(ca.cars);
     refreshTriggerBodies();
     toggleScheduledWithin();
     toggleCheapest();
@@ -1032,6 +1037,115 @@
     if (soc) soc.hidden = src !== "soc";
   }
 
+  // ── Vehicles (multi-car) ─────────────────────────────────────────────
+  // A repeatable list of car PROFILES, each carrying its own per-car keys
+  // (name, soc_entity, battery_kwh, target_soc_pct, departure, commute_*). On
+  // save they become the `cars` array; an empty list = single-car (the flat
+  // Battery settings below are used, via top-level fallback in the integration).
+  let _carSeq = 0;
+  function carRows() {
+    return Array.from(document.querySelectorAll("#car-list [data-car-row]"));
+  }
+  function updateCarEmptyHint() {
+    const h = $("car-empty-hint");
+    if (h) h.hidden = carRows().length > 0;
+  }
+  function wireCarRow(row) {
+    // unique ids on the pickers so the combobox live-value plumbing works
+    row.querySelectorAll("[data-picker]").forEach((sel) => {
+      const id = `car${_carSeq}_${sel.dataset.k}`;
+      sel.id = id;
+      const live = sel.parentNode.querySelector(".ca-live");
+      if (live) live.setAttribute("data-live-for", id);
+    });
+    _carSeq++;
+    const enab = row.querySelector('[data-k="commute_enabled"]');
+    const cwrap = row.querySelector("[data-commute-wrap]");
+    const src = row.querySelector("[data-commute-source]");
+    const odo = row.querySelector("[data-odo-wrap]");
+    const sync = () => {
+      if (cwrap) cwrap.hidden = !(enab && enab.checked);
+      if (odo) odo.hidden = !(src && src.value === "odometer");
+    };
+    if (enab) enab.addEventListener("change", () => { sync(); updateSummary(); });
+    if (src) src.addEventListener("change", () => { sync(); updateSummary(); });
+    const rm = row.querySelector("[data-car-remove]");
+    if (rm) rm.addEventListener("click", () => { row.remove(); updateCarEmptyHint(); updateSummary(); });
+    sync();
+  }
+  function addCarRow(data) {
+    const tmpl = $("car-row-tmpl");
+    const row = tmpl.content.firstElementChild.cloneNode(true);
+    $("car-list").appendChild(row);
+    wireCarRow(row);
+    setupComboboxes();                 // wire + populate the new pickers (idempotent)
+    if (data) fillCarRow(row, data);
+    updateCarEmptyHint();
+    return row;
+  }
+  function fillCarRow(row, data) {
+    row.querySelectorAll("[data-k]").forEach((el) => {
+      const v = data[el.dataset.k];
+      if (el.type === "checkbox") el.checked = !!v;
+      else el.value = v == null ? "" : v;
+      if (el.hasAttribute("data-picker") && el._combo) refreshCombo(el);
+    });
+    const enab = row.querySelector('[data-k="commute_enabled"]');
+    const src = row.querySelector("[data-commute-source]");
+    if (enab) enab.dispatchEvent(new Event("change"));
+    if (src) src.dispatchEvent(new Event("change"));
+  }
+  function renderCars(list) {
+    const host = $("car-list");
+    if (host) host.innerHTML = "";
+    (Array.isArray(list) ? list : []).forEach((c) => addCarRow(c));
+    updateCarEmptyHint();
+  }
+  function gatherCars() {
+    return carRows().map((row) => {
+      const car = {};
+      row.querySelectorAll("[data-k]").forEach((el) => {
+        if (el.type === "checkbox") { car[el.dataset.k] = !!el.checked; return; }
+        const raw = el.value;
+        if (raw === "" || raw == null) return;
+        car[el.dataset.k] = el.hasAttribute("data-num") ? Number(raw) : raw;
+      });
+      return car;
+    }).filter((c) => c.name || c.soc_entity);   // drop blank rows
+  }
+
+  // ── Collapsible cards ────────────────────────────────────────────────
+  // Each config card's header toggles its body, so the page isn't a wall of
+  // fields. Click or keyboard (Enter/Space) on the header; chevron shows state.
+  function setupCollapsible() {
+    document.querySelectorAll(".ca-card").forEach((card) => {
+      const head = card.querySelector(":scope > .ca-card-head");
+      const body = card.querySelector(":scope > .ca-card-body");
+      if (!head || !body || head._collap) return;
+      head._collap = true;
+      head.classList.add("ca-collapsible");
+      head.setAttribute("role", "button");
+      head.setAttribute("tabindex", "0");
+      head.setAttribute("aria-expanded", "true");
+      const chev = document.createElement("span");
+      chev.className = "ca-chevron"; chev.setAttribute("aria-hidden", "true");
+      chev.textContent = "⌄";
+      head.appendChild(chev);
+      const toggle = () => {
+        const collapsed = card.classList.toggle("ca-collapsed");
+        head.setAttribute("aria-expanded", String(!collapsed));
+      };
+      head.addEventListener("click", (e) => {
+        // ignore clicks on any interactive control that might sit in a header
+        if (e.target.closest("input,select,button,a,.ca-combo")) return;
+        toggle();
+      });
+      head.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+      });
+    });
+  }
+
   function toggleSurplusSource() {
     const src = ($("surplus_source") || {}).value || "entity";
     document.querySelectorAll(".ss-block").forEach((el) => { el.hidden = el.dataset.ss !== src; });
@@ -1161,6 +1275,14 @@
 
     if (currentMode === "reminder") {
       ca.triggers = TRIGGERS.filter((t) => { const cb = $(`trig-${t}`); return cb && cb.checked; });
+    }
+
+    // Multi-vehicle: the Vehicles list lives in the Target section. When any
+    // car is defined it becomes the `cars` array (per-car profiles); empty list
+    // = single-car (the flat fields below).
+    if (currentMode === "target_soc") {
+      const cars = gatherCars();
+      if (cars.length) ca.cars = cars;
     }
 
     const wanted = new Set(MODE_KEYS[currentMode]);
@@ -1346,6 +1468,7 @@
     $("cheapest_window").addEventListener("change", () => { toggleCheapest(); updateSummary(); });
     $("commute_enabled").addEventListener("change", () => { toggleCommute(); updateSummary(); });
     $("commute_source").addEventListener("change", () => { toggleCommuteSource(); updateSummary(); });
+    $("car-add").addEventListener("click", () => { addCarRow(); updateSummary(); });
     $("surplus_source").addEventListener("change", () => { toggleSurplusSource(); updateSummary(); });
     const sss = $("surplus_source_ss");
     if (sss) sss.addEventListener("change", () => { toggleSurplusSourceSS(); updateSummary(); });
@@ -1420,6 +1543,7 @@
     applyTooltips();
     loadAddonConfig();            // best-effort gateway-config warning
     await loadConfig();
+    setupCollapsible();           // after the form is built, wire card collapse
   }
 
   document.addEventListener("DOMContentLoaded", () => {

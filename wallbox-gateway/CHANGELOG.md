@@ -4,6 +4,21 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.37.0] - 2026-06-28
+
+### Added
+- **Vehicles list (multi-car, P1)** in the Smart-charge mode — add the cars that
+  share one charger, each with its own battery entity, capacity, target, ready-by
+  and commute settings (incl. per-car learn-from source). Add / edit / remove
+  rows; saved as the `cars` profile list (pairs with integration 0.18.0b10).
+  Leave empty for single-car (the flat Battery settings are used).
+- **Collapsible cards** — every config section's header now collapses/expands
+  (click or Enter/Space, chevron shows state), so the page isn't a wall of fields.
+
+### Fixed
+- Re-running picker setup (when adding a vehicle row) no longer rebuilds and
+  wipes already-selected entity pickers.
+
 ## [0.36.0] - 2026-06-28
 
 ### Changed
