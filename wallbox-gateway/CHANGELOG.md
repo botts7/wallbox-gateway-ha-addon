@@ -4,6 +4,15 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.38.0] - 2026-06-28
+
+### Changed
+- **Vehicles + Commute now apply to Smart + Solar too** (not just Smart charge).
+  Both cards are shared across the target-bearing strategies, so Smart + Solar
+  gets per-car profiles and the learned commute target. Pure Solar stays
+  surplus-driven (grabs all available solar up to its ceiling) and doesn't show
+  them. Verified saving in both Smart charge and Smart + Solar.
+
 ## [0.37.1] - 2026-06-28
 
 ### Fixed

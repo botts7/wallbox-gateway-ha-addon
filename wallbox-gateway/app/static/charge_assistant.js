@@ -116,9 +116,6 @@
       "soc_entity", "target_soc_pct", "target_autostart", "departure_time",
       "battery_kwh", "charge_power_kw", "cheapest_window", "price_entity",
       "trip_target_pct", "trip_until", "price_cap", "notify_service",
-      "commute_enabled", "commute_reserve_pct", "commute_margin_pct",
-      "commute_cover_days", "commute_window_days", "commute_source",
-      "commute_odometer_entity", "commute_efficiency",
     ],
     solar: [
       "surplus_source", "surplus_entity", "grid_entity", "grid_export_negative",
@@ -142,6 +139,9 @@
   // card outside the per-mode sections, so they're gathered/applied explicitly
   // (like poll_interval) rather than via the section-scoped FIELDS loop.
   const ACTING_MODES = ["target_soc", "solar", "smart_solar"];
+  // Strategies that charge to an SOC target → get the shared Vehicles + Commute
+  // cards. Pure Solar is surplus-driven (grabs everything), so it's excluded.
+  const COMMUTE_MODES = ["target_soc", "smart_solar"];
   const WINDOW_FIELDS = { window_start: "window_start", window_end: "window_end" };
   const WINDOW_CHECKS = {
     window_enabled: "window_enabled", window_overrun: "window_overrun",
@@ -1114,6 +1114,25 @@
     }).filter((c) => c.name || c.soc_entity);   // drop blank rows
   }
 
+  // Vehicles + Commute apply to every target-bearing strategy (Smart charge AND
+  // Smart + Solar), not just Target. They're authored inside the Target section
+  // for locality; here we lift them into the shared acting-card area so the
+  // existing data-modes show/hide governs them (shown for target_soc +
+  // smart_solar, hidden on pure Solar — which just grabs all surplus).
+  function relocateSharedCards() {
+    const carList = $("car-list"), commuteEn = $("commute_enabled");
+    const firstActing = document.querySelector(".ca-acting-card");
+    if (!carList || !commuteEn || !firstActing) return;
+    const parent = firstActing.parentNode;
+    const tmpl = $("car-row-tmpl");
+    [carList.closest(".ca-card"), commuteEn.closest(".ca-card")].forEach((card) => {
+      if (!card) return;
+      card.setAttribute("data-modes", "target_soc,smart_solar");
+      parent.insertBefore(card, firstActing);
+    });
+    if (tmpl) parent.insertBefore(tmpl, firstActing);
+  }
+
   // ── Collapsible cards ────────────────────────────────────────────────
   // Each config card's header toggles its body, so the page isn't a wall of
   // fields. Click or keyboard (Enter/Space) on the header; chevron shows state.
@@ -1277,12 +1296,21 @@
       ca.triggers = TRIGGERS.filter((t) => { const cb = $(`trig-${t}`); return cb && cb.checked; });
     }
 
-    // Multi-vehicle: the Vehicles list lives in the Target section. When any
-    // car is defined it becomes the `cars` array (per-car profiles); empty list
-    // = single-car (the flat fields below).
-    if (currentMode === "target_soc") {
+    // Vehicles + Commute are shared across the target-bearing strategies
+    // (Smart charge + Smart + Solar). They live outside the per-mode section,
+    // so gather them explicitly here (not via the section-scoped FIELDS loop).
+    if (COMMUTE_MODES.includes(currentMode)) {
       const cars = gatherCars();
-      if (cars.length) ca.cars = cars;
+      if (cars.length) ca.cars = cars;                       // empty = single-car
+      if ($("commute_enabled")) ca.commute_enabled = !!$("commute_enabled").checked;
+      ["commute_source", "commute_odometer_entity"].forEach((fid) => {
+        const el = $(fid); if (el && el.value) ca[fid] = el.value;
+      });
+      ["commute_reserve_pct", "commute_margin_pct", "commute_cover_days",
+       "commute_window_days", "commute_efficiency"].forEach((fid) => {
+        const el = $(fid);
+        if (el && el.value !== "") { const n = Number(el.value); if (Number.isFinite(n)) ca[fid] = n; }
+      });
     }
 
     const wanted = new Set(MODE_KEYS[currentMode]);
@@ -1539,6 +1567,7 @@
     if (!ok) return;
     await loadNotifyServices();   // before combobox setup so notify list is ready
     setupComboboxes();
+    relocateSharedCards();        // Vehicles + Commute → shared (target + smart_solar)
     loadPages();                  // best-effort: fill the "Tap opens" page datalist
     applyTooltips();
     loadAddonConfig();            // best-effort gateway-config warning

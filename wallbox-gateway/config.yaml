@@ -1,5 +1,5 @@
 ﻿name: "Wallbox BLE Gateway Manager"
-version: "0.37.1"
+version: "0.38.0"
 slug: wallbox_gateway
 description: >
   Manage your ESP32-based Wallbox BLE gateway from inside Home Assistant.
