@@ -50,6 +50,7 @@
     commute_source: "commute_source",
     commute_odometer_entity: "commute_odometer_entity",
     commute_efficiency: "commute_efficiency",
+    unknown_car: "unknown_car",
     notify_service_t: "notify_service",
     // solar
     surplus_source: "surplus_source",
@@ -1302,6 +1303,8 @@
     if (COMMUTE_MODES.includes(currentMode)) {
       const cars = gatherCars();
       if (cars.length) ca.cars = cars;                       // empty = single-car
+      const uc = $("unknown_car");
+      if (uc && uc.value) ca.unknown_car = uc.value;         // multi-car safety policy
       if ($("commute_enabled")) ca.commute_enabled = !!$("commute_enabled").checked;
       ["commute_source", "commute_odometer_entity"].forEach((fid) => {
         const el = $(fid); if (el && el.value) ca[fid] = el.value;

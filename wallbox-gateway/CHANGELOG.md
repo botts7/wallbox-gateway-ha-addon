@@ -4,6 +4,13 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.39.0] - 2026-06-28
+
+### Added
+- **"When unsure which car is plugged in" policy** in the Vehicles card
+  (conservative / ask / assume) — pairs with integration 0.18.0b14. Controls how
+  the assistant charges while the plugged-in car is still a guess.
+
 ## [0.38.0] - 2026-06-28
 
 ### Changed

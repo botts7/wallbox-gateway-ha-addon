@@ -291,6 +291,18 @@
         <button type="button" class="ca-btn ca-btn-ghost" id="car-add">&#x2795; Add vehicle</button>
         <div class="ca-hint" id="car-empty-hint">No vehicles added — the single
            Battery settings below are used (one-car mode).</div>
+        <div class="ca-field" id="unknown-car-wrap" style="margin-top:12px">
+          <label>When unsure which car is plugged in</label>
+          <select id="unknown_car">
+            <option value="conservative">Conservative — charge only to the lowest target until confirmed</option>
+            <option value="ask">Ask — don't auto-start on a guess; wait for confirmation</option>
+            <option value="assume_last">Assume — act on the best guess immediately</option>
+          </select>
+          <div class="ca-hint">The car on the cable is a guess until you confirm
+             (or it starts charging). <b>Conservative</b> never over-charges an
+             unknown car; <b>Ask</b> waits for your tap; <b>Assume</b> acts on the
+             guess right away.</div>
+        </div>
       </div>
     </section>
 
