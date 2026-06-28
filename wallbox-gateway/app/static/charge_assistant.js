@@ -42,6 +42,11 @@
     trip_target_pct: "trip_target_pct",
     trip_until: "trip_until",
     price_cap: "price_cap",
+    // target — commute-based adaptive target (learn daily use)
+    commute_reserve_pct: "commute_reserve_pct",
+    commute_margin_pct: "commute_margin_pct",
+    commute_cover_days: "commute_cover_days",
+    commute_window_days: "commute_window_days",
     notify_service_t: "notify_service",
     // solar
     surplus_source: "surplus_source",
@@ -78,6 +83,7 @@
   const CHECKS = {
     only_if_scheduled: "only_if_scheduled",
     actionable: "actionable",
+    commute_enabled: "commute_enabled",
     target_autostart: "target_autostart",
     cheapest_window: "cheapest_window",
     solar_dynamic: "solar_dynamic",
@@ -90,6 +96,8 @@
     "charge_power_kw", "surplus_start", "surplus_stop", "surplus_debounce_min",
     "min_current_a", "max_current_a", "supply_voltage", "supply_phases",
     "load_limit_w", "trip_target_pct", "price_cap", "solar_max_soc",
+    "commute_reserve_pct", "commute_margin_pct", "commute_cover_days",
+    "commute_window_days",
   ]);
   // Which CA keys belong to each mode — only these are written on save, so
   // switching modes doesn't carry stale fields from another mode.
@@ -105,6 +113,8 @@
       "soc_entity", "target_soc_pct", "target_autostart", "departure_time",
       "battery_kwh", "charge_power_kw", "cheapest_window", "price_entity",
       "trip_target_pct", "trip_until", "price_cap", "notify_service",
+      "commute_enabled", "commute_reserve_pct", "commute_margin_pct",
+      "commute_cover_days", "commute_window_days",
     ],
     solar: [
       "surplus_source", "surplus_entity", "grid_entity", "grid_export_negative",
@@ -154,7 +164,11 @@
       title: "Plug in your car",
       message: "Your car isn't plugged in — plug it in to charge.",
     },
-    target_soc: { target_soc_pct: 80, battery_kwh: 60, charge_power_kw: 7.4 },
+    target_soc: {
+      target_soc_pct: 80, battery_kwh: 60, charge_power_kw: 7.4,
+      commute_reserve_pct: 20, commute_margin_pct: 10,
+      commute_cover_days: 1, commute_window_days: 7,
+    },
     solar: {
       surplus_start: 1.4, surplus_stop: 0.4, surplus_debounce_min: 3,
       min_current_a: 6, max_current_a: 32, supply_voltage: 230, supply_phases: 1,
@@ -494,6 +508,11 @@
     soc_entity_t: "Required — the battery-level sensor the assistant reads to know when to stop.",
     target_soc_pct: "Everyday charge ceiling. Charging stops here (80% is kind to the battery).",
     target_autostart: "Also START charging when below target and plugged in (not just stop at target).",
+    commute_enabled: "Learn how much you drive each day (from real charge history) and set the target automatically — enough for your commute plus a margin, no more.",
+    commute_reserve_pct: "Never let the learned target fall below this — a floor so you always have a buffer.",
+    commute_margin_pct: "Extra headroom added on top of your learned daily use.",
+    commute_cover_days: "How many days of driving each charge should cover (1 = top up to one day's use; 2 = charge less often).",
+    commute_window_days: "How many days of charge history to average your daily use over.",
     departure_time: "Be ready by this time — charging starts just-in-time to reach target by then.",
     battery_kwh: "Battery capacity, used to estimate how long charging takes.",
     charge_power_kw: "Typical charge power, used to estimate charging duration.",
@@ -687,6 +706,7 @@
     refreshTriggerBodies();
     toggleScheduledWithin();
     toggleCheapest();
+    toggleCommute();
     // Surplus-source defaults (entity mode; grid-export-negative defaults on).
     if (!$("surplus_source").value) $("surplus_source").value = "entity";
     $("grid_export_negative").checked = ca.grid_export_negative !== false;
@@ -872,7 +892,26 @@
     if (currentMode === "target_soc") {
       const soc = $("soc_entity_t").value;
       if (!soc) return "Pick a battery-level entity so I know when to stop.";
-      let s = `I'll charge up to ${b(($("target_soc_pct").value || "80") + "%")}`;
+      const cap = ($("target_soc_pct").value || "80") + "%";
+      let s;
+      if ($("commute_enabled").checked) {
+        const cover = $("commute_cover_days").value || "1";
+        const d = cover === "1" ? "a day's" : `${cover} days'`;
+        s = `I'll learn how much you drive and charge enough for ${b(d)} commute ` +
+            `(plus ${b(($("commute_margin_pct").value || "10") + "%")} margin, ` +
+            `never below ${b(($("commute_reserve_pct").value || "20") + "%")}, ` +
+            `capped at ${b(cap)})`;
+        if ($("departure_time").value) s += `, ready by ${b($("departure_time").value)}`;
+        s += `, reading ${b(nameOf(soc))}`;
+        const lv = liveOf(soc);
+        if (lv) s += ` (now ${b(lv)})`;
+        s += ".";
+        if ($("cheapest_window").checked && $("price_entity").value) {
+          s += " I'll top up only in the cheapest hours.";
+        }
+        return s + windowClause() + reminderLayerClause();
+      }
+      s = `I'll charge up to ${b(cap)}`;
       if ($("departure_time").value) s += `, ready by ${b($("departure_time").value)}`;
       s += `, reading ${b(nameOf(soc))}`;
       const live = liveOf(soc);
@@ -962,6 +1001,11 @@
     const w = $("cheapest-wrap");
     if (w) w.hidden = !$("cheapest_window").checked;
     updatePriceForecastHint();
+  }
+
+  function toggleCommute() {
+    const w = $("commute-wrap");
+    if (w) w.hidden = !$("commute_enabled").checked;
   }
 
   function toggleSurplusSource() {
@@ -1276,6 +1320,7 @@
     });
     $("only_if_scheduled").addEventListener("change", () => { toggleScheduledWithin(); updateSummary(); });
     $("cheapest_window").addEventListener("change", () => { toggleCheapest(); updateSummary(); });
+    $("commute_enabled").addEventListener("change", () => { toggleCommute(); updateSummary(); });
     $("surplus_source").addEventListener("change", () => { toggleSurplusSource(); updateSummary(); });
     const sss = $("surplus_source_ss");
     if (sss) sss.addEventListener("change", () => { toggleSurplusSourceSS(); updateSummary(); });

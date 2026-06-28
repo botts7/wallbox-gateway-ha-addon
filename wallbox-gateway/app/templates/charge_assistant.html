@@ -345,6 +345,53 @@
 
     <section class="ca-card">
       <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#0ea5e9">&#x1F698;</span>
+        <div class="ca-card-titles">
+          <h2>Commute charging <span class="ca-opt">learns your driving</span></h2>
+          <p class="ca-card-desc">Instead of always charging to the fixed target,
+             learn how much you actually drive (from real charge history) and set
+             the target automatically — enough for your commute plus a margin.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <label class="ca-check"><input type="checkbox" id="commute_enabled"> <span>&#x1F698; Charge for my daily commute (learned)</span></label>
+        <div class="ca-indent" id="commute-wrap" hidden>
+          <div class="ca-hint" id="commute-preview" style="margin-bottom:8px">After
+             a few charges, the <b>Daily use (average)</b> and <b>Commute charge
+             target</b> sensors show what's been learned.</div>
+          <div class="ca-row">
+            <div class="ca-field">
+              <label>Always keep at least</label>
+              <div class="ca-input-suffix"><input type="number" id="commute_reserve_pct" min="0" max="100" placeholder="20"><span>%</span></div>
+              <div class="ca-hint">A floor — the learned target never drops below this.</div>
+            </div>
+            <div class="ca-field">
+              <label>Safety margin</label>
+              <div class="ca-input-suffix"><input type="number" id="commute_margin_pct" min="0" max="100" placeholder="10"><span>%</span></div>
+              <div class="ca-hint">Extra headroom on top of learned use.</div>
+            </div>
+          </div>
+          <div class="ca-row">
+            <div class="ca-field">
+              <label>Cover</label>
+              <div class="ca-input-suffix"><input type="number" id="commute_cover_days" min="1" max="14" step="1" placeholder="1"><span>days</span></div>
+              <div class="ca-hint">How many days of driving each charge should cover.</div>
+            </div>
+            <div class="ca-field">
+              <label>Learn over</label>
+              <div class="ca-input-suffix"><input type="number" id="commute_window_days" min="1" max="60" step="1" placeholder="7"><span>days</span></div>
+              <div class="ca-hint">History window for the daily-use average.</div>
+            </div>
+          </div>
+          <div class="ca-hint">Caps at your target level above, so it never
+             over-charges. Pair with a cheap overnight window so it tops up only
+             what you need, when it's cheapest.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ca-card">
+      <div class="ca-card-head">
         <span class="ca-card-icon" style="--chip:#14b8a6">&#x1F50B;</span>
         <div class="ca-card-titles">
           <h2>Battery care &amp; limits <span class="ca-opt">optional</span></h2>

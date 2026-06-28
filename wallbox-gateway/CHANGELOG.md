@@ -4,6 +4,17 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.34.0] - 2026-06-28
+
+### Added
+- **Commute charging** card in the Charge Assistant's Target-charge mode (pairs
+  with integration 0.18.0b7). Tick "Charge for my daily commute" and the
+  assistant learns how much you drive (from real charge history) and sets the
+  target automatically — enough for the commute plus a margin, capped at your
+  everyday target. Tunables: always-keep floor, safety margin, days-to-cover and
+  the learning window. The live summary explains exactly what it'll do, and the
+  config preview shows the learned daily use.
+
 ## [0.33.0] - 2026-06-28
 
 ### Added
