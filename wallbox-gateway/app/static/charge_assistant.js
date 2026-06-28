@@ -610,6 +610,8 @@
     // Top-level integration tunables (not under charge_assistant).
     const pi = $("poll_interval");
     if (pi) pi.value = opts.poll_interval == null ? "" : opts.poll_interval;
+    const ar = $("auto_resume_eco");
+    if (ar) ar.checked = opts.auto_resume_eco !== false;   // default on
     applyConfig(ca);
     $("ca-form").hidden = false;
     $("ca-actionbar").hidden = false;
@@ -798,7 +800,9 @@
     const ca = gather();
     const pi = $("poll_interval");
     const poll = pi && pi.value !== "" && Number.isFinite(Number(pi.value)) ? Number(pi.value) : null;
-    return JSON.stringify({ ca, poll });
+    const ar = $("auto_resume_eco");
+    const autoResume = ar ? !!ar.checked : true;
+    return JSON.stringify({ ca, poll, autoResume });
   }
 
   // Capture the current form as "saved" — after load and after a successful
@@ -1160,6 +1164,8 @@
       const n = Number(pi.value);
       if (Number.isFinite(n)) options.poll_interval = n;
     }
+    const ar = $("auto_resume_eco");
+    if (ar) options.auto_resume_eco = !!ar.checked;   // top-level option (default on)
     const payload = { options };
     if (host) payload.host = host;
     const r = await fetchJSON("api/ha/config", {
