@@ -18,6 +18,7 @@ browser. The Core base URL is overridable for local dev / tests.
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from typing import Any
@@ -151,6 +152,88 @@ def list_notify_services(cfg: CoreConfig, timeout: float = 8.0) -> list[str]:
     return out
 
 
+def _ws_url(cfg: CoreConfig) -> str:
+    """Derive the Core WebSocket URL from the REST base_url.
+    http://supervisor/core/api -> ws://supervisor/core/websocket
+    http://host:8123/api       -> ws://host:8123/api/websocket"""
+    u = cfg.base_url
+    scheme = "wss" if u.startswith("https") else "ws"
+    host_path = u.split("://", 1)[-1]
+    if host_path.endswith("/core/api"):
+        host_path = host_path[: -len("/core/api")] + "/core/websocket"
+    elif host_path.endswith("/api"):
+        host_path = host_path[: -len("/api")] + "/api/websocket"
+    else:
+        host_path = host_path.rstrip("/") + "/api/websocket"
+    return f"{scheme}://{host_path}"
+
+
+def _lovelace_paths(dashboards: list[dict], configs: dict) -> list[str]:
+    """Pure: build dashboard/view paths from the dashboards list + each
+    dashboard's lovelace config. ``configs`` is keyed by url_path (None = the
+    default 'Overview' dashboard). Returns de-duplicated, order-preserving."""
+    urls = [None] + [d.get("url_path") for d in (dashboards or []) if d.get("url_path")]
+    out: list[str] = []
+    for url in urls:
+        root = "/lovelace" if not url else f"/{url}"
+        out.append(root)
+        for idx, v in enumerate(((configs.get(url) or {}).get("views")) or []):
+            vp = v.get("path") or idx
+            out.append(f"{root}/{vp}")
+    seen, res = set(), []
+    for p in out:
+        if p not in seen:
+            seen.add(p)
+            res.append(p)
+    return res
+
+
+def list_pages(cfg: CoreConfig, timeout: float = 6.0) -> list[str]:
+    """Lovelace dashboard + view paths via the WS API (there's no REST
+    equivalent). Best-effort: any failure (missing websocket-client, auth, a
+    YAML/auto dashboard that won't serve its config) returns [] / partial, and
+    the GUI just falls back to free-text."""
+    if not cfg.available:
+        return []
+    try:
+        import websocket  # websocket-client; lazy so a missing dep degrades gracefully
+    except Exception:
+        return []
+
+    def _recv() -> dict:
+        return json.loads(ws.recv())
+
+    try:
+        ws = websocket.create_connection(_ws_url(cfg), timeout=timeout)
+    except Exception:
+        return []
+    try:
+        if _recv().get("type") != "auth_required":
+            return []
+        ws.send(json.dumps({"type": "auth", "access_token": cfg.token}))
+        if _recv().get("type") != "auth_ok":
+            return []
+        ws.send(json.dumps({"id": 1, "type": "lovelace/dashboards/list"}))
+        msg = _recv()
+        dashboards = msg.get("result") or [] if msg.get("success") else []
+        configs: dict = {}
+        i = 2
+        for url in [None] + [d.get("url_path") for d in dashboards if d.get("url_path")]:
+            ws.send(json.dumps({"id": i, "type": "lovelace/config", "url_path": url}))
+            r = _recv()
+            if r.get("success"):
+                configs[url] = r.get("result") or {}
+            i += 1
+        return _lovelace_paths(dashboards, configs)
+    except Exception:
+        return []
+    finally:
+        try:
+            ws.close()
+        except Exception:
+            pass
+
+
 def get_config(
     cfg: CoreConfig, host: str | None = None, timeout: float = 8.0
 ) -> dict[str, Any]:
@@ -201,3 +284,20 @@ def set_config(
         raise CoreUnavailable(str(e)) from e
     if r.status_code >= 400:
         raise CoreError(f"set_config HTTP {r.status_code}: {r.text[:200]}")
+
+
+def call_test_reminder(cfg: CoreConfig, timeout: float = 10.0) -> None:
+    """Fire wallbox_gateway.test_reminder (sends the reminder notification now,
+    using the saved config) so the user can verify their notify + message."""
+    _ensure(cfg)
+    try:
+        r = requests.post(
+            f"{cfg.base_url}/services/{_INTEGRATION_DOMAIN}/test_reminder",
+            headers=_headers(cfg),
+            json={},
+            timeout=timeout,
+        )
+    except requests.RequestException as e:
+        raise CoreUnavailable(str(e)) from e
+    if r.status_code >= 400:
+        raise CoreError(f"test_reminder HTTP {r.status_code}: {r.text[:200]}")

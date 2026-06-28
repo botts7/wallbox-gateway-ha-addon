@@ -270,7 +270,39 @@ window.WBCost = (function () {
     } catch (e) { return []; }
   }
 
-  // Recompute week/month cost from the cached sessions + fresh windows, and
+  // Week/month cost + savings straight from the firmware CHARGE-LOG — the
+  // ground-truth cp-based charge windows, each carrying its real green share
+  // (gwh). This is the single source of truth for cost: it avoids the browser
+  // session cache, which could go stale (frozen when the Sessions page isn't
+  // open) AND mis-record daytime solar as grid (green=0), wildly inflating the
+  // month figure. Each burst is billed as a mini-session at the rate of the
+  // hours it actually ran; solar (gwh) is free.
+  function summarizeFromLog(tariff) {
+    const now = Date.now() / 1000;
+    const weekAgo = now - 7 * 86400;
+    const d = new Date();
+    const monthStart = new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000;
+    let wkC = 0, moC = 0, wkK = 0, moK = 0, wkSol = 0, moSol = 0, wkSh = 0, moSh = 0;
+    (_chargeLog || []).forEach((iv) => {
+      const st = iv.start || 0;
+      if (st < weekAgo && st < monthStart) return;
+      const stop = (iv.stop && iv.stop > st) ? iv.stop : st;
+      const bs = { ts: st, stop, en: iv.wh || 0, gen: iv.gwh || 0, dur: Math.max(60, stop - st) };
+      const t = _tariffForSession(bs);
+      const bd = _sessionCost(t, bs);
+      const kwh = (iv.wh || 0) / 1000;
+      const shift = Math.max(0, _baselineCost(t, bs) - bd.total);
+      if (st >= weekAgo) { wkC += bd.total; wkK += kwh; wkSol += bd.saved || 0; wkSh += shift; }
+      if (st >= monthStart) { moC += bd.total; moK += kwh; moSol += bd.saved || 0; moSh += shift; }
+    });
+    return {
+      weekCost: wkC, monthCost: moC, weekKwh: wkK, monthKwh: moK,
+      weekShiftSaved: wkSh, monthShiftSaved: moSh,
+      weekSolarSaved: wkSol, monthSolarSaved: moSol,
+    };
+  }
+
+  // Recompute week/month cost from the firmware charge-log + fresh windows, and
   // publish wb-addon-cost-summary (same shape sessions.js writes).
   async function refresh() {
     const tz = await fetchJSON('api/sess?met=g_tzn&par=null&wait=4000');
@@ -278,34 +310,16 @@ window.WBCost = (function () {
     await Promise.all([loadChargeLog(), loadScheduleWindows()]);
     const tariff = loadTariff();
     if (!tariff) { try { localStorage.removeItem(SUMMARY_KEY); } catch (e) {} return null; }
-    const sessions = loadCachedSessions();
-    const now = Date.now() / 1000;
-    const weekAgo = now - 7 * 86400;
-    const d = new Date(); const monthStart = new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000;
-    let wk = 0, mo = 0, wkCost = 0, moCost = 0;
-    let wkShift = 0, moShift = 0, wkSolar = 0, moSolar = 0;
-    sessions.forEach((s) => {
-      const kwh = (s.en || 0) / 1000;
-      const inWeek = s.ts >= weekAgo, inMonth = s.ts >= monthStart;
-      if (inWeek) wk += kwh;
-      if (inMonth) mo += kwh;
-      if (inWeek || inMonth) {
-        const t = _tariffForSession(s);
-        const bd = _sessionCost(t, s);
-        // Time-shift saving = what charging-at-plug-in would have cost minus the
-        // actual cost. Solar saving = grid cost the green kWh avoided.
-        const shift = Math.max(0, _baselineCost(t, s) - bd.total);
-        if (inWeek) { wkCost += bd.total; wkShift += shift; wkSolar += bd.saved; }
-        if (inMonth) { moCost += bd.total; moShift += shift; moSolar += bd.saved; }
-      }
-    });
+    // Cost + savings from the charge-log (ground truth) — never the session
+    // cache (could be stale / mis-record solar as grid).
+    const s = summarizeFromLog(tariff);
     const summary = {
-      weekCost: wkCost, monthCost: moCost, weekKwh: wk, monthKwh: mo,
-      // Savings (estimates vs a "charged at plug-in" baseline — see _baselineCost).
-      weekShiftSaved: wkShift, monthShiftSaved: moShift,
-      weekSolarSaved: wkSolar, monthSolarSaved: moSolar,
-      weekSaved: wkShift + wkSolar, monthSaved: moShift + moSolar,
-      savingsBaseline: 'plug-in',
+      weekCost: s.weekCost, monthCost: s.monthCost, weekKwh: s.weekKwh, monthKwh: s.monthKwh,
+      weekShiftSaved: s.weekShiftSaved, monthShiftSaved: s.monthShiftSaved,
+      weekSolarSaved: s.weekSolarSaved, monthSolarSaved: s.monthSolarSaved,
+      weekSaved: s.weekShiftSaved + s.weekSolarSaved,
+      monthSaved: s.monthShiftSaved + s.monthSolarSaved,
+      source: 'charge-log',
       currency: (tariff.currency || '$'), ts: Math.floor(Date.now() / 1000),
     };
     try { localStorage.setItem(SUMMARY_KEY, JSON.stringify(summary)); } catch (e) {}
@@ -322,6 +336,7 @@ window.WBCost = (function () {
     },
     sessionCost: (tariff, s) => _sessionCost(tariff, s),
     baselineCost: (tariff, s) => _baselineCost(tariff, s),
+    summarizeFromLog: (tariff) => summarizeFromLog(tariff),
   };
 
   return { refresh: refresh, _debug: _debug };

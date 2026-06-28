@@ -680,6 +680,17 @@ a { color: var(--accent); }
 .cb-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--elevated); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 12px; color: var(--text2); }
 .cb-sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 .cb-saved { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.4); color: var(--success); font-weight: 600; }
+/* Clearly-defined charging breakdown (Sessions page) — stacked, labelled rows */
+#src-split { display: block; background: var(--elevated); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-top: 10px; }
+#src-split[hidden] { display: none; }
+.cbrk-head { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+.cbrk-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid var(--border); }
+.cbrk-row:first-of-type { border-top: 0; }
+.cbrk-label { font-size: 13px; color: var(--text2); }
+.cbrk-i { font-size: 11px; opacity: .55; cursor: help; }
+.cbrk-val { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text); }
+.cbrk-cost .cbrk-val { color: var(--primary); }
+.cbrk-saved .cbrk-val { color: var(--success); }
 
 /* ---- Tariff editor modal ---- */
 .tariff-modal { position: fixed; inset: 0; z-index: 300; padding: 16px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
@@ -752,6 +763,19 @@ a { color: var(--accent); }
 .sv-fig-hero .sv-fig-value { font-size: clamp(14px, 19cqw, 26px); }
 .sv-breakdown { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .sv-chip { font-size: 12.5px; color: var(--text2); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; }
+/* Savings baseline toggle (what the savings is measured against) + tooltips */
+.sv-toggle { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.sv-toggle-cap { font-size: 12px; color: var(--text3); margin-right: 2px; }
+.sv-tog { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--text2); background: var(--elevated); border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 5px; }
+.sv-tog:hover { border-color: var(--primary); }
+.sv-tog-active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.sv-info { font-size: 11px; opacity: 0.7; cursor: help; }
+/* Where savings came from: time-shift vs solar, always shown so Solar is clear */
+.sv-split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.sv-split-item { background: var(--elevated); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sv-split-label { font-size: 12.5px; color: var(--text2); }
+.sv-split-val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: #22c55e; white-space: nowrap; }
+@media (max-width: 380px) { .sv-split { grid-template-columns: 1fr; } }
 .sv-note { font-size: 12.5px; color: var(--text3); margin: 12px 0 0; line-height: 1.45; }
 .sv-config { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
 .sv-config > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text2); }

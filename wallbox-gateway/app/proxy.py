@@ -58,3 +58,21 @@ def fetch_json(cfg: GatewayConfig, path: str, timeout: float = 5.0) -> dict:
         raise GatewayUnreachable(str(e)) from e
     r.raise_for_status()
     return r.json()
+
+
+def post_form(cfg: GatewayConfig, path: str, data: dict, timeout: float = 8.0) -> dict:
+    """POST form-encoded data to a gateway endpoint (e.g. /api/control_owner).
+    The gateway's auth-only API endpoints read form/query args via http.arg()."""
+    if not cfg.configured:
+        raise GatewayNotConfigured("gateway_ip not set in Add-on options")
+    try:
+        r = requests.post(
+            cfg.url(path),
+            data=data or {},
+            auth=(cfg.auth_user, cfg.auth_pass) if cfg.auth_pass else None,
+            timeout=timeout,
+        )
+    except requests.RequestException as e:
+        raise GatewayUnreachable(str(e)) from e
+    r.raise_for_status()
+    return r.json()

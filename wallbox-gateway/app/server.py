@@ -22,6 +22,7 @@ from proxy import (
     GatewayUnreachable,
     config_from_env,
     fetch_json,
+    post_form,
 )
 import ha_bridge
 import ota
@@ -30,6 +31,27 @@ import ota
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("wallbox-addon")
+
+# Cache-busting: templates append `?v={{ ASSET_V }}` to their JS/CSS so a new
+# build (which changes the file mtime) is fetched fresh instead of the browser
+# serving a stale copy of the same-named asset. Static files are also given a
+# short max-age so a missed ?v can't pin an old asset for long.
+import os as _os
+_STATIC_DIR = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "static")
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 300
+
+
+@app.context_processor
+def _inject_asset_v():
+    try:
+        v = max(
+            int(_os.path.getmtime(_os.path.join(_STATIC_DIR, f)))
+            for f in _os.listdir(_STATIC_DIR)
+            if f.endswith((".js", ".css"))
+        )
+    except (OSError, ValueError):
+        v = 0
+    return {"ASSET_V": v}
 
 
 def _gateway_error(exc: Exception) -> Tuple[dict, int]:
@@ -191,6 +213,25 @@ def api_command():
     path = "/api/command" + (("?" + qs) if qs else "")
     try:
         return jsonify(fetch_json(cfg, path, timeout=8.0))
+    except Exception as e:
+        body, code = _gateway_error(e)
+        return jsonify(body), code
+
+
+_OWNERS = {"wallbox_schedule", "integration", "addon", "none"}
+
+
+@app.route("/api/control_owner", methods=["POST"])
+def api_control_owner():
+    """Set the gateway's charge-control owner from the Add-on, so the user
+    never has to open the gateway's own Settings page. Forwards to the
+    gateway's auth-only /api/control_owner (persists to NVS, no reboot)."""
+    cfg = config_from_env()
+    owner = (request.values.get("owner") or "").strip()
+    if owner not in _OWNERS:
+        return jsonify({"error": "bad_owner", "allowed": sorted(_OWNERS)}), 400
+    try:
+        return jsonify(post_form(cfg, "/api/control_owner", {"owner": owner}, timeout=8.0))
     except Exception as e:
         body, code = _gateway_error(e)
         return jsonify(body), code
@@ -361,6 +402,18 @@ def api_ha_notify_services():
         return jsonify(body), code
 
 
+@app.route("/api/ha/pages")
+def api_ha_pages():
+    """List Lovelace dashboard/view paths for the 'Tap opens' field.
+    Best-effort (WS API) — returns [] on any failure; the GUI falls back to
+    free-text, so this never blocks the page."""
+    cfg = ha_bridge.config_from_env()
+    try:
+        return jsonify({"pages": ha_bridge.list_pages(cfg)})
+    except Exception:
+        return jsonify({"pages": []})
+
+
 @app.route("/api/ha/config")
 def api_ha_get_config():
     """Read the integration's current options to pre-fill the GUI."""
@@ -368,6 +421,18 @@ def api_ha_get_config():
     host = (request.args.get("host") or "").strip() or None
     try:
         return jsonify(ha_bridge.get_config(cfg, host=host))
+    except Exception as e:
+        body, code = _ha_error(e)
+        return jsonify(body), code
+
+
+@app.route("/api/ha/test_reminder", methods=["POST"])
+def api_ha_test_reminder():
+    """Fire the integration's test_reminder so the user sees the notification."""
+    cfg = ha_bridge.config_from_env()
+    try:
+        ha_bridge.call_test_reminder(cfg)
+        return jsonify({"ok": True})
     except Exception as e:
         body, code = _ha_error(e)
         return jsonify(body), code

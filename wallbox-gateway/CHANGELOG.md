@@ -4,6 +4,270 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.39.1] - 2026-06-28
+
+### Fixed
+- **Collapsible cards no longer corrupt the native `<details>` "Dynamic current"
+  / "Integration settings" cards** (was adding a second chevron and breaking their
+  keyboard toggle).
+- **Commute defaults (20% / 10% / 1 day / 7 days / 18 kWh/100km) now seed** when
+  you pick Smart charge / Smart + Solar (the relocated card was outside the scope
+  the default-seeder scanned).
+- Vehicle-picker dropdowns are cleaned up when a row is removed (no orphaned DOM);
+  a loaded vehicle's live battery/odometer value shows immediately.
+
+## [0.39.0] - 2026-06-28
+
+### Added
+- **"When unsure which car is plugged in" policy** in the Vehicles card
+  (conservative / ask / assume) — pairs with integration 0.18.0b14. Controls how
+  the assistant charges while the plugged-in car is still a guess.
+
+## [0.38.0] - 2026-06-28
+
+### Changed
+- **Vehicles + Commute now apply to Smart + Solar too** (not just Smart charge).
+  Both cards are shared across the target-bearing strategies, so Smart + Solar
+  gets per-car profiles and the learned commute target. Pure Solar stays
+  surplus-driven (grabs all available solar up to its ceiling) and doesn't show
+  them. Verified saving in both Smart charge and Smart + Solar.
+
+## [0.37.1] - 2026-06-28
+
+### Fixed
+- **Static assets are cache-busted** (`?v=<mtime>` on JS/CSS + 5-min max-age), so
+  a new build no longer serves a stale cached page — you see the new UI on reload
+  without a manual hard-refresh.
+
+## [0.37.0] - 2026-06-28
+
+### Added
+- **Vehicles list (multi-car, P1)** in the Smart-charge mode — add the cars that
+  share one charger, each with its own battery entity, capacity, target, ready-by
+  and commute settings (incl. per-car learn-from source). Add / edit / remove
+  rows; saved as the `cars` profile list (pairs with integration 0.18.0b10).
+  Leave empty for single-car (the flat Battery settings are used).
+- **Collapsible cards** — every config section's header now collapses/expands
+  (click or Enter/Space, chevron shows state), so the page isn't a wall of fields.
+
+### Fixed
+- Re-running picker setup (when adding a vehicle row) no longer rebuilds and
+  wipes already-selected entity pickers.
+
+## [0.36.0] - 2026-06-28
+
+### Changed
+- Commute card now points at the new **Projected SOC after a day's driving**
+  sensor (integration 0.18.0b9) alongside Daily use / Commute target, so you can
+  see at a glance whether you'll make it without charging.
+
+## [0.35.0] - 2026-06-28
+
+### Added
+- **"Learn from" dropdown in the Commute card** (pairs with integration
+  0.18.0b8). Choose how daily use is measured: **Charger energy delivered**
+  (default), **Car odometer (km) + efficiency**, or **Car battery-level drop
+  (SOC)**. Picking odometer reveals an odometer-entity picker + efficiency field;
+  SOC reuses the battery-level entity already chosen above. The live summary
+  states which source it's learning from.
+
+## [0.34.0] - 2026-06-28
+
+### Added
+- **Commute charging** card in the Charge Assistant's Target-charge mode (pairs
+  with integration 0.18.0b7). Tick "Charge for my daily commute" and the
+  assistant learns how much you drive (from real charge history) and sets the
+  target automatically — enough for the commute plus a margin, capped at your
+  everyday target. Tunables: always-keep floor, safety margin, days-to-cover and
+  the learning window. The live summary explains exactly what it'll do, and the
+  config preview shows the learned daily use.
+
+## [0.33.0] - 2026-06-28
+
+### Added
+- **"Auto-resume Eco-Smart / native schedule after a manual charge"** toggle in
+  Integration settings (default on). Pairs with integration 0.18.0b6 — after a
+  manual charge stops and leaves the charger paused + idle, the integration clears
+  the override so your charger's own Solar + schedule control resumes, no manual
+  "Resume schedule" tap needed.
+
+## [0.32.0] - 2026-06-28
+
+### Fixed
+- **Switching the Charge Assistant mode to "Off" no longer wipes your config.**
+  Previously, picking "Off" saved only `{mode: "off"}` and erased your window,
+  target, departure, surplus source, etc. Now "Off" **preserves all your
+  settings** (so flipping back to a mode doesn't make you reconfigure) while
+  staying fully inert — strategy off = no charging, and the plug-in reminder
+  layer is disabled so nothing nudges either.
+
+## [0.31.0] - 2026-06-27
+
+### Added
+- **"Solar available" plug-in reminder** in the reminder layer — nudges you to
+  plug in when there's spare solar and the car's unplugged (with a surplus
+  threshold), plus an **"Only when home"** presence picker so it only fires when
+  you're home. Pairs with integration 0.18.0b4.
+
+## [0.30.0] - 2026-06-27
+
+### Added
+- **Clearly-defined "Charging breakdown" on the Sessions page** — every charging
+  metric, each labelled with a hover definition, all from the accurate charge-log
+  (charging only, never whole-house):
+  - **Energy charged** (total kWh this month)
+  - **⚡ Grid (billed)** — kWh + % of charging that came from the grid (the part
+    you pay for)
+  - **☀️ Solar (free)** — kWh + % from your solar (never billed)
+  - **Charging cost** — grid energy × your tariff; explicitly "charging only, not
+    your whole-house bill"
+  - **Solar value** — what that solar charging would have cost at grid rates
+
+### Changed
+- Week/month **kWh tiles** on the Sessions page now also come from the charge-log,
+  so the tiles, the breakdown and the cost are one consistent figure (no more a
+  session-cache total that disagrees with the cost).
+
+## [0.29.0] - 2026-06-27
+
+### Fixed
+- **Charging cost was wildly over-stated** (e.g. a month showing ~$105 — closer
+  to a whole-house bill than EV charging). Two causes, both fixed:
+  - Cost was computed from the browser **session cache**, which could go **stale**
+    (frozen whenever the Sessions page wasn't open — so recent cheap overnight
+    charging was missing) and, worse, **mis-recorded daytime solar charges with
+    green = 0**, so free solar got billed as grid at peak rates.
+  - Cost (week + month, the dashboard tiles **and** the savings card) now comes
+    from the firmware **charge-log** — the ground-truth cp-based charge windows,
+    each carrying its real green share (`gwh`). Solar is never billed; each burst
+    is costed at the rate of the hours it actually ran. Reloaded fresh every time,
+    so it can't go stale. Applied in both the dashboard (cost.js) and the Sessions
+    page (sessions.js) so neither overwrites the other.
+
+### Known follow-up
+- The session **history list** still reflects the gateway's own per-session
+  records, some of which logged green = 0 for solar charges (a firmware
+  `green_energy` issue). Cost no longer depends on those, but the session-list
+  kWh totals can still look high until the firmware recording is fixed.
+
+## [0.28.0] - 2026-06-27
+
+### Added
+- **"Solar can fill up to %" field** in the Smart + Solar config — the ceiling
+  for free solar charging past the SOC target (`solar_max_soc`, default 100% =
+  grab all available solar). Lower it (e.g. 90%) to protect the battery while
+  still letting solar charge beyond the grid target. Dev-tested: field renders,
+  defaults to 100, saves under `solar_max_soc`.
+
+## [0.27.0] - 2026-06-27
+
+### Added
+- **Charging-savings clarity.** The savings card now shows an explicit
+  **☀️ Solar saved** figure alongside **⏱️ Time-shift**, so the solar number
+  lines up with the official Wallbox app's "green" value (the two were measuring
+  different things — solar vs time-of-use shifting — which was confusing).
+- **Baseline toggle with tooltips.** A quick **"Compared to: vs plug-in /
+  vs avg rate"** toggle on the savings card, each with a hover tooltip explaining
+  what it means:
+  - *vs plug-in* — what charging the moment you plugged in would have cost (no
+    time-shifting); the realistic "if I did nothing" baseline, usually smaller.
+  - *vs avg rate* — what it would have cost at your tariff's all-day average rate
+    (peak + off-peak blended); shows the full value of charging off-peak.
+  The toggle mirrors (and stays in sync with) the advanced selector, which still
+  offers the third "fixed time" baseline.
+
+## [0.26.0] - 2026-06-27
+
+### Changed
+- **Charging-window help text** now reflects that the window *bounds* the charge:
+  it starts just-in-time to finish by the window end and **stops at the window
+  end**, and a departure deadline only pushes charging outside the cheap hours if
+  you enable overrun / pre-start. (Previously it implied "your departure time
+  always wins", which is no longer how the integration behaves — the window wins
+  by default.)
+
+### Notes
+- Pairs with integration **0.18.0b1**, which makes the window govern grid
+  charging, re-asserts a forced start against Eco-Smart, and adds a
+  **Next charge start** sensor (shows when a just-in-time charge will begin).
+
+## [0.25.4] - 2026-06-25
+
+### Added
+- **"Send test reminder"** button — saves the current config and fires the
+  reminder notification immediately, so you can check the message + tap-path +
+  notify service on your phone without waiting for a trigger.
+- The **charging window** now shows its **length** (e.g. "6h 0m", handling
+  midnight wrap) and warns when start == end.
+
+## [0.25.3] - 2026-06-25
+
+### Added
+- **"Tap opens (path)"** in the plug-in reminder is now a **dropdown of your
+  actual Lovelace dashboards + views** (fetched over the HA WebSocket API), while
+  still accepting any free-text path. Falls back to free-text if the list can't
+  be fetched. (Adds the `websocket-client` dependency — installed best-effort so
+  the build never fails on it.)
+
+## [0.25.2] - 2026-06-25
+
+### Fixed
+- Entity pickers show the **live value** of the selected entity again — picking
+  an entity wasn't refreshing the side preview (only the initial page load did),
+  so it stuck on "—".
+
+### Changed
+- **Charging window + Auto-start grace** now show only for **Smart charge** and
+  **Smart + Solar** (they gate *grid* charging) and are **hidden for pure Solar**,
+  where neither applies. In **Smart + Solar** the window description makes clear
+  it limits only **grid top-up** — *solar still charges anytime there's surplus*
+  (a night window does not block daytime solar). Mirrored in the integration's
+  options flow.
+
+## [0.25.1] - 2026-06-24
+
+### Fixed
+- Dashboard status now reads **"Connected — not charging"** for an idle charger
+  (status 4 with `gen=0`) instead of "Paused", reserving "Paused" for a real
+  Schedule/Solar override — matching the integration's charger-status sensor.
+
+## [0.25.0] - 2026-06-24
+
+### Added
+- **Auto-start grace period** field on the acting (Smart charge / Solar / Smart +
+  Solar) config — when set, the assistant notifies "charging will start in N min
+  — tap to cancel" before it begins, so you can hold off. 0 = start immediately.
+  (Backed by the integration's managed-override session, which also suppresses
+  the charger's Eco-Smart Solar-Only pause during a grid charge and restores it
+  + resumes native schedule control when the charge finishes.)
+
+## [0.24.0] - 2026-06-24
+
+Composable Charge Assistant — mix behaviours instead of picking one mode.
+
+### Added
+- **Plug-in reminders as a layer** — enable plug-in nudges *on top of* Smart
+  charge or Solar (not just as a standalone mode). Charge-event alerts and
+  reminder nudges can target different notify services.
+- **Smart + Solar** strategy — charge from excess solar whenever it's
+  available (free), and top up from grid only inside your cheap window or just
+  in time to reach the target by departure.
+- **Charging window** — restrict charging to cheap hours (e.g. 00:00–06:00),
+  with *pre-start* (begin early to be ready by departure), *overrun* (finish
+  past the window if the target isn't reached), and a notification when a
+  charge runs outside the window.
+- Live summary + the dashboard card describe the whole composed setup in one
+  sentence. Native HA options flow brought to parity (new Smart + Solar step,
+  window + reminder-layer fields).
+- **Charge-control owner is now settable from the Add-on** — a dropdown on the
+  Assistant page writes straight to the gateway (no need to open its own
+  Settings page). After saving an acting mode while the owner isn't Home
+  Assistant, a prompt offers to hand control over so the assistant actually
+  runs.
+
+Requires Wallbox Gateway integration ≥ 0.16.0 and gateway firmware with the
+`/api/control_owner` endpoint (v3.2.0-beta.6+).
+
 ## [0.23.0] - 2026-06-23
 
 Saved-state visibility — you can always see what the assistant is set to.

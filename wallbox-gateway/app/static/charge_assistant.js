@@ -42,6 +42,15 @@
     trip_target_pct: "trip_target_pct",
     trip_until: "trip_until",
     price_cap: "price_cap",
+    // target — commute-based adaptive target (learn daily use)
+    commute_reserve_pct: "commute_reserve_pct",
+    commute_margin_pct: "commute_margin_pct",
+    commute_cover_days: "commute_cover_days",
+    commute_window_days: "commute_window_days",
+    commute_source: "commute_source",
+    commute_odometer_entity: "commute_odometer_entity",
+    commute_efficiency: "commute_efficiency",
+    unknown_car: "unknown_car",
     notify_service_t: "notify_service",
     // solar
     surplus_source: "surplus_source",
@@ -60,21 +69,39 @@
     supply_phases: "supply_phases",
     load_limit_w: "load_limit_w",
     load_power_entity: "load_power_entity",
+    // smart_solar — combined (target fields + surplus fields), own field ids
+    soc_entity_ss: "soc_entity",
+    target_soc_pct_ss: "target_soc_pct",
+    departure_time_ss: "departure_time",
+    battery_kwh_ss: "battery_kwh",
+    charge_power_kw_ss: "charge_power_kw",
+    surplus_source_ss: "surplus_source",
+    surplus_entity_ss: "surplus_entity",
+    grid_entity_ss: "grid_entity",
+    solar_entity_ss: "solar_entity",
+    load_entity_ss: "load_entity",
+    surplus_start_ss: "surplus_start",
+    solar_max_soc: "solar_max_soc",
+    notify_service_ss: "notify_service",
   };
   const CHECKS = {
     only_if_scheduled: "only_if_scheduled",
     actionable: "actionable",
+    commute_enabled: "commute_enabled",
     target_autostart: "target_autostart",
     cheapest_window: "cheapest_window",
     solar_dynamic: "solar_dynamic",
     grid_export_negative: "grid_export_negative",
+    grid_export_negative_ss: "grid_export_negative",
   };
   const NUM_KEYS = new Set([
     "lead_hours", "tariff_below", "skip_above_pct", "soc_max_age_min",
     "scheduled_within_h", "escalate_min", "target_soc_pct", "battery_kwh",
     "charge_power_kw", "surplus_start", "surplus_stop", "surplus_debounce_min",
     "min_current_a", "max_current_a", "supply_voltage", "supply_phases",
-    "load_limit_w", "trip_target_pct", "price_cap",
+    "load_limit_w", "trip_target_pct", "price_cap", "solar_max_soc",
+    "commute_reserve_pct", "commute_margin_pct", "commute_cover_days",
+    "commute_window_days", "commute_efficiency",
   ]);
   // Which CA keys belong to each mode — only these are written on save, so
   // switching modes doesn't carry stale fields from another mode.
@@ -98,9 +125,41 @@
       "solar_dynamic", "min_current_a", "max_current_a", "supply_voltage",
       "supply_phases", "load_limit_w", "load_power_entity",
     ],
+    smart_solar: [
+      "soc_entity", "target_soc_pct", "departure_time", "battery_kwh",
+      "charge_power_kw", "surplus_source", "surplus_entity", "grid_entity",
+      "grid_export_negative", "solar_entity", "load_entity", "surplus_start",
+      "solar_max_soc", "notify_service",
+    ],
     off: [],
   };
   const TRIGGERS = ["arrival", "nightly", "lead", "tariff"];
+
+  // Acting strategies drive charging (vs reminder which only notifies). The
+  // shared "Charging window" card is shown for these. Window fields live in a
+  // card outside the per-mode sections, so they're gathered/applied explicitly
+  // (like poll_interval) rather than via the section-scoped FIELDS loop.
+  const ACTING_MODES = ["target_soc", "solar", "smart_solar"];
+  // Strategies that charge to an SOC target → get the shared Vehicles + Commute
+  // cards. Pure Solar is surplus-driven (grabs everything), so it's excluded.
+  const COMMUTE_MODES = ["target_soc", "smart_solar"];
+  const WINDOW_FIELDS = { window_start: "window_start", window_end: "window_end" };
+  const WINDOW_CHECKS = {
+    window_enabled: "window_enabled", window_overrun: "window_overrun",
+    window_prestart: "window_prestart", window_cost_warn: "window_cost_warn",
+  };
+
+  // Plug-in reminder LAYER — saved as a nested `reminder` sub-dict so it can
+  // ride on top of an acting strategy. Distinct field ids (…_l) so they don't
+  // collide with the standalone Reminder mode's fields.
+  const RL_TRIGGERS = ["arrival", "nightly", "lead", "tariff", "solar"];
+  const RL_FIELDS = {   // layer field id -> reminder sub-dict key
+    arrival_entity_l: "arrival_entity", nightly_time_l: "nightly_time",
+    lead_hours_l: "lead_hours", tariff_entity_l: "tariff_entity",
+    tariff_below_l: "tariff_below", solar_remind_kw_l: "solar_remind_kw",
+    home_entity_l: "home_entity", notify_service_l: "notify_service",
+  };
+  const RL_NUM = new Set(["lead_hours", "tariff_below", "solar_remind_kw"]);
 
   // Smart defaults — filled the moment a mode is picked (only into empty
   // fields), so the user starts from a sensible config instead of a blank form.
@@ -110,10 +169,19 @@
       title: "Plug in your car",
       message: "Your car isn't plugged in — plug it in to charge.",
     },
-    target_soc: { target_soc_pct: 80, battery_kwh: 60, charge_power_kw: 7.4 },
+    target_soc: {
+      target_soc_pct: 80, battery_kwh: 60, charge_power_kw: 7.4,
+      commute_reserve_pct: 20, commute_margin_pct: 10,
+      commute_cover_days: 1, commute_window_days: 7,
+      commute_source: "charger", commute_efficiency: 18,
+    },
     solar: {
       surplus_start: 1.4, surplus_stop: 0.4, surplus_debounce_min: 3,
       min_current_a: 6, max_current_a: 32, supply_voltage: 230, supply_phases: 1,
+    },
+    smart_solar: {
+      target_soc_pct: 80, battery_kwh: 60, charge_power_kw: 7.4, surplus_start: 1.4,
+      solar_max_soc: 100,
     },
   };
   const OWNER_NAMES = {
@@ -138,6 +206,10 @@
   // rendered into the "Active now" line so the user always sees what's running.
   let savedSig = null;
   let savedCa = { mode: "off" };
+  // The full charge_assistant config last loaded/saved — so turning the mode
+  // "Off" can PRESERVE your settings (off = inert, not a wipe) instead of
+  // saving just {mode:"off"} and erasing window/target/surplus/etc.
+  let loadedCa = {};
   let isDirty = false;
 
   // Escapes for both text and double-quoted attribute contexts (entity ids land
@@ -174,7 +246,10 @@
 
   function setupComboboxes() {
     // Entity pickers: single-select, value held in the (hidden) <select>.
+    // Skip already-wired pickers so re-running this (e.g. after adding a vehicle
+    // row) doesn't rebuild their <option>s and wipe the selected value.
     pickerSelects().forEach((sel) => {
+      if (sel._combo) return;
       const domains = (sel.dataset.domains || "").split(",").map((s) => s.trim());
       const dc = sel.dataset.deviceClass || "";
       let matches = entities.filter((e) => domains.includes(e.domain));
@@ -206,6 +281,7 @@
     });
     // Notify fields: multi-select chips, value = comma-joined services.
     notifyInputs().forEach((inp) => {
+      if (inp._combo) return;
       inp.style.display = "none";
       attachCombobox(inp, {
         multi: true,
@@ -261,6 +337,11 @@
         C.list.hidden = true;
         if (!cfg.multi) syncSingle(holder); else inp.value = "";
       }, 160));
+      // Selecting/clearing a value dispatches "change" on the hidden control.
+      // Run the combo's own onChange (live preview + summary) — previously only
+      // the form-level summary listener caught it, so the live value never
+      // refreshed when you PICKED an entity (only on initial load).
+      holder.addEventListener("change", () => { if (C.cfg.onChange) C.cfg.onChange(); });
     }
     refreshCombo(holder);
   }
@@ -437,6 +518,14 @@
     soc_entity_t: "Required — the battery-level sensor the assistant reads to know when to stop.",
     target_soc_pct: "Everyday charge ceiling. Charging stops here (80% is kind to the battery).",
     target_autostart: "Also START charging when below target and plugged in (not just stop at target).",
+    commute_enabled: "Learn how much you drive each day (from real charge history) and set the target automatically — enough for your commute plus a margin, no more.",
+    commute_reserve_pct: "Never let the learned target fall below this — a floor so you always have a buffer.",
+    commute_margin_pct: "Extra headroom added on top of your learned daily use.",
+    commute_cover_days: "How many days of driving each charge should cover (1 = top up to one day's use; 2 = charge less often).",
+    commute_window_days: "How many days of charge history to average your daily use over.",
+    commute_source: "Where daily use comes from. Charger energy needs no car integration. Odometer/SOC read your car integration's history — distance-true and they still count driving when you charge somewhere else.",
+    commute_odometer_entity: "A total-distance (km) sensor from your car integration.",
+    commute_efficiency: "Your car's real-world consumption — turns km/day into energy/day.",
     departure_time: "Be ready by this time — charging starts just-in-time to reach target by then.",
     battery_kwh: "Battery capacity, used to estimate how long charging takes.",
     charge_power_kw: "Typical charge power, used to estimate charging duration.",
@@ -464,6 +553,21 @@
     load_power_entity: "House/grid power sensor for the load limit (else the charger's own meter is used).",
     notify_service_s: "HA notify service(s) for solar charge start/stop alerts. Optional.",
     poll_interval: "How often the integration reads the gateway (5–300 s).",
+    window_enabled: "Only let the assistant charge during a set window — e.g. midnight–6am — so it never runs when power is expensive.",
+    window_start: "Start of the cheap window (local time). Can be later than the end to cross midnight.",
+    window_end: "End of the cheap window (local time).",
+    window_overrun: "If the target isn't reached by the window end, keep charging past it until it is.",
+    window_prestart: "If a departure is set and the cheap window is too short, start before it so you're still ready in time.",
+    window_cost_warn: "Send a notification whenever a charge runs outside the cheap window (a pricier period), so you can stop it if you'd rather wait.",
+    rl_enabled: "Also send plug-in reminders on top of this charging strategy. Notifications only — never controls charging.",
+    arrival_entity_l: "Remind me to plug in when this person/device gets home.",
+    nightly_time_l: "Remind me to plug in at this time every evening.",
+    lead_hours_l: "Remind me this many hours before the charger's next scheduled charge.",
+    tariff_entity_l: "Price sensor that triggers a reminder when the rate drops.",
+    solar_remind_kw_l: "Nudge me to plug in when solar surplus reaches this (your surplus source's units). Blank = your charge-start level.",
+    home_entity_l: "Only send reminders when this person/device is home. Leave blank for no home check.",
+    tariff_below_l: "Remind me when the price entity is at/below this value.",
+    notify_service_l: "HA notify service for the plug-in reminders (can differ from the charge-event alerts).",
   };
   function applyTooltips() {
     Object.entries(TOOLTIPS).forEach(([id, tip]) => {
@@ -534,9 +638,12 @@
     host = r.body.host || null;
     const opts = r.body.options || {};
     const ca = opts.charge_assistant || {};
+    loadedCa = { ...ca };   // remember the full config so "Off" can preserve it
     // Top-level integration tunables (not under charge_assistant).
     const pi = $("poll_interval");
     if (pi) pi.value = opts.poll_interval == null ? "" : opts.poll_interval;
+    const ar = $("auto_resume_eco");
+    if (ar) ar.checked = opts.auto_resume_eco !== false;   // default on
     applyConfig(ca);
     $("ca-form").hidden = false;
     $("ca-actionbar").hidden = false;
@@ -544,21 +651,38 @@
     loadOwner();
   }
 
-  // Charge-control owner is a gateway-side setting (read-only here) — surface
-  // the current value from the gateway status the Add-on already proxies.
+  // Charge-control owner — read the gateway's current value and reflect it in
+  // the dropdown. Settable here (writes straight to the gateway via the
+  // /api/control_owner proxy) so the user never opens the gateway's own page.
   async function loadOwner() {
-    const span = $("ctrl-owner-live");
-    if (!span) return;
+    const sel = $("ctrl-owner-select");
     const r = await fetchJSON("api/status");
     const owner = r.ok && r.body ? (r.body.control_owner || "") : "";
     ownerState = owner || null;
-    span.textContent = owner ? (OWNER_NAMES[owner] || owner) : "unknown";
-    span.classList.toggle("live-ok", owner === "integration");
+    if (sel && owner) sel.value = owner;
     // Capability gating: the original Zentri Pulsar can't do live current
     // control over BLE — disable dynamic-current for it.
     applyCapabilities(r.ok && r.body ? !!r.body.zentri : false);
     updateOwnerWarn();
     updateSummary();
+  }
+
+  // Write the owner to the gateway. Returns true on success.
+  async function setOwner(owner) {
+    const r = await fetchJSON("api/control_owner", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "owner=" + encodeURIComponent(owner),
+    });
+    if (r.ok && r.body && r.body.ok) {
+      ownerState = owner;
+      const sel = $("ctrl-owner-select");
+      if (sel) sel.value = owner;
+      updateOwnerWarn();
+      updateSummary();
+      return true;
+    }
+    return false;
   }
 
   function applyCapabilities(isZentri) {
@@ -592,20 +716,47 @@
       const cb = $(`trig-${t}`);
       if (cb) cb.checked = trigs.includes(t);
     });
+    renderCars(ca.cars);
     refreshTriggerBodies();
     toggleScheduledWithin();
     toggleCheapest();
+    toggleCommute();
     // Surplus-source defaults (entity mode; grid-export-negative defaults on).
     if (!$("surplus_source").value) $("surplus_source").value = "entity";
     $("grid_export_negative").checked = ca.grid_export_negative !== false;
     toggleSurplusSource();
+    // smart_solar surplus source mirrors the solar one (own fields).
+    if ($("surplus_source_ss") && !$("surplus_source_ss").value) $("surplus_source_ss").value = "entity";
+    if ($("grid_export_negative_ss")) $("grid_export_negative_ss").checked = ca.grid_export_negative !== false;
+    toggleSurplusSourceSS();
+    // Auto-start grace + charging window (shared acting-mode card).
+    if ($("autostart_grace_min")) $("autostart_grace_min").value = ca.autostart_grace_min || 0;
+    Object.entries(WINDOW_FIELDS).forEach(([fid, key]) => {
+      const el = $(fid); if (el) el.value = ca[key] == null ? "" : ca[key];
+    });
+    Object.entries(WINDOW_CHECKS).forEach(([fid, key]) => {
+      const el = $(fid); if (el) el.checked = !!ca[key];
+    });
+    toggleWindow();
+    // Plug-in reminder layer (nested `reminder` sub-dict).
+    const rl = (ca.reminder && typeof ca.reminder === "object") ? ca.reminder : {};
+    if ($("rl_enabled")) $("rl_enabled").checked = !!rl.enabled;
+    RL_TRIGGERS.forEach((t) => {
+      const cb = $(`rl-trig-${t}`);
+      if (cb) cb.checked = Array.isArray(rl.triggers) && rl.triggers.includes(t);
+    });
+    Object.entries(RL_FIELDS).forEach(([fid, key]) => {
+      const el = $(fid); if (el) el.value = rl[key] == null ? "" : rl[key];
+    });
+    toggleReminderLayer();
+    refreshRLTriggerBodies();
     refreshAllCombos();   // sync combobox displays/chips to the loaded values
     pickerSelects().forEach((s) => updateLive(s.id));
     selectMode(ca.mode || "off", { fromLoad: true });
   }
 
   // ── mode + conditional UI ───────────────────────────────────────
-  const MODE_NAMES = { off: "Off", reminder: "Reminder", target_soc: "Smart charge", solar: "Solar" };
+  const MODE_NAMES = { off: "Off", reminder: "Reminder", target_soc: "Smart charge", solar: "Solar", smart_solar: "Smart + Solar" };
 
   function selectMode(mode, opts) {
     if (!MODE_KEYS[mode]) mode = "off";
@@ -616,6 +767,20 @@
     document.querySelectorAll(".ca-mode-section").forEach((el) => {
       el.classList.toggle("ca-active", el.dataset.section === mode);
     });
+    // Shared acting-mode cards. data-acting = ANY acting strategy (e.g. the
+    // plug-in reminder layer). data-modes = only the listed strategies (the
+    // grace + window cards: pure Solar uses neither, so they hide there).
+    const acting = ACTING_MODES.includes(mode);
+    document.querySelectorAll("[data-acting]").forEach((el) => { el.hidden = !acting; });
+    document.querySelectorAll("[data-modes]").forEach((el) => {
+      el.hidden = !el.dataset.modes.split(",").map((s) => s.trim()).includes(mode);
+    });
+    // The window only gates GRID charging in Smart+Solar — solar still charges
+    // on surplus anytime — so a night window must not read as "blocks solar".
+    const wd = $("window-desc");
+    if (wd) wd.textContent = (mode === "smart_solar")
+      ? "Limits GRID top-up to cheap hours (e.g. midnight–6am). Solar still charges anytime there's surplus."
+      : "Restrict charging to cheap hours (e.g. midnight–6am) so it never runs when power is expensive.";
     const form = $("ca-form");
     if (form) form.dataset.mode = mode;
     const pill = $("ca-mode-pill");
@@ -628,14 +793,25 @@
 
   function applyDefaults(mode) {
     const d = DEFAULTS[mode];
-    if (!d) return;
     const section = document.querySelector(`.ca-mode-section[data-section="${mode}"]`);
-    Object.entries(FIELDS).forEach(([fid, key]) => {
-      if (!(key in d)) return;
-      const el = $(fid);
-      if (!el || (section && !section.contains(el))) return;
-      if (el.value === "" || el.value == null) el.value = d[key];
-    });
+    if (d) {
+      Object.entries(FIELDS).forEach(([fid, key]) => {
+        if (!(key in d)) return;
+        const el = $(fid);
+        if (!el || (section && !section.contains(el))) return;
+        if (el.value === "" || el.value == null) el.value = d[key];
+      });
+    }
+    // Commute fields live in the relocated (shared) card, outside the mode
+    // section, so the section-scoped loop above skips them — seed by id here.
+    if (COMMUTE_MODES.includes(mode)) {
+      const cd = { commute_reserve_pct: 20, commute_margin_pct: 10,
+                   commute_cover_days: 1, commute_window_days: 7, commute_efficiency: 18 };
+      Object.entries(cd).forEach(([fid, val]) => {
+        const el = $(fid);
+        if (el && (el.value === "" || el.value == null)) el.value = val;
+      });
+    }
   }
 
   // Acting modes (target/solar) only run when the gateway hands us control.
@@ -669,7 +845,9 @@
     const ca = gather();
     const pi = $("poll_interval");
     const poll = pi && pi.value !== "" && Number.isFinite(Number(pi.value)) ? Number(pi.value) : null;
-    return JSON.stringify({ ca, poll });
+    const ar = $("auto_resume_eco");
+    const autoResume = ar ? !!ar.checked : true;
+    return JSON.stringify({ ca, poll, autoResume });
   }
 
   // Capture the current form as "saved" — after load and after a successful
@@ -739,7 +917,33 @@
     if (currentMode === "target_soc") {
       const soc = $("soc_entity_t").value;
       if (!soc) return "Pick a battery-level entity so I know when to stop.";
-      let s = `I'll charge up to ${b(($("target_soc_pct").value || "80") + "%")}`;
+      const cap = ($("target_soc_pct").value || "80") + "%";
+      let s;
+      if ($("commute_enabled").checked) {
+        const cover = $("commute_cover_days").value || "1";
+        const d = cover === "1" ? "a day's" : `${cover} days'`;
+        const src = ($("commute_source") || {}).value || "charger";
+        const odo = $("commute_odometer_entity").value;
+        const srcPhrase = src === "odometer"
+          ? `from ${odo ? b(nameOf(odo)) : "your car's odometer"} (at ${b(($("commute_efficiency").value || "18") + " kWh/100km")})`
+          : src === "soc"
+          ? "from your car's battery-level drop"
+          : "from charger energy used";
+        s = `I'll learn how much you drive ${srcPhrase} and charge enough for ${b(d)} commute ` +
+            `(plus ${b(($("commute_margin_pct").value || "10") + "%")} margin, ` +
+            `never below ${b(($("commute_reserve_pct").value || "20") + "%")}, ` +
+            `capped at ${b(cap)})`;
+        if ($("departure_time").value) s += `, ready by ${b($("departure_time").value)}`;
+        s += `, reading ${b(nameOf(soc))}`;
+        const lv = liveOf(soc);
+        if (lv) s += ` (now ${b(lv)})`;
+        s += ".";
+        if ($("cheapest_window").checked && $("price_entity").value) {
+          s += " I'll top up only in the cheapest hours.";
+        }
+        return s + windowClause() + reminderLayerClause();
+      }
+      s = `I'll charge up to ${b(cap)}`;
       if ($("departure_time").value) s += `, ready by ${b($("departure_time").value)}`;
       s += `, reading ${b(nameOf(soc))}`;
       const live = liveOf(soc);
@@ -760,7 +964,7 @@
       } else {
         s += " I'll stop at the target but won't auto-start.";
       }
-      return s;
+      return s + windowClause() + reminderLayerClause();
     }
 
     if (currentMode === "solar") {
@@ -786,7 +990,23 @@
         s += $("load_limit_w").value && Number($("load_limit_w").value) > 0
           ? `, keeping total house draw under ${b($("load_limit_w").value + " W")}.` : ".";
       }
-      return s;
+      return s + windowClause() + reminderLayerClause();
+    }
+
+    if (currentMode === "smart_solar") {
+      const soc = $("soc_entity_ss").value;
+      if (!soc) return "Pick a battery-level entity so I know when to stop.";
+      let s = `I'll charge up to ${b(($("target_soc_pct_ss").value || "80") + "%")} on ${b(nameOf(soc))}`;
+      const live = liveOf(soc);
+      if (live) s += ` (now ${b(live)})`;
+      s += ", from <b>solar surplus</b> whenever it's available";
+      if ($("departure_time_ss").value) {
+        s += `, topping up from grid only as needed to be ready by ${b($("departure_time_ss").value)}`;
+      } else {
+        s += ", topping up from grid inside your window";
+      }
+      s += ".";
+      return s + windowClause() + reminderLayerClause();
     }
     return "";
   }
@@ -815,9 +1035,236 @@
     updatePriceForecastHint();
   }
 
+  function toggleCommute() {
+    const w = $("commute-wrap");
+    if (w) w.hidden = !$("commute_enabled").checked;
+    toggleCommuteSource();
+  }
+
+  function toggleCommuteSource() {
+    const src = ($("commute_source") || {}).value || "charger";
+    const odo = $("commute-odo-wrap");
+    const soc = $("commute-soc-hint");
+    if (odo) odo.hidden = src !== "odometer";
+    if (soc) soc.hidden = src !== "soc";
+  }
+
+  // ── Vehicles (multi-car) ─────────────────────────────────────────────
+  // A repeatable list of car PROFILES, each carrying its own per-car keys
+  // (name, soc_entity, battery_kwh, target_soc_pct, departure, commute_*). On
+  // save they become the `cars` array; an empty list = single-car (the flat
+  // Battery settings below are used, via top-level fallback in the integration).
+  let _carSeq = 0;
+  function carRows() {
+    return Array.from(document.querySelectorAll("#car-list [data-car-row]"));
+  }
+  function updateCarEmptyHint() {
+    const h = $("car-empty-hint");
+    if (h) h.hidden = carRows().length > 0;
+  }
+  function wireCarRow(row) {
+    // unique ids on the pickers so the combobox live-value plumbing works
+    row.querySelectorAll("[data-picker]").forEach((sel) => {
+      const id = `car${_carSeq}_${sel.dataset.k}`;
+      sel.id = id;
+      const live = sel.parentNode.querySelector(".ca-live");
+      if (live) live.setAttribute("data-live-for", id);
+    });
+    _carSeq++;
+    const enab = row.querySelector('[data-k="commute_enabled"]');
+    const cwrap = row.querySelector("[data-commute-wrap]");
+    const src = row.querySelector("[data-commute-source]");
+    const odo = row.querySelector("[data-odo-wrap]");
+    const sync = () => {
+      if (cwrap) cwrap.hidden = !(enab && enab.checked);
+      if (odo) odo.hidden = !(src && src.value === "odometer");
+    };
+    if (enab) enab.addEventListener("change", () => { sync(); updateSummary(); });
+    if (src) src.addEventListener("change", () => { sync(); updateSummary(); });
+    const rm = row.querySelector("[data-car-remove]");
+    if (rm) rm.addEventListener("click", () => { destroyRowCombos(row); row.remove(); updateCarEmptyHint(); updateSummary(); });
+    sync();
+  }
+  function addCarRow(data) {
+    const tmpl = $("car-row-tmpl");
+    const row = tmpl.content.firstElementChild.cloneNode(true);
+    $("car-list").appendChild(row);
+    wireCarRow(row);
+    setupComboboxes();                 // wire + populate the new pickers (idempotent)
+    if (data) fillCarRow(row, data);
+    updateCarEmptyHint();
+    return row;
+  }
+  function destroyRowCombos(scope) {
+    // The combobox dropdown list is parented on <body>, so it must be removed
+    // explicitly when a row is removed/re-rendered or it orphans on the page.
+    scope.querySelectorAll("[data-picker]").forEach((sel) => {
+      if (sel._combo && sel._combo.list) sel._combo.list.remove();
+    });
+  }
+  function fillCarRow(row, data) {
+    row.querySelectorAll("[data-k]").forEach((el) => {
+      const v = data[el.dataset.k];
+      if (el.type === "checkbox") el.checked = !!v;
+      else el.value = v == null ? "" : v;
+      if (el.hasAttribute("data-picker") && el._combo) { refreshCombo(el); updateLive(el.id); }
+    });
+    const enab = row.querySelector('[data-k="commute_enabled"]');
+    const src = row.querySelector("[data-commute-source]");
+    if (enab) enab.dispatchEvent(new Event("change"));
+    if (src) src.dispatchEvent(new Event("change"));
+  }
+  function renderCars(list) {
+    const host = $("car-list");
+    if (host) { carRows().forEach(destroyRowCombos); host.innerHTML = ""; }
+    (Array.isArray(list) ? list : []).forEach((c) => addCarRow(c));
+    updateCarEmptyHint();
+  }
+  function gatherCars() {
+    return carRows().map((row) => {
+      const car = {};
+      row.querySelectorAll("[data-k]").forEach((el) => {
+        if (el.type === "checkbox") { car[el.dataset.k] = !!el.checked; return; }
+        const raw = el.value;
+        if (raw === "" || raw == null) return;
+        car[el.dataset.k] = el.hasAttribute("data-num") ? Number(raw) : raw;
+      });
+      return car;
+    }).filter((c) => c.name || c.soc_entity);   // drop blank rows
+  }
+
+  // Vehicles + Commute apply to every target-bearing strategy (Smart charge AND
+  // Smart + Solar), not just Target. They're authored inside the Target section
+  // for locality; here we lift them into the shared acting-card area so the
+  // existing data-modes show/hide governs them (shown for target_soc +
+  // smart_solar, hidden on pure Solar — which just grabs all surplus).
+  function relocateSharedCards() {
+    const carList = $("car-list"), commuteEn = $("commute_enabled");
+    const firstActing = document.querySelector(".ca-acting-card");
+    if (!carList || !commuteEn || !firstActing) return;
+    const parent = firstActing.parentNode;
+    const tmpl = $("car-row-tmpl");
+    [carList.closest(".ca-card"), commuteEn.closest(".ca-card")].forEach((card) => {
+      if (!card) return;
+      card.setAttribute("data-modes", "target_soc,smart_solar");
+      parent.insertBefore(card, firstActing);
+    });
+    if (tmpl) parent.insertBefore(tmpl, firstActing);
+  }
+
+  // ── Collapsible cards ────────────────────────────────────────────────
+  // Each config card's header toggles its body, so the page isn't a wall of
+  // fields. Click or keyboard (Enter/Space) on the header; chevron shows state.
+  function setupCollapsible() {
+    document.querySelectorAll(".ca-card").forEach((card) => {
+      // Native <details> cards (Dynamic current, Integration settings) already
+      // collapse via the browser; wrapping them would double-toggle and break
+      // their keyboard handling.
+      if (card.tagName === "DETAILS") return;
+      const head = card.querySelector(":scope > .ca-card-head");
+      const body = card.querySelector(":scope > .ca-card-body");
+      if (!head || !body || head._collap) return;
+      head._collap = true;
+      head.classList.add("ca-collapsible");
+      head.setAttribute("role", "button");
+      head.setAttribute("tabindex", "0");
+      head.setAttribute("aria-expanded", "true");
+      const chev = document.createElement("span");
+      chev.className = "ca-chevron"; chev.setAttribute("aria-hidden", "true");
+      chev.textContent = "⌄";
+      head.appendChild(chev);
+      const toggle = () => {
+        const collapsed = card.classList.toggle("ca-collapsed");
+        head.setAttribute("aria-expanded", String(!collapsed));
+      };
+      head.addEventListener("click", (e) => {
+        // ignore clicks on any interactive control that might sit in a header
+        if (e.target.closest("input,select,button,a,.ca-combo")) return;
+        toggle();
+      });
+      head.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+      });
+    });
+  }
+
   function toggleSurplusSource() {
     const src = ($("surplus_source") || {}).value || "entity";
     document.querySelectorAll(".ss-block").forEach((el) => { el.hidden = el.dataset.ss !== src; });
+  }
+  function toggleSurplusSourceSS() {
+    const src = ($("surplus_source_ss") || {}).value || "entity";
+    document.querySelectorAll(".ss-block-ss").forEach((el) => { el.hidden = el.dataset.ssx !== src; });
+  }
+
+  function toggleWindow() {
+    const w = $("window-wrap");
+    if (w) w.hidden = !($("window_enabled") && $("window_enabled").checked);
+    updateWindowDur();
+  }
+
+  // Show the window length (handles midnight wrap) + warn if start == end.
+  function updateWindowDur() {
+    const el = $("window-dur");
+    if (!el) return;
+    const a = $("window_start") && $("window_start").value;
+    const b = $("window_end") && $("window_end").value;
+    el.classList.remove("ca-warn");
+    if (!a || !b) { el.textContent = ""; return; }
+    if (a === b) { el.textContent = "⚠ Start and end are the same — set a real window."; el.classList.add("ca-warn"); return; }
+    const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+    let d = toMin(b) - toMin(a);
+    if (d < 0) d += 1440;
+    el.textContent = `Window length: ${Math.floor(d / 60)}h ${d % 60}m`;
+  }
+
+  function toggleReminderLayer() {
+    const w = $("rl-wrap");
+    if (w) w.hidden = !($("rl_enabled") && $("rl_enabled").checked);
+  }
+  function refreshRLTriggerBodies() {
+    document.querySelectorAll("[data-rl-trigger]").forEach((el) => {
+      const cb = $(`rl-trig-${el.dataset.rlTrigger}`);
+      el.classList.toggle("on", !!(cb && cb.checked));
+    });
+  }
+
+  // Plain-English clause for the plug-in reminder layer, appended to acting
+  // strategies' summaries.
+  function reminderLayerClause() {
+    const en = $("rl_enabled");
+    if (!en || !en.checked) return "";
+    const on = RL_TRIGGERS.filter((t) => { const cb = $(`rl-trig-${t}`); return cb && cb.checked; });
+    if (!on.length) return " It'll also remind you to plug in (pick when).";
+    const b = (s) => `<b>${esc(s)}</b>`;
+    const parts = on.map((t) => {
+      if (t === "arrival") return "you get home";
+      if (t === "nightly") { const v = $("nightly_time_l").value; return v ? `nightly at ${b(v)}` : "nightly"; }
+      if (t === "lead") return "before a scheduled charge";
+      if (t === "tariff") return "the price drops";
+      if (t === "solar") return "there's spare solar";
+      return "";
+    });
+    let s = " It'll also remind you to plug in when " + joinList(parts.filter(Boolean));
+    const svc = $("notify_service_l").value;
+    s += svc ? ` via ${b(svc)}.` : ".";
+    return s;
+  }
+
+  // Plain-English clause for the allowed charging window, appended to acting
+  // strategies' summaries.
+  function windowClause() {
+    const en = $("window_enabled");
+    if (!en || !en.checked) return "";
+    const a = $("window_start").value, b = $("window_end").value;
+    if (!a || !b) return " Charging is limited to a set window (set the times).";
+    let s = ` Charges only between <b>${esc(a)}–${esc(b)}</b>`;
+    const extra = [];
+    if ($("window_prestart").checked) extra.push("starting earlier if needed for departure");
+    if ($("window_overrun").checked) extra.push("finishing late if the target isn't reached");
+    if (extra.length) s += ", " + extra.join(" and ");
+    s += ".";
+    return s;
   }
 
   // Be honest about forecast availability — cheapest-window is impossible
@@ -857,10 +1304,38 @@
 
   function gather() {
     const ca = { mode: currentMode };
-    if (currentMode === "off") return ca;
+    if (currentMode === "off") {
+      // "Off" PRESERVES your saved settings (so switching back doesn't make you
+      // reconfigure) but is fully inert: strategy off = no charging, and the
+      // reminder layer is disabled so nothing nudges either.
+      const preserved = { ...loadedCa, mode: "off" };
+      if (preserved.reminder && typeof preserved.reminder === "object") {
+        preserved.reminder = { ...preserved.reminder, enabled: false };
+      }
+      return preserved;
+    }
 
     if (currentMode === "reminder") {
       ca.triggers = TRIGGERS.filter((t) => { const cb = $(`trig-${t}`); return cb && cb.checked; });
+    }
+
+    // Vehicles + Commute are shared across the target-bearing strategies
+    // (Smart charge + Smart + Solar). They live outside the per-mode section,
+    // so gather them explicitly here (not via the section-scoped FIELDS loop).
+    if (COMMUTE_MODES.includes(currentMode)) {
+      const cars = gatherCars();
+      if (cars.length) ca.cars = cars;                       // empty = single-car
+      const uc = $("unknown_car");
+      if (uc && uc.value) ca.unknown_car = uc.value;         // multi-car safety policy
+      if ($("commute_enabled")) ca.commute_enabled = !!$("commute_enabled").checked;
+      ["commute_source", "commute_odometer_entity"].forEach((fid) => {
+        const el = $(fid); if (el && el.value) ca[fid] = el.value;
+      });
+      ["commute_reserve_pct", "commute_margin_pct", "commute_cover_days",
+       "commute_window_days", "commute_efficiency"].forEach((fid) => {
+        const el = $(fid);
+        if (el && el.value !== "") { const n = Number(el.value); if (Number.isFinite(n)) ca[fid] = n; }
+      });
     }
 
     const wanted = new Set(MODE_KEYS[currentMode]);
@@ -877,12 +1352,46 @@
       const v = readField(fid);
       if (v !== undefined) ca[key] = v;
     });
-    // checkboxes for this mode
+    // checkboxes for this mode — section-scoped, since some keys (e.g.
+    // grid_export_negative) have a distinct field id per mode.
     Object.entries(CHECKS).forEach(([fid, key]) => {
       if (!wanted.has(key)) return;
       const el = $(fid);
-      if (el) ca[key] = !!el.checked;
+      if (!el) return;
+      if (activeSection && !activeSection.contains(el)) return;
+      ca[key] = !!el.checked;
     });
+    // Shared acting-mode cards (not section-scoped): charging window + the
+    // plug-in reminder layer (nested `reminder` sub-dict).
+    if (ACTING_MODES.includes(currentMode)) {
+      const gm = $("autostart_grace_min");
+      if (gm) ca.autostart_grace_min = Math.max(0, Number(gm.value) || 0);
+      Object.entries(WINDOW_FIELDS).forEach(([fid, key]) => {
+        const el = $(fid); if (el && el.value) ca[key] = el.value;
+      });
+      Object.entries(WINDOW_CHECKS).forEach(([fid, key]) => {
+        const el = $(fid); if (el) ca[key] = !!el.checked;
+      });
+      if ($("rl_enabled") && $("rl_enabled").checked) {
+        const rl = {
+          enabled: true,
+          triggers: RL_TRIGGERS.filter((t) => { const cb = $(`rl-trig-${t}`); return cb && cb.checked; }),
+        };
+        Object.entries(RL_FIELDS).forEach(([fid, key]) => {
+          const el = $(fid);
+          if (!el || el.value === "" || el.value == null) return;
+          if (RL_NUM.has(key)) {
+            const n = Number(el.value);
+            if (Number.isFinite(n)) rl[key] = n;
+          } else {
+            rl[key] = el.value;
+          }
+        });
+        ca.reminder = rl;
+      } else {
+        ca.reminder = { enabled: false };
+      }
+    }
     return ca;
   }
 
@@ -898,6 +1407,8 @@
       const n = Number(pi.value);
       if (Number.isFinite(n)) options.poll_interval = n;
     }
+    const ar = $("auto_resume_eco");
+    if (ar) options.auto_resume_eco = !!ar.checked;   // top-level option (default on)
     const payload = { options };
     if (host) payload.host = host;
     const r = await fetchJSON("api/ha/config", {
@@ -908,15 +1419,79 @@
     if (r.ok && r.body.ok) {
       status.className = "ca-save-status ok";
       status.textContent = "Saved — assistant reloaded.";
+      loadedCa = { ...ca };   // this is now the config "Off" will preserve
       snapshotSaved();   // this config is now the saved one → Active-now + clean
       const overview = (buildSummary() || "").replace(/<[^>]+>/g, "").trim();
       showToast("✓ Saved. " + (overview || "Assistant is off — nothing automated."), "ok");
+      maybePromptOwner();   // offer to hand control to HA if an acting mode needs it
     } else {
       const msg = "Save failed: " + (r.body.detail || r.body.error || `HTTP ${r.status}`);
       status.className = "ca-save-status err";
       status.textContent = msg;
       showToast("⚠ " + msg, "err");
     }
+  }
+
+  // Save the current config, then fire the integration's test_reminder so the
+  // user sees the actual notification (message + tap-path + notify service).
+  async function sendTest() {
+    const hasReminder = currentMode === "reminder" ||
+      ($("rl_enabled") && $("rl_enabled").checked);
+    if (!hasReminder) {
+      showToast("Enable a plug-in reminder first, then test it.", "err");
+      return;
+    }
+    const btn = $("ca-test");
+    if (btn) btn.disabled = true;
+    showToast("Saving + sending a test…", "info");
+    await save();                                        // test uses the saved config
+    await new Promise((r) => setTimeout(r, 1800));       // let the entry reload settle
+    const r = await fetchJSON("api/ha/test_reminder", { method: "POST" });
+    if (r.ok && r.body.ok) {
+      showToast("✓ Test reminder sent — check your phone / notifications.", "ok");
+    } else {
+      showToast("⚠ Test failed: " + (r.body.detail || r.body.error || `HTTP ${r.status}`), "err");
+    }
+    if (btn) btn.disabled = false;
+  }
+
+  // After saving an acting mode, if the gateway owner isn't the integration,
+  // the assistant won't actually control charging — offer to fix that here so
+  // the user never has to open the gateway's own settings page.
+  function maybePromptOwner() {
+    if (!ACTING_MODES.includes(currentMode)) return;
+    if (ownerState === "integration") return;
+    showOwnerPrompt();
+  }
+
+  function showOwnerPrompt() {
+    const old = $("ca-owner-prompt");
+    if (old) old.remove();
+    const cur = ownerState ? (OWNER_NAMES[ownerState] || ownerState) : "not set";
+    const m = document.createElement("div");
+    m.id = "ca-owner-prompt";
+    m.className = "ca-modal";
+    m.innerHTML =
+      '<div class="ca-modal-box" role="dialog" aria-modal="true">' +
+      '<h3>Let Home Assistant control charging?</h3>' +
+      '<p>This mode drives charging, but the gateway’s control owner is ' +
+      '<b>' + esc(cur) + '</b> — so the assistant won’t act yet. ' +
+      'Hand charge control to Home Assistant now?</p>' +
+      '<div class="ca-modal-btns">' +
+      '<button type="button" class="ca-btn ca-btn-ghost" data-act="no">Not now</button>' +
+      '<button type="button" class="ca-btn ca-btn-primary" data-act="yes">Enable HA control</button>' +
+      '</div></div>';
+    document.body.appendChild(m);
+    m.addEventListener("click", async (e) => {
+      if (e.target === m || e.target.dataset.act === "no") { m.remove(); return; }
+      if (e.target.dataset.act === "yes") {
+        e.target.disabled = true;
+        const ok = await setOwner("integration");
+        m.remove();
+        showToast(ok ? "✓ Home Assistant now controls charging."
+                     : "⚠ Couldn’t set the owner on the gateway.", ok ? "ok" : "err");
+      }
+    });
   }
 
   let _toastTimer = null;
@@ -944,7 +1519,31 @@
     });
     $("only_if_scheduled").addEventListener("change", () => { toggleScheduledWithin(); updateSummary(); });
     $("cheapest_window").addEventListener("change", () => { toggleCheapest(); updateSummary(); });
+    $("commute_enabled").addEventListener("change", () => { toggleCommute(); updateSummary(); });
+    $("commute_source").addEventListener("change", () => { toggleCommuteSource(); updateSummary(); });
+    $("car-add").addEventListener("click", () => { addCarRow(); updateSummary(); });
     $("surplus_source").addEventListener("change", () => { toggleSurplusSource(); updateSummary(); });
+    const sss = $("surplus_source_ss");
+    if (sss) sss.addEventListener("change", () => { toggleSurplusSourceSS(); updateSummary(); });
+    const os = $("ctrl-owner-select");
+    if (os) os.addEventListener("change", async () => {
+      const v = os.value;
+      const ok = await setOwner(v);
+      if (ok) showToast("✓ Charge-control owner set to " + (OWNER_NAMES[v] || v), "ok");
+      else { showToast("⚠ Couldn't set the owner on the gateway.", "err"); if (ownerState) os.value = ownerState; }
+    });
+    const we = $("window_enabled");
+    if (we) we.addEventListener("change", () => { toggleWindow(); updateSummary(); });
+    ["window_start", "window_end"].forEach((id) => {
+      const el = $(id);
+      if (el) el.addEventListener("input", () => { updateWindowDur(); updateSummary(); });
+    });
+    const rle = $("rl_enabled");
+    if (rle) rle.addEventListener("change", () => { toggleReminderLayer(); updateSummary(); });
+    RL_TRIGGERS.forEach((t) => {
+      const cb = $(`rl-trig-${t}`);
+      if (cb) cb.addEventListener("change", () => { refreshRLTriggerBodies(); updateSummary(); });
+    });
     const hu = $("ca-hide-unavail");
     if (hu) hu.addEventListener("change", (e) => { hideUnavailable = e.target.checked; });
     // Any field edit re-renders the live summary — the always-on feedback that
@@ -953,12 +1552,27 @@
     form.addEventListener("input", updateSummary);
     form.addEventListener("change", updateSummary);
     $("ca-save").addEventListener("click", save);
+    if ($("ca-test")) $("ca-test").addEventListener("click", sendTest);
     $("ca-reload").addEventListener("click", () => init());
   }
 
   async function loadNotifyServices() {
     const r = await fetchJSON("api/ha/notify_services");
     notifyServices = (r.ok && r.body.services) || [];
+  }
+
+  // Best-effort: fill the "Tap opens (path)" datalist with the user's Lovelace
+  // dashboard/view paths (WS-only — server returns [] on any failure, so the
+  // field always works as free-text).
+  async function loadPages() {
+    try {
+      const r = await fetchJSON("api/ha/pages");
+      const pages = (r.ok && r.body && r.body.pages) || [];
+      const dl = $("ca-pages");
+      if (dl && pages.length) {
+        dl.innerHTML = pages.map((p) => `<option value="${esc(p)}"></option>`).join("");
+      }
+    } catch (e) { /* free-text fallback */ }
   }
 
   // Warn (and explain) when the Add-on has no gateway IP configured — the
@@ -978,9 +1592,12 @@
     if (!ok) return;
     await loadNotifyServices();   // before combobox setup so notify list is ready
     setupComboboxes();
+    relocateSharedCards();        // Vehicles + Commute → shared (target + smart_solar)
+    loadPages();                  // best-effort: fill the "Tap opens" page datalist
     applyTooltips();
     loadAddonConfig();            // best-effort gateway-config warning
     await loadConfig();
+    setupCollapsible();           // after the form is built, wire card collapse
   }
 
   document.addEventListener("DOMContentLoaded", () => {

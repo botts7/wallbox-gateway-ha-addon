@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Wallbox Gateway &middot; Charge Assistant</title>
-<link rel="stylesheet" href="static/style.css">
-<link rel="stylesheet" href="static/charge_assistant.css">
+<link rel="stylesheet" href="static/style.css?v={{ ASSET_V }}">
+<link rel="stylesheet" href="static/charge_assistant.css?v={{ ASSET_V }}">
 </head>
 <body class="page-assistant">
 
@@ -75,6 +75,11 @@
         <span class="ca-mode-icon">&#x2600;&#xFE0F;</span>
         <span class="ca-mode-name">Solar</span>
         <span class="ca-mode-sub">Use excess solar</span>
+      </button>
+      <button type="button" class="ca-mode" data-mode="smart_solar" role="tab">
+        <span class="ca-mode-icon">&#x1F50B;</span>
+        <span class="ca-mode-name">Smart + Solar</span>
+        <span class="ca-mode-sub">Solar first, grid to finish</span>
       </button>
     </div>
 
@@ -250,7 +255,8 @@
           </div>
           <div class="ca-field">
             <label>Tap opens (path)</label>
-            <input type="text" id="tap_path" placeholder="/lovelace/energy">
+            <input type="text" id="tap_path" list="ca-pages" placeholder="/lovelace/energy" autocomplete="off">
+            <datalist id="ca-pages"></datalist>
           </div>
         </div>
         <div class="ca-field">
@@ -269,6 +275,108 @@
 
   <!-- ── Smart-charge (target SOC) mode ─────────────────────────── -->
   <div class="ca-mode-section" data-section="target_soc">
+    <section class="ca-card">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#6366f1">&#x1F697;</span>
+        <div class="ca-card-titles">
+          <h2>Vehicles <span class="ca-opt">optional · for sharing one charger</span></h2>
+          <p class="ca-card-desc">Add the cars that share this charger, each with
+             its own battery, target and commute settings. Leave empty to use the
+             single Battery settings below. The car on the cable is picked
+             automatically (confirmed by a notification when it plugs in).</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <div id="car-list"></div>
+        <button type="button" class="ca-btn ca-btn-ghost" id="car-add">&#x2795; Add vehicle</button>
+        <div class="ca-hint" id="car-empty-hint">No vehicles added — the single
+           Battery settings below are used (one-car mode).</div>
+        <div class="ca-field" id="unknown-car-wrap" style="margin-top:12px">
+          <label>When unsure which car is plugged in</label>
+          <select id="unknown_car">
+            <option value="conservative">Conservative — charge only to the lowest target until confirmed</option>
+            <option value="ask">Ask — don't auto-start on a guess; wait for confirmation</option>
+            <option value="assume_last">Assume — act on the best guess immediately</option>
+          </select>
+          <div class="ca-hint">The car on the cable is a guess until you confirm
+             (or it starts charging). <b>Conservative</b> never over-charges an
+             unknown car; <b>Ask</b> waits for your tap; <b>Assume</b> acts on the
+             guess right away.</div>
+        </div>
+      </div>
+    </section>
+
+    <template id="car-row-tmpl">
+      <div class="ca-car-row" data-car-row>
+        <div class="ca-row">
+          <div class="ca-field" style="flex:2">
+            <label>Name</label>
+            <input type="text" data-k="name" placeholder="e.g. BYD Sealion 7">
+          </div>
+          <div class="ca-field">
+            <label>Battery capacity</label>
+            <div class="ca-input-suffix"><input type="number" data-k="battery_kwh" data-num min="1" step="0.1" placeholder="80"><span>kWh</span></div>
+          </div>
+          <button type="button" class="ca-icon-btn" data-car-remove title="Remove vehicle">&#x1F5D1;</button>
+        </div>
+        <div class="ca-field">
+          <label>Battery level entity <span class="ca-req">required</span></label>
+          <div class="ca-picker">
+            <select data-k="soc_entity" data-picker data-domains="sensor" data-device-class="battery"></select>
+            <span class="ca-live">&mdash;</span>
+          </div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Target level</label>
+            <div class="ca-input-suffix"><input type="number" data-k="target_soc_pct" data-num min="1" max="100" placeholder="80"><span>%</span></div>
+          </div>
+          <div class="ca-field">
+            <label>Ready by <span class="ca-opt">optional</span></label>
+            <input type="time" data-k="departure">
+          </div>
+        </div>
+        <label class="ca-check"><input type="checkbox" data-k="commute_enabled" data-bool> <span>&#x1F698; Charge for this car's commute (learned)</span></label>
+        <div class="ca-indent" data-commute-wrap hidden>
+          <div class="ca-field">
+            <label>Learn from</label>
+            <select data-k="commute_source" data-commute-source>
+              <option value="charger">Charger energy delivered</option>
+              <option value="odometer">Car odometer (km) + efficiency</option>
+              <option value="soc">Car battery-level drop (SOC)</option>
+            </select>
+          </div>
+          <div class="ca-row" data-odo-wrap hidden>
+            <div class="ca-field">
+              <label>Odometer entity</label>
+              <div class="ca-picker">
+                <select data-k="commute_odometer_entity" data-picker data-domains="sensor" data-device-class="distance"></select>
+                <span class="ca-live">&mdash;</span>
+              </div>
+            </div>
+            <div class="ca-field">
+              <label>Efficiency</label>
+              <div class="ca-input-suffix"><input type="number" data-k="commute_efficiency" data-num min="5" max="50" step="0.5" placeholder="18"><span>kWh/100km</span></div>
+            </div>
+          </div>
+          <div class="ca-row">
+            <div class="ca-field">
+              <label>Always keep at least</label>
+              <div class="ca-input-suffix"><input type="number" data-k="commute_reserve_pct" data-num min="0" max="100" placeholder="20"><span>%</span></div>
+            </div>
+            <div class="ca-field">
+              <label>Safety margin</label>
+              <div class="ca-input-suffix"><input type="number" data-k="commute_margin_pct" data-num min="0" max="100" placeholder="10"><span>%</span></div>
+            </div>
+            <div class="ca-field">
+              <label>Cover</label>
+              <div class="ca-input-suffix"><input type="number" data-k="commute_cover_days" data-num min="1" max="14" step="1" placeholder="1"><span>days</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
     <section class="ca-card">
       <div class="ca-card-head">
         <span class="ca-card-icon" style="--chip:#3b82f6">&#x1F3AF;</span>
@@ -333,6 +441,81 @@
              publishes a price forecast (Amber, Nord Pool, Tibber…).</div>
           <div class="ca-hint">Always still ready by your departure time — if cheap
              hours run short, it charges anyway.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ca-card">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#0ea5e9">&#x1F698;</span>
+        <div class="ca-card-titles">
+          <h2>Commute charging <span class="ca-opt">learns your driving</span></h2>
+          <p class="ca-card-desc">Instead of always charging to the fixed target,
+             learn how much you actually drive (from real charge history) and set
+             the target automatically — enough for your commute plus a margin.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <label class="ca-check"><input type="checkbox" id="commute_enabled"> <span>&#x1F698; Charge for my daily commute (learned)</span></label>
+        <div class="ca-indent" id="commute-wrap" hidden>
+          <div class="ca-hint" id="commute-preview" style="margin-bottom:8px">After
+             a few charges, the <b>Daily use (average)</b>, <b>Commute charge
+             target</b> and <b>Projected SOC after a day's driving</b> sensors show
+             what's been learned and whether you'll make it without charging.</div>
+          <div class="ca-field">
+            <label>Learn from</label>
+            <select id="commute_source">
+              <option value="charger">Charger energy delivered (no car integration needed)</option>
+              <option value="odometer">Car odometer (km) + efficiency</option>
+              <option value="soc">Car battery-level drop (SOC)</option>
+            </select>
+            <div class="ca-hint" id="commute-source-hint">How daily use is measured. Charger energy uses what the wallbox delivered; the car-based sources read your car integration's history (distance-true, and they still count driving when you charge elsewhere).</div>
+          </div>
+          <div class="ca-row ca-indent" id="commute-odo-wrap" hidden>
+            <div class="ca-field">
+              <label>Odometer entity</label>
+              <div class="ca-picker">
+                <select id="commute_odometer_entity" data-domains="sensor" data-device-class="distance"></select>
+                <span class="ca-live" data-live-for="commute_odometer_entity">&mdash;</span>
+              </div>
+              <div class="ca-hint">A total-distance (km) sensor from your car integration.</div>
+            </div>
+            <div class="ca-field">
+              <label>Efficiency</label>
+              <div class="ca-input-suffix"><input type="number" id="commute_efficiency" min="5" max="50" step="0.5" placeholder="18"><span>kWh/100km</span></div>
+              <div class="ca-hint">Used to turn km/day into energy/day.</div>
+            </div>
+          </div>
+          <div class="ca-hint ca-indent" id="commute-soc-hint" hidden>Uses the
+             <b>battery-level entity</b> you picked above — counts each daily SOC
+             drop as driving. Needs battery capacity set for the % conversion.</div>
+          <div class="ca-row">
+            <div class="ca-field">
+              <label>Always keep at least</label>
+              <div class="ca-input-suffix"><input type="number" id="commute_reserve_pct" min="0" max="100" placeholder="20"><span>%</span></div>
+              <div class="ca-hint">A floor — the learned target never drops below this.</div>
+            </div>
+            <div class="ca-field">
+              <label>Safety margin</label>
+              <div class="ca-input-suffix"><input type="number" id="commute_margin_pct" min="0" max="100" placeholder="10"><span>%</span></div>
+              <div class="ca-hint">Extra headroom on top of learned use.</div>
+            </div>
+          </div>
+          <div class="ca-row">
+            <div class="ca-field">
+              <label>Cover</label>
+              <div class="ca-input-suffix"><input type="number" id="commute_cover_days" min="1" max="14" step="1" placeholder="1"><span>days</span></div>
+              <div class="ca-hint">How many days of driving each charge should cover.</div>
+            </div>
+            <div class="ca-field">
+              <label>Learn over</label>
+              <div class="ca-input-suffix"><input type="number" id="commute_window_days" min="1" max="60" step="1" placeholder="7"><span>days</span></div>
+              <div class="ca-hint">History window for the daily-use average.</div>
+            </div>
+          </div>
+          <div class="ca-hint">Caps at your target level above, so it never
+             over-charges. Pair with a cheap overnight window so it tops up only
+             what you need, when it's cheapest.</div>
         </div>
       </div>
     </section>
@@ -534,6 +717,271 @@
     </section>
   </div>
 
+  <!-- ── Smart + Solar (combined strategy) ──────────────────────── -->
+  <div class="ca-mode-section" data-section="smart_solar">
+    <section class="ca-card">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#10b981">&#x1F50B;</span>
+        <div class="ca-card-titles">
+          <h2>Solar first, grid to finish</h2>
+          <p class="ca-card-desc">Charges from excess solar whenever it's available
+             (free), and tops up from grid only inside your cheap window — or just
+             in time to reach the target by departure.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <div class="ca-field">
+          <label>Battery level entity <span class="ca-req">required</span></label>
+          <div class="ca-picker">
+            <select id="soc_entity_ss" data-domains="sensor" data-device-class="battery"></select>
+            <span class="ca-live" data-live-for="soc_entity_ss">—</span>
+          </div>
+          <div class="ca-hint">The assistant reads this to know when to stop.</div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Target level</label>
+            <div class="ca-input-suffix"><input type="number" id="target_soc_pct_ss" min="1" max="100" placeholder="80"><span>%</span></div>
+          </div>
+          <div class="ca-field">
+            <label>Ready by <span class="ca-opt">optional</span></label>
+            <input type="time" id="departure_time_ss">
+          </div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Solar can fill up to <span class="ca-opt">optional</span></label>
+            <div class="ca-input-suffix"><input type="number" id="solar_max_soc" min="1" max="100" placeholder="100"><span>%</span></div>
+            <div class="ca-hint">The target above caps <strong>grid</strong> top-up. Free solar keeps
+               charging past it, up to this — default 100% (grab all available solar). Lower it to
+               protect the battery (e.g. 90%).</div>
+          </div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Battery capacity</label>
+            <div class="ca-input-suffix"><input type="number" id="battery_kwh_ss" min="1" step="0.1" placeholder="60"><span>kWh</span></div>
+            <div class="ca-hint">For the ready-by / pre-start estimate.</div>
+          </div>
+          <div class="ca-field">
+            <label>Typical charge power</label>
+            <div class="ca-input-suffix"><input type="number" id="charge_power_kw_ss" min="0.5" step="0.1" placeholder="7.4"><span>kW</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ca-card">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#f59e0b">&#x2600;&#xFE0F;</span>
+        <div class="ca-card-titles">
+          <h2>Solar surplus</h2>
+          <p class="ca-card-desc">Where available solar comes from. Charges whenever
+             surplus rises above the start threshold.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <div class="ca-field">
+          <label>Surplus source</label>
+          <select id="surplus_source_ss">
+            <option value="entity">I have a surplus sensor</option>
+            <option value="grid">Compute from grid power</option>
+            <option value="solar_load">Compute from solar − house load</option>
+          </select>
+        </div>
+        <div class="ca-field ss-block-ss" data-ssx="entity">
+          <label>Solar surplus entity</label>
+          <div class="ca-picker">
+            <select id="surplus_entity_ss" data-domains="sensor" data-device-class="power"></select>
+            <span class="ca-live" data-live-for="surplus_entity_ss">—</span>
+          </div>
+        </div>
+        <div class="ss-block-ss" data-ssx="grid" hidden>
+          <div class="ca-field">
+            <label>Grid power entity</label>
+            <div class="ca-picker">
+              <select id="grid_entity_ss" data-domains="sensor" data-device-class="power"></select>
+              <span class="ca-live" data-live-for="grid_entity_ss">—</span>
+            </div>
+          </div>
+          <label class="ca-check"><input type="checkbox" id="grid_export_negative_ss"> <span>Grid reads negative when exporting</span></label>
+        </div>
+        <div class="ss-block-ss" data-ssx="solar_load" hidden>
+          <div class="ca-row">
+            <div class="ca-field">
+              <label>Solar production</label>
+              <div class="ca-picker">
+                <select id="solar_entity_ss" data-domains="sensor" data-device-class="power"></select>
+                <span class="ca-live" data-live-for="solar_entity_ss">—</span>
+              </div>
+            </div>
+            <div class="ca-field">
+              <label>House load</label>
+              <div class="ca-picker">
+                <select id="load_entity_ss" data-domains="sensor" data-device-class="power"></select>
+                <span class="ca-live" data-live-for="load_entity_ss">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="ca-field">
+          <label>Start at/above</label>
+          <input type="number" id="surplus_start_ss" step="0.1" placeholder="1.4">
+          <div class="ca-hint">Charge from solar once surplus rises to this (your sensor's units).</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ca-card">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#22c55e">&#x1F4F2;</span>
+        <div class="ca-card-titles">
+          <h2>Notification <span class="ca-opt">optional</span></h2>
+          <p class="ca-card-desc">Get a heads-up when charging starts / completes.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <div class="ca-field">
+          <label>Notify service</label>
+          <input type="text" id="notify_service_ss" data-notify placeholder="notify.mobile_app_my_phone">
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ── Auto-start grace (Smart charge / Smart+Solar only — shown by JS) ──── -->
+  <section class="ca-card ca-acting-card" data-modes="target_soc,smart_solar" hidden>
+    <div class="ca-card-head">
+      <span class="ca-card-icon" style="--chip:#f59e0b">&#x23F3;</span>
+      <div class="ca-card-titles">
+        <h2>Auto-start grace <span class="ca-opt">optional</span></h2>
+        <p class="ca-card-desc">When the assistant decides to auto-start, wait this
+           long first and send a "starting in N min — tap to cancel" notification,
+           so you can hold off. 0 = start immediately.</p>
+      </div>
+    </div>
+    <div class="ca-card-body">
+      <div class="ca-field" style="max-width:220px">
+        <label>Grace before auto-start (minutes)</label>
+        <input type="number" id="autostart_grace_min" min="0" max="60" step="1" value="0">
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Charging window (Smart charge / Smart+Solar only — shown by JS) ──── -->
+  <section class="ca-card ca-acting-card" data-modes="target_soc,smart_solar" hidden>
+    <div class="ca-card-head">
+      <span class="ca-card-icon" style="--chip:#0ea5e9">&#x23F0;</span>
+      <div class="ca-card-titles">
+        <h2>Charging window <span class="ca-opt">optional</span></h2>
+        <p class="ca-card-desc" id="window-desc">Restrict charging to cheap hours (e.g. midnight–6am)
+           so it never runs when power is expensive.</p>
+      </div>
+    </div>
+    <div class="ca-card-body">
+      <label class="ca-check"><input type="checkbox" id="window_enabled"> <span>Only charge during a set window</span></label>
+      <div id="window-wrap" hidden>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>From</label>
+            <input type="time" id="window_start">
+          </div>
+          <div class="ca-field">
+            <label>Until</label>
+            <input type="time" id="window_end">
+          </div>
+        </div>
+        <div class="ca-hint" id="window-dur"></div>
+        <label class="ca-check"><input type="checkbox" id="window_overrun"> <span>Keep charging past the window until the target is reached</span></label>
+        <label class="ca-check"><input type="checkbox" id="window_prestart"> <span>Start before the window if needed to be ready by departure</span></label>
+        <label class="ca-check"><input type="checkbox" id="window_cost_warn"> <span>Notify me when a charge runs outside the window</span></label>
+        <div class="ca-hint">The window <strong>bounds the charge</strong>: it starts just-in-time to finish
+           by the <em>end</em> of the window and <strong>stops at the window end</strong>. The window can cross
+           midnight (e.g. 23:00 → 07:00). To let a departure deadline push charging
+           <em>outside</em> the cheap window, turn on “keep charging past the window” (overrun) and/or
+           “start before the window” (pre-start) above — otherwise the window wins and the car may not
+           reach target if the cheap hours are too short.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Plug-in reminders LAYER (acting strategies only) ───────── -->
+  <section class="ca-card ca-acting-card" data-acting hidden>
+    <div class="ca-card-head">
+      <span class="ca-card-icon" style="--chip:#3b82f6">&#x1F514;</span>
+      <div class="ca-card-titles">
+        <h2>Plug-in reminders <span class="ca-opt">optional</span></h2>
+        <p class="ca-card-desc">Also nudge you to plug in — on top of the charging
+           strategy above. Notifications only; never controls charging.</p>
+      </div>
+    </div>
+    <div class="ca-card-body">
+      <label class="ca-check"><input type="checkbox" id="rl_enabled"> <span>Send plug-in reminders</span></label>
+      <div id="rl-wrap" hidden>
+        <div class="ca-trigger" data-rl-trigger="arrival">
+          <label class="ca-check"><input type="checkbox" id="rl-trig-arrival"> <span>&#x1F3E0; When I arrive home</span></label>
+          <div class="ca-trigger-body">
+            <div class="ca-field">
+              <label>Presence entity</label>
+              <div class="ca-picker">
+                <select id="arrival_entity_l" data-domains="person,device_tracker"></select>
+                <span class="ca-live" data-live-for="arrival_entity_l">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="ca-trigger" data-rl-trigger="nightly">
+          <label class="ca-check"><input type="checkbox" id="rl-trig-nightly"> <span>&#x1F319; Every night at a set time</span></label>
+          <div class="ca-trigger-body">
+            <div class="ca-field"><label>Time</label><input type="time" id="nightly_time_l"></div>
+          </div>
+        </div>
+        <div class="ca-trigger" data-rl-trigger="lead">
+          <label class="ca-check"><input type="checkbox" id="rl-trig-lead"> <span>&#x23F1;&#xFE0F; Before the next scheduled charge</span></label>
+          <div class="ca-trigger-body">
+            <div class="ca-field"><label>Hours before</label><input type="number" id="lead_hours_l" min="0.25" step="0.25" placeholder="2"></div>
+          </div>
+        </div>
+        <div class="ca-trigger" data-rl-trigger="tariff">
+          <label class="ca-check"><input type="checkbox" id="rl-trig-tariff"> <span>&#x1F4B0; When electricity price drops</span></label>
+          <div class="ca-trigger-body">
+            <div class="ca-field">
+              <label>Price entity</label>
+              <div class="ca-picker">
+                <select id="tariff_entity_l" data-domains="sensor"></select>
+                <span class="ca-live" data-live-for="tariff_entity_l">—</span>
+              </div>
+            </div>
+            <div class="ca-field"><label>Notify when at/below</label><input type="number" id="tariff_below_l" step="0.01" placeholder="0.20"></div>
+          </div>
+        </div>
+        <div class="ca-trigger" data-rl-trigger="solar">
+          <label class="ca-check"><input type="checkbox" id="rl-trig-solar"> <span>&#x2600;&#xFE0F; When solar is available (plug in for free solar)</span></label>
+          <div class="ca-trigger-body">
+            <div class="ca-field">
+              <label>Nudge when surplus reaches</label>
+              <input type="number" id="solar_remind_kw_l" step="0.1" placeholder="1.4">
+              <div class="ca-hint">Uses your solar / surplus source. Blank = your charge-start level. Only fires while the car is unplugged.</div>
+            </div>
+          </div>
+        </div>
+        <div class="ca-field">
+          <label>Only when home <span class="ca-opt">optional</span></label>
+          <div class="ca-picker">
+            <select id="home_entity_l" data-domains="person,device_tracker"></select>
+            <span class="ca-live" data-live-for="home_entity_l">—</span>
+          </div>
+          <div class="ca-hint">If set, reminders only fire when this person/device is home.</div>
+        </div>
+        <div class="ca-field">
+          <label>Notify service</label>
+          <input type="text" id="notify_service_l" data-notify placeholder="notify.mobile_app_my_phone">
+          <div class="ca-hint">Where the plug-in reminders go (can differ from charge-event alerts).</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ── Integration settings (always shown) ───────────────────── -->
   <details class="ca-card ca-adv ca-settings">
     <summary class="ca-card-head">
@@ -553,12 +1001,21 @@
         </div>
         <div class="ca-field">
           <label>Charge-control owner</label>
-          <div class="ca-owner" id="ctrl-owner-live">—</div>
-          <div class="ca-hint">Who may drive charging. Change it on the gateway's
-             own <strong>Settings</strong> page. The assistant acts only when this
-             is <code>integration</code>.</div>
+          <select id="ctrl-owner-select">
+            <option value="wallbox_schedule">Wallbox native schedule</option>
+            <option value="integration">Home Assistant Integration</option>
+            <option value="addon">Home Assistant Add-on</option>
+            <option value="none">None (manual / plug-in only)</option>
+          </select>
+          <div class="ca-hint" id="ctrl-owner-hint">Who may drive charging. The
+             assistant only acts when this is <strong>Home Assistant
+             Integration</strong>. Changing it here writes straight to the gateway.</div>
         </div>
       </div>
+      <label class="ca-check"><input type="checkbox" id="auto_resume_eco" checked> <span>Auto-resume Eco-Smart / native schedule after a manual charge</span></label>
+      <div class="ca-hint">A manual start pauses Eco-Smart / your schedule. When the charge
+         stops and the charger is left paused + idle, the integration clears the override so
+         the charger's own Solar + schedule control resumes — no need to tap “Resume schedule”.</div>
     </div>
   </details>
 
@@ -572,6 +1029,7 @@
     <span class="ca-dirty clean" id="ca-dirty">✓ Up to date</span>
     <span class="ca-save-status" id="ca-save-status"></span>
     <div class="ca-actionbar-btns">
+      <button type="button" class="ca-btn ca-btn-ghost" id="ca-test" title="Save, then send the reminder notification now so you can check it on your phone">Send test reminder</button>
       <button type="button" class="ca-btn ca-btn-ghost" id="ca-reload">Reload</button>
       <button type="button" class="ca-btn ca-btn-primary" id="ca-save" disabled>Save changes</button>
     </div>
@@ -579,7 +1037,7 @@
 
 </main>
 
-<script src="static/ca_summary.js"></script>
-<script src="static/charge_assistant.js"></script>
+<script src="static/ca_summary.js?v={{ ASSET_V }}"></script>
+<script src="static/charge_assistant.js?v={{ ASSET_V }}"></script>
 </body>
 </html>
