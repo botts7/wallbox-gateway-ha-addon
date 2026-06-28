@@ -47,6 +47,9 @@
     commute_margin_pct: "commute_margin_pct",
     commute_cover_days: "commute_cover_days",
     commute_window_days: "commute_window_days",
+    commute_source: "commute_source",
+    commute_odometer_entity: "commute_odometer_entity",
+    commute_efficiency: "commute_efficiency",
     notify_service_t: "notify_service",
     // solar
     surplus_source: "surplus_source",
@@ -97,7 +100,7 @@
     "min_current_a", "max_current_a", "supply_voltage", "supply_phases",
     "load_limit_w", "trip_target_pct", "price_cap", "solar_max_soc",
     "commute_reserve_pct", "commute_margin_pct", "commute_cover_days",
-    "commute_window_days",
+    "commute_window_days", "commute_efficiency",
   ]);
   // Which CA keys belong to each mode — only these are written on save, so
   // switching modes doesn't carry stale fields from another mode.
@@ -114,7 +117,8 @@
       "battery_kwh", "charge_power_kw", "cheapest_window", "price_entity",
       "trip_target_pct", "trip_until", "price_cap", "notify_service",
       "commute_enabled", "commute_reserve_pct", "commute_margin_pct",
-      "commute_cover_days", "commute_window_days",
+      "commute_cover_days", "commute_window_days", "commute_source",
+      "commute_odometer_entity", "commute_efficiency",
     ],
     solar: [
       "surplus_source", "surplus_entity", "grid_entity", "grid_export_negative",
@@ -168,6 +172,7 @@
       target_soc_pct: 80, battery_kwh: 60, charge_power_kw: 7.4,
       commute_reserve_pct: 20, commute_margin_pct: 10,
       commute_cover_days: 1, commute_window_days: 7,
+      commute_source: "charger", commute_efficiency: 18,
     },
     solar: {
       surplus_start: 1.4, surplus_stop: 0.4, surplus_debounce_min: 3,
@@ -513,6 +518,9 @@
     commute_margin_pct: "Extra headroom added on top of your learned daily use.",
     commute_cover_days: "How many days of driving each charge should cover (1 = top up to one day's use; 2 = charge less often).",
     commute_window_days: "How many days of charge history to average your daily use over.",
+    commute_source: "Where daily use comes from. Charger energy needs no car integration. Odometer/SOC read your car integration's history — distance-true and they still count driving when you charge somewhere else.",
+    commute_odometer_entity: "A total-distance (km) sensor from your car integration.",
+    commute_efficiency: "Your car's real-world consumption — turns km/day into energy/day.",
     departure_time: "Be ready by this time — charging starts just-in-time to reach target by then.",
     battery_kwh: "Battery capacity, used to estimate how long charging takes.",
     charge_power_kw: "Typical charge power, used to estimate charging duration.",
@@ -897,7 +905,14 @@
       if ($("commute_enabled").checked) {
         const cover = $("commute_cover_days").value || "1";
         const d = cover === "1" ? "a day's" : `${cover} days'`;
-        s = `I'll learn how much you drive and charge enough for ${b(d)} commute ` +
+        const src = ($("commute_source") || {}).value || "charger";
+        const odo = $("commute_odometer_entity").value;
+        const srcPhrase = src === "odometer"
+          ? `from ${odo ? b(nameOf(odo)) : "your car's odometer"} (at ${b(($("commute_efficiency").value || "18") + " kWh/100km")})`
+          : src === "soc"
+          ? "from your car's battery-level drop"
+          : "from charger energy used";
+        s = `I'll learn how much you drive ${srcPhrase} and charge enough for ${b(d)} commute ` +
             `(plus ${b(($("commute_margin_pct").value || "10") + "%")} margin, ` +
             `never below ${b(($("commute_reserve_pct").value || "20") + "%")}, ` +
             `capped at ${b(cap)})`;
@@ -1006,6 +1021,15 @@
   function toggleCommute() {
     const w = $("commute-wrap");
     if (w) w.hidden = !$("commute_enabled").checked;
+    toggleCommuteSource();
+  }
+
+  function toggleCommuteSource() {
+    const src = ($("commute_source") || {}).value || "charger";
+    const odo = $("commute-odo-wrap");
+    const soc = $("commute-soc-hint");
+    if (odo) odo.hidden = src !== "odometer";
+    if (soc) soc.hidden = src !== "soc";
   }
 
   function toggleSurplusSource() {
@@ -1321,6 +1345,7 @@
     $("only_if_scheduled").addEventListener("change", () => { toggleScheduledWithin(); updateSummary(); });
     $("cheapest_window").addEventListener("change", () => { toggleCheapest(); updateSummary(); });
     $("commute_enabled").addEventListener("change", () => { toggleCommute(); updateSummary(); });
+    $("commute_source").addEventListener("change", () => { toggleCommuteSource(); updateSummary(); });
     $("surplus_source").addEventListener("change", () => { toggleSurplusSource(); updateSummary(); });
     const sss = $("surplus_source_ss");
     if (sss) sss.addEventListener("change", () => { toggleSurplusSourceSS(); updateSummary(); });

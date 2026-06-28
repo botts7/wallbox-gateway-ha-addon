@@ -359,6 +359,33 @@
           <div class="ca-hint" id="commute-preview" style="margin-bottom:8px">After
              a few charges, the <b>Daily use (average)</b> and <b>Commute charge
              target</b> sensors show what's been learned.</div>
+          <div class="ca-field">
+            <label>Learn from</label>
+            <select id="commute_source">
+              <option value="charger">Charger energy delivered (no car integration needed)</option>
+              <option value="odometer">Car odometer (km) + efficiency</option>
+              <option value="soc">Car battery-level drop (SOC)</option>
+            </select>
+            <div class="ca-hint" id="commute-source-hint">How daily use is measured. Charger energy uses what the wallbox delivered; the car-based sources read your car integration's history (distance-true, and they still count driving when you charge elsewhere).</div>
+          </div>
+          <div class="ca-row ca-indent" id="commute-odo-wrap" hidden>
+            <div class="ca-field">
+              <label>Odometer entity</label>
+              <div class="ca-picker">
+                <select id="commute_odometer_entity" data-domains="sensor" data-device-class="distance"></select>
+                <span class="ca-live" data-live-for="commute_odometer_entity">&mdash;</span>
+              </div>
+              <div class="ca-hint">A total-distance (km) sensor from your car integration.</div>
+            </div>
+            <div class="ca-field">
+              <label>Efficiency</label>
+              <div class="ca-input-suffix"><input type="number" id="commute_efficiency" min="5" max="50" step="0.5" placeholder="18"><span>kWh/100km</span></div>
+              <div class="ca-hint">Used to turn km/day into energy/day.</div>
+            </div>
+          </div>
+          <div class="ca-hint ca-indent" id="commute-soc-hint" hidden>Uses the
+             <b>battery-level entity</b> you picked above — counts each daily SOC
+             drop as driving. Needs battery capacity set for the % conversion.</div>
           <div class="ca-row">
             <div class="ca-field">
               <label>Always keep at least</label>

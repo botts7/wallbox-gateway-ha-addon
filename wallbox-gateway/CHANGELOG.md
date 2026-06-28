@@ -4,6 +4,16 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.35.0] - 2026-06-28
+
+### Added
+- **"Learn from" dropdown in the Commute card** (pairs with integration
+  0.18.0b8). Choose how daily use is measured: **Charger energy delivered**
+  (default), **Car odometer (km) + efficiency**, or **Car battery-level drop
+  (SOC)**. Picking odometer reveals an odometer-entity picker + efficiency field;
+  SOC reuses the battery-level entity already chosen above. The live summary
+  states which source it's learning from.
+
 ## [0.34.0] - 2026-06-28
 
 ### Added
