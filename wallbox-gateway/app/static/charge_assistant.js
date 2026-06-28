@@ -186,6 +186,10 @@
   // rendered into the "Active now" line so the user always sees what's running.
   let savedSig = null;
   let savedCa = { mode: "off" };
+  // The full charge_assistant config last loaded/saved — so turning the mode
+  // "Off" can PRESERVE your settings (off = inert, not a wipe) instead of
+  // saving just {mode:"off"} and erasing window/target/surplus/etc.
+  let loadedCa = {};
   let isDirty = false;
 
   // Escapes for both text and double-quoted attribute contexts (entity ids land
@@ -602,6 +606,7 @@
     host = r.body.host || null;
     const opts = r.body.options || {};
     const ca = opts.charge_assistant || {};
+    loadedCa = { ...ca };   // remember the full config so "Off" can preserve it
     // Top-level integration tunables (not under charge_assistant).
     const pi = $("poll_interval");
     if (pi) pi.value = opts.poll_interval == null ? "" : opts.poll_interval;
@@ -1071,7 +1076,16 @@
 
   function gather() {
     const ca = { mode: currentMode };
-    if (currentMode === "off") return ca;
+    if (currentMode === "off") {
+      // "Off" PRESERVES your saved settings (so switching back doesn't make you
+      // reconfigure) but is fully inert: strategy off = no charging, and the
+      // reminder layer is disabled so nothing nudges either.
+      const preserved = { ...loadedCa, mode: "off" };
+      if (preserved.reminder && typeof preserved.reminder === "object") {
+        preserved.reminder = { ...preserved.reminder, enabled: false };
+      }
+      return preserved;
+    }
 
     if (currentMode === "reminder") {
       ca.triggers = TRIGGERS.filter((t) => { const cb = $(`trig-${t}`); return cb && cb.checked; });
@@ -1156,6 +1170,7 @@
     if (r.ok && r.body.ok) {
       status.className = "ca-save-status ok";
       status.textContent = "Saved — assistant reloaded.";
+      loadedCa = { ...ca };   // this is now the config "Off" will preserve
       snapshotSaved();   // this config is now the saved one → Active-now + clean
       const overview = (buildSummary() || "").replace(/<[^>]+>/g, "").trim();
       showToast("✓ Saved. " + (overview || "Assistant is off — nothing automated."), "ok");

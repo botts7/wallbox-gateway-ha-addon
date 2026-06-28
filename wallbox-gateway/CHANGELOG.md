@@ -4,6 +4,16 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.32.0] - 2026-06-28
+
+### Fixed
+- **Switching the Charge Assistant mode to "Off" no longer wipes your config.**
+  Previously, picking "Off" saved only `{mode: "off"}` and erased your window,
+  target, departure, surplus source, etc. Now "Off" **preserves all your
+  settings** (so flipping back to a mode doesn't make you reconfigure) while
+  staying fully inert — strategy off = no charging, and the plug-in reminder
+  layer is disabled so nothing nudges either.
+
 ## [0.31.0] - 2026-06-27
 
 ### Added
