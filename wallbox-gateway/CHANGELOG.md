@@ -4,6 +4,22 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.40.0] - 2026-07-02
+
+### Added
+- **Multiple gateways from one Add-on.** Add a `gateways:` list in the Add-on
+  Configuration tab (one entry per charger — `name`, `ip`, `auth_user`,
+  `auth_pass`) to manage several Pulsars from a single install. A charger
+  switcher appears in the header on every page; your selection is remembered for
+  the browser session and every dashboard / sessions / OTA / Charge-Assistant
+  call targets the chosen gateway. Existing single-gateway installs are
+  unaffected — the legacy `gateway_ip` fields still work when `gateways` is empty.
+
+### Notes
+- Each ESP32 gateway remains fully independent (its own MQTT device keyed by
+  charger serial). The Add-on is the config/monitoring GUI; entities still come
+  from firmware MQTT discovery and/or the (multi-instance) HACS integration.
+
 ## [0.39.1] - 2026-06-28
 
 ### Fixed

@@ -623,7 +623,13 @@
   }
 
   async function loadConfig() {
-    const r = await fetchJSON("api/ha/config");
+    // With multiple gateways, target the active one's integration entry so the
+    // GUI edits the right charger. (Single-gateway installs resolve to it
+    // regardless.) gw.js resolves wbReady once the gateway list has loaded.
+    if (window.wbReady) { try { await window.wbReady; } catch (e) { /* ignore */ } }
+    const activeIp = (window.wbActiveGatewayIp && window.wbActiveGatewayIp()) || "";
+    const cfgUrl = activeIp ? ("api/ha/config?host=" + encodeURIComponent(activeIp)) : "api/ha/config";
+    const r = await fetchJSON(cfgUrl);
     if (!r.ok) {
       $("ca-no-bridge").hidden = false;
       $("ca-bridge-detail").textContent = r.body.detail || r.body.error || `HTTP ${r.status}`;
@@ -635,7 +641,7 @@
       $("ca-form").hidden = true;
       return;
     }
-    host = r.body.host || null;
+    host = r.body.host || activeIp || null;
     const opts = r.body.options || {};
     const ca = opts.charge_assistant || {};
     loadedCa = { ...ca };   // remember the full config so "Off" can preserve it
