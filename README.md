@@ -83,6 +83,22 @@ Roadmap:
   charge-interval capture); without it they fall back to schedule-
   inferred billing.
 
+### Add-on ↔ Integration
+
+The Add-on is the config GUI for the [Wallbox Gateway
+integration](https://github.com/botts7/hass-wallbox-gateway). Keep them on a
+matched pair — the Charge Assistant page talks to the integration over
+services that were added in specific versions:
+
+| Add-on | Needs integration | Notes |
+|-------:|:------------------|:------|
+| **≥ 0.40.0** | **≥ 0.18.0** | Charge Assistant config bridge (`get_config`/`set_config`) is on the HACS **default** channel from 0.18.0. Multiple gateways from one Add-on. |
+| 0.23.0 – 0.39.x | 0.17.0b4 (beta) | Bridge was **beta-only** — needed "show beta versions" in HACS. |
+
+If the Add-on finds an integration older than its required floor, the Charge
+Assistant page tells you which version to update to (rather than a generic
+error).
+
 ## Layout
 
 ```
