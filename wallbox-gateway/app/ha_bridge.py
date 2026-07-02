@@ -68,6 +68,26 @@ class CoreError(Exception):
     """Raised when the Core API returns an error response."""
 
 
+class IntegrationOutdated(CoreError):
+    """The Wallbox Gateway integration is installed but too old — it doesn't
+    expose the get_config/set_config services the Charge Assistant needs.
+    Subclasses CoreError so existing `except CoreError` handlers still catch it,
+    but the frontend can show an actionable "update the integration" message."""
+
+
+# Minimum integration version that exposes the config bridge services.
+MIN_INTEGRATION_VERSION = "0.18.0"
+
+
+def _looks_like_missing_service(status: int, text: str) -> bool:
+    """HA returns 400 with 'Service/Action <domain>.<name> not found' when the
+    service isn't registered — i.e. the integration is missing or too old."""
+    if status != 400:
+        return False
+    t = (text or "").lower()
+    return ("not found" in t) and (_INTEGRATION_DOMAIN in t)
+
+
 def config_from_env() -> CoreConfig:
     # SUPERVISOR_TOKEN is injected by the Supervisor for add-ons granted
     # homeassistant_api. WB_HA_BASE_URL lets local dev point at a real
@@ -253,6 +273,11 @@ def get_config(
     except requests.RequestException as e:
         raise CoreUnavailable(str(e)) from e
     if r.status_code >= 400:
+        if _looks_like_missing_service(r.status_code, r.text):
+            raise IntegrationOutdated(
+                "Wallbox Gateway integration is missing or older than "
+                f"{MIN_INTEGRATION_VERSION} (no get_config service)."
+            )
         raise CoreError(f"get_config HTTP {r.status_code}: {r.text[:200]}")
     data = r.json()
     # HA wraps service-response data as {"service_response": {...}} (or
@@ -283,6 +308,11 @@ def set_config(
     except requests.RequestException as e:
         raise CoreUnavailable(str(e)) from e
     if r.status_code >= 400:
+        if _looks_like_missing_service(r.status_code, r.text):
+            raise IntegrationOutdated(
+                "Wallbox Gateway integration is missing or older than "
+                f"{MIN_INTEGRATION_VERSION} (no set_config service)."
+            )
         raise CoreError(f"set_config HTTP {r.status_code}: {r.text[:200]}")
 
 

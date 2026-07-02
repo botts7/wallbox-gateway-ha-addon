@@ -631,8 +631,16 @@
     const cfgUrl = activeIp ? ("api/ha/config?host=" + encodeURIComponent(activeIp)) : "api/ha/config";
     const r = await fetchJSON(cfgUrl);
     if (!r.ok) {
-      $("ca-no-bridge").hidden = false;
-      $("ca-bridge-detail").textContent = r.body.detail || r.body.error || `HTTP ${r.status}`;
+      // Integration installed but too old to expose get_config — actionable,
+      // distinct from a generic "can't reach HA" (which is the token/502 case).
+      if (r.body && r.body.error === "integration_outdated") {
+        $("ca-outdated").hidden = false;
+        if (r.body.min_version) $("ca-min-version").textContent = r.body.min_version;
+        $("ca-outdated-detail").textContent = r.body.detail || "";
+      } else {
+        $("ca-no-bridge").hidden = false;
+        $("ca-bridge-detail").textContent = r.body.detail || r.body.error || `HTTP ${r.status}`;
+      }
       $("ca-form").hidden = true;
       return;
     }

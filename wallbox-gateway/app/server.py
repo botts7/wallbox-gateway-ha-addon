@@ -395,6 +395,13 @@ def api_ota_upload():
 def _ha_error(exc: Exception) -> Tuple[dict, int]:
     if isinstance(exc, ha_bridge.CoreUnavailable):
         return {"error": "ha_unavailable", "detail": str(exc)}, 503
+    # Subclass of CoreError — check first. Integration installed but too old.
+    if isinstance(exc, ha_bridge.IntegrationOutdated):
+        return {
+            "error": "integration_outdated",
+            "detail": str(exc),
+            "min_version": ha_bridge.MIN_INTEGRATION_VERSION,
+        }, 502
     if isinstance(exc, ha_bridge.CoreError):
         return {"error": "ha_error", "detail": str(exc)}, 502
     return {"error": "unknown", "detail": repr(exc)}, 500
