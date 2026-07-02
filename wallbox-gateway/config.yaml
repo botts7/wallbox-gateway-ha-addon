@@ -1,5 +1,5 @@
 ﻿name: "Wallbox BLE Gateway Manager"
-version: "0.39.1"
+version: "0.40.0"
 slug: wallbox_gateway
 description: >
   Manage your ESP32-based Wallbox BLE gateway from inside Home Assistant.
@@ -21,11 +21,22 @@ homeassistant_api: true
 panel_icon: mdi:ev-station
 panel_title: "Wallbox Gateway"
 options:
+  # One entry per charger/gateway. Add more to manage several Pulsars from the
+  # one Add-on (a switcher appears in the UI). Leave empty to use the legacy
+  # single-gateway fields below.
+  gateways: []
+  # Legacy single-gateway fields — honoured only when `gateways` is empty, so
+  # existing installs keep working without reconfiguring.
   gateway_ip: ""
   gateway_auth_user: "admin"
   gateway_auth_pass: ""
   poll_interval_s: 10
 schema:
+  gateways:
+    - name: "str?"
+      ip: "str?"
+      auth_user: "str?"
+      auth_pass: "password?"
   gateway_ip: "str?"
   gateway_auth_user: "str?"
   gateway_auth_pass: "password?"

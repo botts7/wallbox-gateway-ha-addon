@@ -20,8 +20,9 @@ from requests import HTTPError
 from proxy import (
     GatewayNotConfigured,
     GatewayUnreachable,
-    config_from_env,
+    config_for,
     fetch_json,
+    gateways,
     post_form,
 )
 import ha_bridge
@@ -64,6 +65,25 @@ def _gateway_error(exc: Exception) -> Tuple[dict, int]:
     return {"error": "unknown", "detail": repr(exc)}, 500
 
 
+def _cfg():
+    """The gateway a request targets — the `?gw=<index>` param (default 0). All
+    gateway-proxy routes go through this so the UI can switch chargers."""
+    return config_for(request.args.get("gw"))
+
+
+@app.route("/api/gateways")
+def api_gateways():
+    """The configured gateways, for the UI's gateway switcher. Never returns the
+    auth password."""
+    return jsonify({
+        "gateways": [
+            {"index": i, "name": g.name or f"Gateway {i + 1}",
+             "ip": g.ip, "configured": g.configured}
+            for i, g in enumerate(gateways())
+        ]
+    })
+
+
 @app.route("/")
 def dashboard():
     return render_template("index.html")
@@ -96,7 +116,7 @@ def api_sess():
     met validated against the whitelist; par (the session id for r_log)
     forwarded verbatim.
     """
-    cfg = config_from_env()
+    cfg = _cfg()
     met = (request.args.get("met") or "").strip()
     if met not in _ALLOWED_SESS_METS:
         return jsonify({
@@ -115,7 +135,7 @@ def api_sess():
 
 @app.route("/api/health")
 def api_health():
-    cfg = config_from_env()
+    cfg = _cfg()
     try:
         return jsonify(fetch_json(cfg, "/api/health"))
     except Exception as e:
@@ -125,7 +145,7 @@ def api_health():
 
 @app.route("/api/status")
 def api_status():
-    cfg = config_from_env()
+    cfg = _cfg()
     try:
         return jsonify(fetch_json(cfg, "/api/status"))
     except Exception as e:
@@ -136,7 +156,7 @@ def api_status():
 @app.route("/api/charge_log")
 def api_charge_log():
     """Real per-session charge-burst windows recorded by the gateway firmware."""
-    cfg = config_from_env()
+    cfg = _cfg()
     try:
         return jsonify(fetch_json(cfg, "/api/charge_log"))
     except Exception as e:
@@ -146,7 +166,7 @@ def api_charge_log():
 
 @app.route("/api/charger")
 def api_charger():
-    cfg = config_from_env()
+    cfg = _cfg()
     try:
         return jsonify(fetch_json(cfg, "/api/charger"))
     except Exception as e:
@@ -156,7 +176,7 @@ def api_charger():
 
 @app.route("/api/diag/disconnects")
 def api_diag_disconnects():
-    cfg = config_from_env()
+    cfg = _cfg()
     try:
         return jsonify(fetch_json(cfg, "/api/diag/disconnects"))
     except Exception as e:
@@ -172,7 +192,7 @@ def api_meter():
     House stats. Best-effort: a BLE-busy gateway will return null
     fields, which the dashboard renders as `--`.
     """
-    cfg = config_from_env()
+    cfg = _cfg()
     try:
         return jsonify(fetch_json(
             cfg,
@@ -199,7 +219,7 @@ def api_command():
     Lock / Unlock / Max current / Reboot. Action whitelist enforced;
     extra query params (like &value= for current) are forwarded.
     """
-    cfg = config_from_env()
+    cfg = _cfg()
     action = (request.args.get("action") or "").strip().lower()
     if action not in _ALLOWED_ACTIONS:
         return jsonify({
@@ -226,7 +246,7 @@ def api_control_owner():
     """Set the gateway's charge-control owner from the Add-on, so the user
     never has to open the gateway's own Settings page. Forwards to the
     gateway's auth-only /api/control_owner (persists to NVS, no reboot)."""
-    cfg = config_from_env()
+    cfg = _cfg()
     owner = (request.values.get("owner") or "").strip()
     if owner not in _OWNERS:
         return jsonify({"error": "bad_owner", "allowed": sorted(_OWNERS)}), 400
@@ -251,7 +271,7 @@ def api_sched():
     etc — same shape the gateway's own dashboard sends) and we forward it,
     forcing action=bapi and validating the met against the whitelist.
     """
-    cfg = config_from_env()
+    cfg = _cfg()
     met = (request.args.get("met") or "").strip()
     if met not in _ALLOWED_SCHED_METS:
         return jsonify({
@@ -273,7 +293,7 @@ def api_notifications():
     """Proxy the BAPI `r_not` call — active charger notifications/alerts.
     Best-effort: a BLE-busy gateway returns null/0, rendered as 'none'.
     """
-    cfg = config_from_env()
+    cfg = _cfg()
     try:
         return jsonify(fetch_json(
             cfg,
@@ -289,7 +309,7 @@ def api_notifications():
 def api_addon_config():
     """Surface non-secret Add-on options so the SPA knows whether
     a gateway IP is configured. Auth password is never returned."""
-    cfg = config_from_env()
+    cfg = _cfg()
     return jsonify({
         "configured": cfg.configured,
         "gateway_ip": cfg.ip,
@@ -308,7 +328,7 @@ def api_ota_upload():
     rejection it returns 503+Retry-After (admission guard) or 500
     (truncation / bad magic / Update.end failure).
     """
-    cfg = config_from_env()
+    cfg = _cfg()
     if not cfg.configured:
         return jsonify({
             "error": "not_configured",
@@ -375,6 +395,13 @@ def api_ota_upload():
 def _ha_error(exc: Exception) -> Tuple[dict, int]:
     if isinstance(exc, ha_bridge.CoreUnavailable):
         return {"error": "ha_unavailable", "detail": str(exc)}, 503
+    # Subclass of CoreError — check first. Integration installed but too old.
+    if isinstance(exc, ha_bridge.IntegrationOutdated):
+        return {
+            "error": "integration_outdated",
+            "detail": str(exc),
+            "min_version": ha_bridge.MIN_INTEGRATION_VERSION,
+        }, 502
     if isinstance(exc, ha_bridge.CoreError):
         return {"error": "ha_error", "detail": str(exc)}, 502
     return {"error": "unknown", "detail": repr(exc)}, 500

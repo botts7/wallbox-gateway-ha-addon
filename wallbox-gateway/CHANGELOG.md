@@ -4,6 +4,31 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.40.0] - 2026-07-02
+
+### Added
+- **Multiple gateways from one Add-on.** Add a `gateways:` list in the Add-on
+  Configuration tab (one entry per charger — `name`, `ip`, `auth_user`,
+  `auth_pass`) to manage several Pulsars from a single install. A charger
+  switcher appears in the header on every page; your selection is remembered for
+  the browser session and every dashboard / sessions / OTA / Charge-Assistant
+  call targets the chosen gateway. Existing single-gateway installs are
+  unaffected — the legacy `gateway_ip` fields still work when `gateways` is empty.
+
+### Changed
+- **Clearer Charge Assistant error when the integration is out of date.** If the
+  **Wallbox Gateway** integration is installed but older than **0.18.0** (no
+  `get_config`/`set_config` services), the page now says *"Update the Wallbox
+  Gateway integration to ≥ 0.18.0"* with a link hint, instead of the misleading
+  generic "Home Assistant link unavailable". Requires **integration ≥ 0.18.0**.
+
+### Notes
+- Each ESP32 gateway remains fully independent (its own MQTT device keyed by
+  charger serial). The Add-on is the config/monitoring GUI; entities still come
+  from firmware MQTT discovery and/or the (multi-instance) HACS integration.
+- **Compatibility:** this Add-on (≥ 0.40.0) needs the HACS **Wallbox Gateway
+  integration ≥ 0.18.0** for the Charge Assistant. Update both together.
+
 ## [0.39.1] - 2026-06-28
 
 ### Fixed

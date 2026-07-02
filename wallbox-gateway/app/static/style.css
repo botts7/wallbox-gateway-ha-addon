@@ -69,6 +69,21 @@ header span#gw-ip {
   color: var(--text3);
   font-size: 12px;
 }
+/* Multi-gateway switcher (injected by gw.js, only when >1 gateway). Sits on the
+   right of the header, next to the IP. */
+select.wb-gw-switch {
+  margin-left: auto;
+  background: var(--elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  max-width: 45vw;
+}
+select.wb-gw-switch:hover { border-color: var(--accent); }
+select.wb-gw-switch:focus { outline: none; border-color: var(--accent); }
 
 /* Masonry-style layout: cards flow into balanced columns (one column on
    phones, more as the window widens) with no ragged full-width gaps. Each

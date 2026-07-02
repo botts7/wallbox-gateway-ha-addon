@@ -6,6 +6,7 @@
 <title>Wallbox Gateway &middot; Charge Assistant</title>
 <link rel="stylesheet" href="static/style.css?v={{ ASSET_V }}">
 <link rel="stylesheet" href="static/charge_assistant.css?v={{ ASSET_V }}">
+<script src="static/gw.js?v={{ ASSET_V }}"></script>
 </head>
 <body class="page-assistant">
 
@@ -30,6 +31,15 @@
        granted automatically when the Add-on is installed from the store.
        If you sideloaded it, reinstall/restart the Add-on. (Detail:
        <span id="ca-bridge-detail">—</span>)</p>
+  </section>
+
+  <section id="ca-outdated" class="card warn" hidden>
+    <h2>Update the Wallbox Gateway integration</h2>
+    <p>The <strong>Wallbox Gateway</strong> integration is installed but too old
+       for this Add-on — it doesn't yet expose the config services the Charge
+       Assistant needs. Update it to <strong>v<span id="ca-min-version">0.18.0</span>
+       or newer</strong> in HACS (enable pre-release if you don't see it), then
+       reload. (Detail: <span id="ca-outdated-detail">—</span>)</p>
   </section>
 
   <section id="ca-no-integration" class="card warn" hidden>

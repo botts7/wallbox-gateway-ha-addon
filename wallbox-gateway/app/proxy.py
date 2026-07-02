@@ -9,6 +9,7 @@ small and the network behaviour is testable in isolation.
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 
@@ -20,6 +21,7 @@ class GatewayConfig:
     ip: str
     auth_user: str
     auth_pass: str
+    name: str = ""
 
     @property
     def configured(self) -> bool:
@@ -34,7 +36,60 @@ def config_from_env() -> GatewayConfig:
         ip=os.environ.get("WB_GATEWAY_IP", "").strip(),
         auth_user=os.environ.get("WB_AUTH_USER", "admin"),
         auth_pass=os.environ.get("WB_AUTH_PASS", ""),
+        name=os.environ.get("WB_GATEWAY_NAME", "").strip(),
     )
+
+
+# Supervisor writes the full add-on options here; it's the clean way to carry the
+# multi-gateway list (env vars only carry the legacy single gateway).
+_OPTIONS_PATH = "/data/options.json"
+_gateways_cache: list[GatewayConfig] | None = None
+
+
+def _load_gateways() -> list[GatewayConfig]:
+    """The configured gateways. Prefers the `gateways` list from add-on options;
+    falls back to the legacy single `gateway_ip` (env) so existing installs are
+    unaffected. Always returns at least one entry (possibly unconfigured)."""
+    try:
+        with open(_OPTIONS_PATH, encoding="utf-8") as fh:
+            gws = (json.load(fh) or {}).get("gateways")
+        if isinstance(gws, list) and gws:
+            out = [
+                GatewayConfig(
+                    ip=str(g.get("ip", "")).strip(),
+                    auth_user=str(g.get("auth_user") or "admin"),
+                    auth_pass=str(g.get("auth_pass") or ""),
+                    name=str(g.get("name") or f"Gateway {i + 1}"),
+                )
+                for i, g in enumerate(gws)
+                if str(g.get("ip", "")).strip()
+            ]
+            if out:
+                return out
+    except (OSError, ValueError):
+        pass
+    legacy = config_from_env()
+    return [GatewayConfig(legacy.ip, legacy.auth_user, legacy.auth_pass,
+                          legacy.name or "Gateway")]
+
+
+def gateways() -> list[GatewayConfig]:
+    """Cached gateway list (rebuilt on process restart, i.e. after any options
+    change — Supervisor restarts the add-on when its config changes)."""
+    global _gateways_cache
+    if _gateways_cache is None:
+        _gateways_cache = _load_gateways()
+    return _gateways_cache
+
+
+def config_for(gw) -> GatewayConfig:
+    """The gateway selected by the `?gw=<index>` request param (default 0)."""
+    gws = gateways()
+    try:
+        idx = int(gw)
+    except (TypeError, ValueError):
+        idx = 0
+    return gws[idx] if 0 <= idx < len(gws) else gws[0]
 
 
 class GatewayUnreachable(Exception):
