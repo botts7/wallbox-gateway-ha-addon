@@ -11,8 +11,10 @@ For local dev: WB_GATEWAY_IP=... python3 server.py
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Tuple
+from urllib.parse import quote
 
 from flask import Flask, jsonify, render_template, request
 from requests import HTTPError
@@ -233,6 +235,43 @@ def api_command():
     path = "/api/command" + (("?" + qs) if qs else "")
     try:
         return jsonify(fetch_json(cfg, path, timeout=8.0))
+    except Exception as e:
+        body, code = _gateway_error(e)
+        return jsonify(body), code
+
+
+@app.route("/api/halo")
+def api_halo():
+    """Read the LED halo config (g_halocfg) for the dashboard's Halo card.
+    Dedicated route so the /api/command whitelist stays tight (no generic
+    BAPI passthrough from the browser)."""
+    cfg = _cfg()
+    try:
+        return jsonify(fetch_json(
+            cfg, "/api/command?action=bapi&met=g_halocfg&par=null", timeout=8.0))
+    except Exception as e:
+        body, code = _gateway_error(e)
+        return jsonify(body), code
+
+
+@app.route("/api/halo", methods=["POST"])
+def api_halo_set():
+    """Write the LED halo config (s_halocfg). Body: {bright 0-100, mode 0/1,
+    time_s}. Values are clamped here so a stray request can't send junk to the
+    charger. Forwarded to the gateway as the same GET-based BAPI the web UI uses."""
+    cfg = _cfg()
+    data = request.get_json(silent=True) or {}
+    try:
+        bright = max(0, min(100, int(data.get("bright", 100))))
+        mode = 1 if int(data.get("mode", 0)) else 0
+        time_s = max(0, min(3600, int(data.get("time_s", 0))))
+    except (TypeError, ValueError):
+        return jsonify({"error": "bad_request",
+                        "detail": "bright/mode/time_s must be numbers"}), 400
+    par = quote(json.dumps({"bright": bright, "mode": mode, "time_s": time_s}))
+    try:
+        return jsonify(fetch_json(
+            cfg, f"/api/command?action=bapi&met=s_halocfg&par={par}", timeout=10.0))
     except Exception as e:
         body, code = _gateway_error(e)
         return jsonify(body), code

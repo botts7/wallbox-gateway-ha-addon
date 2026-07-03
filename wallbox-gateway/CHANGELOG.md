@@ -4,6 +4,22 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.42.0] - 2026-07-03
+
+### Added
+- **Halo LED card** on the dashboard — a **Standby** toggle (dim the ring when
+  idle) + a **Brightness** slider (0–100 %), for parity with the ESP web UI and
+  the integration. Reads the charger's real config on load; writes are optimistic
+  (the control updates instantly) with a bounded retry + backoff, and re-read to
+  correct only if a write fails. Hidden automatically if the charger has no halo.
+  New scoped `/api/halo` GET/POST proxy (keeps the `/api/command` whitelist tight).
+
+### Fixed
+- **`fetchJSON` now forwards request options** (`method`/`headers`/`body`) — POST
+  callers previously silently fell back to a GET. Also **hardened the Halo read
+  with retry/backoff** so a lost boot-burst race against the gateway's rate limit
+  doesn't leave the card hidden.
+
 ## [0.41.0] - 2026-07-03
 
 ### Added

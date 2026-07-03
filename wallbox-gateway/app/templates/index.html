@@ -166,6 +166,25 @@
     <div id="ctrl-toast" class="ctrl-toast" hidden></div>
   </section>
 
+  <!-- Halo LED: standby (dim-when-idle) + brightness. Hidden until the
+       charger's g_halocfg read succeeds. -->
+  <section class="card controls" id="halo-card" hidden>
+    <h2>&#x1F4A1; Halo LED</h2>
+    <div class="ctrl-slider">
+      <label class="ctrl-toggle-row" for="halo-standby">
+        <span>Standby (dim when idle)</span>
+        <input type="checkbox" id="halo-standby">
+      </label>
+    </div>
+    <div class="ctrl-slider">
+      <label for="halo-bright">Brightness</label>
+      <div class="ctrl-slider-row">
+        <input type="range" id="halo-bright" min="0" max="100" step="5" value="100">
+        <span class="ctrl-slider-val"><span id="halo-bright-val">100</span> %</span>
+      </div>
+    </div>
+  </section>
+
   <!-- Quick-stats grid: live session telemetry -->
   <section class="grid">
     <div class="stat">

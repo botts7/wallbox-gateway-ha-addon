@@ -15,9 +15,11 @@ const showCard = (id, show) => { const el = $(id); if (el) el.hidden = !show; };
 
 let unreachableShown = false;
 
-async function fetchJSON(path) {
+async function fetchJSON(path, opts) {
   try {
-    const r = await fetch(path, { cache: 'no-store' });
+    // opts (method/headers/body) forwarded for POSTs like /api/halo; GET
+    // callers pass nothing, so behaviour is unchanged for them.
+    const r = await fetch(path, { cache: 'no-store', ...(opts || {}) });
     const body = await r.json().catch(() => ({}));
     return { ok: r.ok, status: r.status, body };
   } catch (e) {
@@ -716,6 +718,81 @@ function syncCurrentSlider(amps) {
   }
 }
 
+// ---- Halo LED (g_halocfg / s_halocfg via the /api/halo proxy) ----
+// _haloState holds the last-read {bright, mode, time_s} so each write is a
+// read-modify-write — changing standby preserves brightness and vice-versa.
+let _haloState = null;
+let _haloBrightTouched = false;
+let _haloBrightTimer = null;
+
+// Read the charger's halo config and paint the controls. Called once on load,
+// and again right after a write so the card reflects the confirmed new state.
+// (No periodic poll — the charger has no halo-change event, and reads are BLE
+// round-trips, so we only read when there's a reason to: load + after a change.)
+async function loadHalo() {
+  // Retry + backoff: the read is a BLE round-trip and can lose the boot-burst
+  // race against the gateway's /api/command rate-limiter. Without this, one
+  // transient miss leaves the card hidden with no re-poll.
+  let rr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const r = await fetchJSON('api/halo');
+    const got = r.ok && r.body ? r.body.r : null;
+    if (got && typeof got.bright === 'number') { rr = got; break; }
+    if (attempt < 2) await new Promise((res) => setTimeout(res, 800 * (attempt + 1)));
+  }
+  const card = $('halo-card');
+  if (!rr) {
+    if (card) card.hidden = true;   // charger didn't return a halo config
+    return;
+  }
+  _haloState = { bright: rr.bright | 0, mode: rr.mode | 0, time_s: rr.time_s | 0 };
+  const sb = $('halo-standby');
+  if (sb) sb.checked = _haloState.mode === 1;
+  const br = $('halo-bright');
+  if (br && !_haloBrightTouched) {
+    br.value = _haloState.bright;
+    setText('halo-bright-val', _haloState.bright);
+  }
+  if (card) card.hidden = false;
+}
+
+async function saveHalo() {
+  if (!_haloState) return;
+  // Optimistic: the toggle/slider already shows the new value. Write in the
+  // background with a bounded retry + backoff so a transient BLE hiccup or the
+  // gateway's /api/command rate-limit doesn't silently drop the change. Each
+  // attempt re-sends the latest state, so a change mid-retry still lands.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const r = await fetchJSON('api/halo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(_haloState),
+    });
+    if (r.ok && r.body && !r.body.error) return;   // success — optimistic UI stands
+    if (attempt < 2) await new Promise((res) => setTimeout(res, 500 * (attempt + 1)));
+  }
+  await loadHalo();   // gave up after 3 tries — correct the UI to the charger's real state
+}
+
+(function wireHalo() {
+  const sb = $('halo-standby');
+  if (sb) sb.addEventListener('change', () => {
+    if (!_haloState) return;
+    _haloState.mode = sb.checked ? 1 : 0;
+    saveHalo();
+  });
+  const br = $('halo-bright');
+  if (br) br.addEventListener('input', (e) => {
+    _haloBrightTouched = true;
+    setText('halo-bright-val', e.target.value);
+    if (_haloBrightTimer) clearTimeout(_haloBrightTimer);
+    _haloBrightTimer = setTimeout(() => {
+      if (_haloState) { _haloState.bright = parseInt(e.target.value, 10) || 0; saveHalo(); }
+      setTimeout(() => { _haloBrightTouched = false; }, 3000);
+    }, 350);
+  });
+})();
+
 // ---- Charger notifications (r_not) ----
 let _notifs = [];
 async function loadNotifs() {
@@ -992,6 +1069,7 @@ refresh();
 // /api/command rate limiter.
 setTimeout(loadSchedules, 1200);
 setTimeout(loadNotifs, 2400);
+setTimeout(loadHalo, 4500);   // after the schedules/notifs boot burst
 setInterval(refresh, POLL_MS);
 setInterval(loadNotifs, 60_000);   // charger notifications refresh slowly
 // Recompute the cost tiles from the real charge windows so they stay current
