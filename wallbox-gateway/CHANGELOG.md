@@ -4,6 +4,18 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.43.0] - 2026-07-04
+
+### Fixed
+- **Sessions list showed 0.00 kWh per session and an empty heatmap** on some
+  chargers, even though the totals were correct (mo-harry). The per-session
+  energy came from the charger's `r_log` read, which returns `en:0` on some
+  firmwares. The recent-session list, the weekly heatmap, and the CSV export now
+  derive each session's energy from the firmware **charge-log** (the same
+  ground-truth source the totals and the gateway's own `/sessions` page already
+  use), mapped to the session by time — falling back to `r_log` only for
+  sessions that predate charge-log capture. No change to already-correct chargers.
+
 ## [0.42.0] - 2026-07-03
 
 ### Added

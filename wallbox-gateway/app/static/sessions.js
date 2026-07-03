@@ -190,11 +190,34 @@ function _governingStart(ts, dur) {
 // intervals (by time, with per-burst green from gwh), (2) schedule inference,
 // (3) plug-in time. Every time-based surface (cost, heatmap) uses this so energy
 // — and its solar/grid mix — lands when it was really delivered.
+// Firmware charge-log intervals that belong to this session, mapped by TIME
+// (the charger's usid is shared across sessions, NOT unique per charge). Shared
+// by _chargeSegments (energy PLACEMENT for cost/heatmap) and _sessionWh /
+// _sessionGreenWh (the authoritative per-session ENERGY).
+function _sessionIntervals(s) {
+  const spanEnd = (s.stop && s.stop > s.ts) ? s.stop : (s.ts + (s.dur || 3600) + 86400);
+  return _chargeLog.filter((iv) => iv.start >= s.ts && iv.start <= spanEnd);
+}
+// Authoritative session energy (Wh): prefer the firmware charge-log sum (ground
+// truth — the same source the totals and the gateway's own /sessions page use),
+// falling back to the per-session r_log value only for sessions that predate
+// charge-log capture. The per-session r_log read returns en:0 on some charger
+// firmwares, which showed every session as 0.00 kWh with an empty heatmap even
+// though the metered totals were correct (mo-harry).
+function _sessionWh(s) {
+  const ivals = _sessionIntervals(s);
+  if (ivals.length) return ivals.reduce((a, b) => a + (b.wh || 0), 0);
+  return s.en || 0;
+}
+function _sessionGreenWh(s) {
+  const ivals = _sessionIntervals(s);
+  if (ivals.length) return ivals.reduce((a, b) => a + (b.gwh || 0), 0);
+  return s.gen || 0;
+}
 function _chargeSegments(s) {
   // (1) Ground truth: firmware intervals whose start falls within this
   // session's plug-in span [ts, stop]. Mapped by TIME (usid isn't per-session).
-  const spanEnd = (s.stop && s.stop > s.ts) ? s.stop : (s.ts + (s.dur || 3600) + 86400);
-  const ivals = _chargeLog.filter((iv) => iv.start >= s.ts && iv.start <= spanEnd);
+  const ivals = _sessionIntervals(s);
   if (ivals.length) {
     const totWh = ivals.reduce((a, b) => a + (b.wh || 0), 0) || 1;
     const totGwh = ivals.reduce((a, b) => a + (b.gwh || 0), 0);
@@ -490,8 +513,9 @@ function buildHeatmap() {
   const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
   let max = 0;
   _sessions.forEach((s) => {
-    if (!s.ts || !s.en) return;
-    const totalKwh = s.en / 1000;
+    const wh = _sessionWh(s);
+    if (!s.ts || !wh) return;
+    const totalKwh = wh / 1000;
     const step = 300;
     // Place energy in the REAL charge window(s), not at plug-in time.
     _chargeSegments(s).forEach((seg) => {
@@ -548,7 +572,7 @@ function renderList() {
     when.textContent = fmtTime(s.ts, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     const meta = document.createElement('div'); meta.className = 'sess-meta';
     const mins = Math.round((s.dur || 0) / 60);
-    meta.textContent = `${((s.en || 0) / 1000).toFixed(2)} kWh · ${mins} min`;
+    meta.textContent = `${(_sessionWh(s) / 1000).toFixed(2)} kWh · ${mins} min`;
     row.appendChild(when); row.appendChild(meta);
     list.appendChild(row);
   });
@@ -626,7 +650,7 @@ async function _fetchLog(sid, attempts = 3) {
 function exportCsv() {
   const rows = [['id', 'start_iso', 'duration_min', 'energy_kwh']];
   _sessions.slice().sort((a, b) => a.ts - b.ts).forEach((s) => {
-    rows.push([s.id, new Date(s.ts * 1000).toISOString(), Math.round((s.dur || 0) / 60), ((s.en || 0) / 1000).toFixed(3)]);
+    rows.push([s.id, new Date(s.ts * 1000).toISOString(), Math.round((s.dur || 0) / 60), (_sessionWh(s) / 1000).toFixed(3)]);
   });
   const csv = rows.map((r) => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
