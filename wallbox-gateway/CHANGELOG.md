@@ -4,6 +4,22 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.41.0] - 2026-07-03
+
+### Added
+- **Gateway-firmware compatibility warning.** The dashboard now reads the
+  gateway's firmware version (`gw_fw`, added in firmware v3.2.0-beta.8) and shows
+  a banner when it's older than **v3.0.0** — the point below which older firmware
+  may not emit the status fields the dashboard reads (so the status grid shows
+  `--`). Closes the third compatibility axis: **gateway firmware ⇄ add-on**.
+
+### Fixed
+- **Charge Assistant `get_config` bridge robustness.** The service call now sends
+  an explicit `return_response=1` (some HA versions read the flag by value, not
+  just presence — a `SupportsResponse.ONLY` service 400s if HA thinks the
+  response wasn't requested). Addresses "`get_config HTTP 400: Bad Request`" on
+  the Charge Assistant page.
+
 ## [0.40.0] - 2026-07-02
 
 ### Added

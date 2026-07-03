@@ -264,8 +264,11 @@ def get_config(
         body["host"] = host
     try:
         r = requests.post(
+            # Explicit `=1` (not a bare flag): HA versions differ on whether they
+            # read return_response by key-presence or by truthy value, and a
+            # SupportsResponse.ONLY service 400s if HA thinks it wasn't requested.
             f"{cfg.base_url}/services/{_INTEGRATION_DOMAIN}/get_config"
-            "?return_response",
+            "?return_response=1",
             headers=_headers(cfg),
             json=body,
             timeout=timeout,

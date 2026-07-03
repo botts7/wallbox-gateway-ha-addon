@@ -99,6 +99,21 @@ If the Add-on finds an integration older than its required floor, the Charge
 Assistant page tells you which version to update to (rather than a generic
 error).
 
+### The three moving parts (firmware ⇄ integration ⇄ add-on)
+
+There are **three** components and each expects a minimum of the others. Keeping
+them on a matched set avoids blank fields / "unavailable" surprises:
+
+| Component | Known-good | Depends on |
+|-----------|-----------|------------|
+| **Gateway firmware** | v3.2.0-beta.8+ | — (talks to the charger over BLE) |
+| **Integration** (HACS) | 0.18.0+ | firmware ≥ 3.0.0 for its entities |
+| **Add-on** | 0.41.0+ | integration ≥ 0.18.0 · firmware ≥ 3.0.0 |
+
+The Add-on reads the gateway's firmware version (`gw_fw` in `/api/status`, added
+in firmware v3.2.0-beta.8) and warns on the dashboard when it's too old — rather
+than silently showing `--` for status fields.
+
 ## Layout
 
 ```

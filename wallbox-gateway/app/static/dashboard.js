@@ -403,6 +403,30 @@ function hydrateDash() {
   pfRender();
 }
 
+// Minimum gateway firmware this Add-on's dashboard/integration expect. Below
+// this, older firmware may not emit the fields we read (status grid shows --).
+const MIN_GW_FW = '3.0.0';
+
+// Parse a gateway version ("v3.2.0-beta.7" / "3.0.0" / "dev") to [maj,min,pat].
+// A non-numeric build (dev/unknown) parses to [0,0,0] and is treated as "skip".
+function parseFw(v) {
+  return String(v || '').replace(/^v/, '').split(/[.\-+]/).slice(0, 3)
+    .map((n) => parseInt(n, 10) || 0);
+}
+function fwLessThan(a, b) {
+  const [a0, a1, a2] = parseFw(a), [b0, b1, b2] = parseFw(b);
+  if (a0 !== b0) return a0 < b0;
+  if (a1 !== b1) return a1 < b1;
+  return a2 < b2;
+}
+function checkGatewayFirmware(gwFw) {
+  // Only warn on a real, older release — skip 'dev'/unknown (major 0) to avoid
+  // false positives on developer builds.
+  const outdated = parseFw(gwFw)[0] > 0 && fwLessThan(gwFw, MIN_GW_FW);
+  showCard('fw-outdated', outdated);
+  if (outdated) setText('fw-cur', gwFw);
+}
+
 // Status text under the power-flow + the schedule-paused banner toggle.
 function setStatus(stateCode, schedulePaused, zentri) {
   const info = (zentri && HERO_STATES_ZENTRI[stateCode]) || HERO_STATES[stateCode];
@@ -462,6 +486,10 @@ async function refresh() {
   let chargerName = '--';
   if (status.ok) {
     const s = status.body;
+    // Firmware compatibility (3rd axis: gateway firmware <-> add-on). Warn when
+    // the gateway is older than the fields this add-on reads. 'dev'/unknown
+    // builds and 3.x+ are left alone; only a real, older release warns.
+    checkGatewayFirmware(s.gw_fw);
     chargerName = s.dev_name || '--';
     setText('charger-name', s.dev_name);
     setText('charger-fw', s.chg_app_fw);
