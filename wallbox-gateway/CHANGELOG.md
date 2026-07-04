@@ -4,6 +4,17 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.44.0] - 2026-07-04
+
+### Fixed
+- **Weekly heatmap now matches the gateway's.** The add-on heatmap was built
+  from the cached per-session list and mapped to charge-log intervals, so any
+  interval whose session read had failed/returned 0 was dropped and the grid
+  diverged from the gateway's. It now builds **directly from the firmware
+  charge-log** — the same source and placement (each interval at its start over
+  its duration, in the charger's timezone) the gateway's own `/sessions` heatmap
+  uses — so the two are identical. Verified cell-for-cell against the charge-log.
+
 ## [0.43.0] - 2026-07-04
 
 ### Fixed

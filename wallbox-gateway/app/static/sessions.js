@@ -512,24 +512,41 @@ function buildHeatmap() {
   const hm = $('heatmap'); if (!hm) return;
   const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
   let max = 0;
-  _sessions.forEach((s) => {
-    const wh = _sessionWh(s);
-    if (!s.ts || !wh) return;
-    const totalKwh = wh / 1000;
-    const step = 300;
-    // Place energy in the REAL charge window(s), not at plug-in time.
-    _chargeSegments(s).forEach((seg) => {
-      const n = Math.max(1, Math.ceil(seg.dur / step));
-      const per = (totalKwh * seg.frac) / n;
-      for (let i = 0; i < n; i++) {
-        const t = seg.start + i * step;
-        if (t >= seg.start + seg.dur) break;
-        const { day, hour } = tzDayHour(t);
-        grid[day][hour] += per;
-        if (grid[day][hour] > max) max = grid[day][hour];
-      }
+  const step = 300;
+  // Spread `kwh` across [ts, ts+dur] in `step`-second buckets, binned by
+  // day/hour in the charger's timezone.
+  const place = (ts, dur, kwh) => {
+    const span = dur || 3600;
+    const n = Math.max(1, Math.ceil(span / step));
+    const per = kwh / n;
+    for (let i = 0; i < n; i++) {
+      const t = ts + i * step;
+      if (t >= ts + span) break;
+      const { day, hour } = tzDayHour(t);
+      grid[day][hour] += per;
+      if (grid[day][hour] > max) max = grid[day][hour];
+    }
+  };
+  if (_chargeLog && _chargeLog.length) {
+    // Ground truth: place each firmware charge-log interval directly, exactly
+    // as the gateway's own /sessions heatmap does (id 'cl'+start). Iterating the
+    // SAME source with the SAME placement is what keeps the two heatmaps
+    // identical — going via cached r_ses sessions dropped intervals whose
+    // per-session r_log read failed / returned 0, so the grids diverged.
+    _chargeLog.forEach((iv) => {
+      const wh = iv.wh || 0;
+      if (!wh) return;
+      place(iv.start, Math.max(60, (iv.stop || iv.start) - iv.start), wh / 1000);
     });
-  });
+  } else {
+    // No firmware charge-log (older gateway) — fall back to the session cache,
+    // placing energy in the real/inferred charge window.
+    _sessions.forEach((s) => {
+      const wh = _sessionWh(s);
+      if (!s.ts || !wh) return;
+      _chargeSegments(s).forEach((seg) => place(seg.start, seg.dur, (wh / 1000) * seg.frac));
+    });
+  }
   hm.textContent = '';
   const cell = (cls, text, title) => {
     const e = document.createElement('div');
