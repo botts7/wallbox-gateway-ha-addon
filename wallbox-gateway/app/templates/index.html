@@ -7,11 +7,13 @@
 <link rel="stylesheet" href="static/style.css">
 <script src="static/gw.js"></script>
 </head>
-<body>
+<body class="page-dashboard">
 
 <header>
   <h1>Wallbox Gateway</h1>
   <span id="gw-ip"></span>
+  <button type="button" id="cards-customize" class="cards-cust-btn"
+          title="Show, hide &amp; reorder cards">&#x2699;&#xFE0F;<span class="cards-cust-txt">&nbsp;Cards</span></button>
 </header>
 
 <nav class="topnav">
@@ -23,6 +25,8 @@
 </nav>
 
 <main>
+
+  <!-- ===== System alerts + banners (always pinned above the card deck) ===== -->
 
   <section id="not-configured" class="card warn" hidden>
     <h2>Gateway not configured</h2>
@@ -70,12 +74,48 @@
     </div>
   </section>
 
+  <!-- Schedule paused banner: shows when r_dat.gen != 0 (manual
+       override of schedule / Eco Smart). The Resume button calls
+       /api/command?action=resume which fires s_cmode {"mode":0}. -->
+  <section class="banner banner-warn" id="paused-banner" style="display:none">
+    <span class="banner-icon">&#x23F8;&#xFE0F;</span>
+    <div class="banner-body">
+      <strong>Schedules &amp; Eco Smart paused</strong>
+      <span class="banner-detail">Manual override is active.</span>
+    </div>
+    <button type="button" class="banner-action" id="btn-resume">&#x25B6;&#xFE0F; Resume</button>
+  </section>
+
+  <!-- Charge reminder (#127): next scheduled charge + plug-in nudge.
+       Driven by /api/status next_scheduled_charge + plug_reminder, both
+       gateway-computed. Switches to banner-warn when not plugged in. -->
+  <section class="banner" id="charge-reminder" style="display:none">
+    <span class="banner-icon" id="charge-reminder-icon">&#x1F5D3;&#xFE0F;</span>
+    <div class="banner-body">
+      <strong id="charge-reminder-title">Next scheduled charge</strong>
+      <span class="banner-detail" id="charge-reminder-detail"></span>
+    </div>
+  </section>
+
+  <!-- Charging-now banner (#141): driven by /api/status charging_now, set by
+       the firmware's live charge-interval tracker (cp>0). -->
+  <section class="banner banner-charging" id="charging-banner" style="display:none">
+    <span class="banner-icon">&#x26A1;</span>
+    <div class="banner-body">
+      <strong id="charging-title">Charging now</strong>
+      <span class="banner-detail" id="charging-detail"></span>
+    </div>
+  </section>
+
+  <!-- ===== Card deck: user-reorderable / hideable (see cards.js) ===== -->
+  <div id="card-deck">
+
   <!-- Energy flow: Solar + Grid -> Vehicle, HA-style. Per-source kWh come from
        the gateway's r_lse feed (green_energy / grid_energy / charged_energy);
        live rate from charging_power. Solar line lights only when this session
        drew solar; Grid line is the default source. Vehicle node swaps to
        "Plug in" when no car is connected. -->
-  <section class="card pf-card" id="card-powerflow">
+  <section class="card pf-card" id="card-powerflow" data-card="energy-flow">
     <div class="pf-head"><span class="pf-head-icon">&#x26A1;</span><span>Energy flow</span></div>
     <svg viewBox="0 0 320 192" class="pf-svg" role="img" aria-label="Live energy flow: Solar and Grid to Vehicle">
       <!-- static guide paths -->
@@ -114,41 +154,8 @@
     <div class="pf-session-row" id="pf-lastburst-row" hidden><span>Last charge burst</span><span id="pf-lastburst">--</span></div>
   </section>
 
-  <!-- Schedule paused banner: shows when r_dat.gen != 0 (manual
-       override of schedule / Eco Smart). The Resume button calls
-       /api/command?action=resume which fires s_cmode {"mode":0}. -->
-  <section class="banner banner-warn" id="paused-banner" style="display:none">
-    <span class="banner-icon">&#x23F8;&#xFE0F;</span>
-    <div class="banner-body">
-      <strong>Schedules &amp; Eco Smart paused</strong>
-      <span class="banner-detail">Manual override is active.</span>
-    </div>
-    <button type="button" class="banner-action" id="btn-resume">&#x25B6;&#xFE0F; Resume</button>
-  </section>
-
-  <!-- Charge reminder (#127): next scheduled charge + plug-in nudge.
-       Driven by /api/status next_scheduled_charge + plug_reminder, both
-       gateway-computed. Switches to banner-warn when not plugged in. -->
-  <section class="banner" id="charge-reminder" style="display:none">
-    <span class="banner-icon" id="charge-reminder-icon">&#x1F5D3;&#xFE0F;</span>
-    <div class="banner-body">
-      <strong id="charge-reminder-title">Next scheduled charge</strong>
-      <span class="banner-detail" id="charge-reminder-detail"></span>
-    </div>
-  </section>
-
-  <!-- Charging-now banner (#141): driven by /api/status charging_now, set by
-       the firmware's live charge-interval tracker (cp>0). -->
-  <section class="banner banner-charging" id="charging-banner" style="display:none">
-    <span class="banner-icon">&#x26A1;</span>
-    <div class="banner-body">
-      <strong id="charging-title">Charging now</strong>
-      <span class="banner-detail" id="charging-detail"></span>
-    </div>
-  </section>
-
   <!-- Controls: charge start/stop, lock/unlock, max current -->
-  <section class="card controls">
+  <section class="card controls" id="controls-card" data-card="controls">
     <h2>Controls</h2>
     <div class="ctrl-row">
       <button id="btn-start" class="ctrl-btn ctrl-success" onclick="sendCmd('start', this)">&#x25B6; Start</button>
@@ -168,7 +175,7 @@
 
   <!-- Halo LED: standby (dim-when-idle) + brightness. Hidden until the
        charger's g_halocfg read succeeds. -->
-  <section class="card controls" id="halo-card" hidden>
+  <section class="card controls" id="halo-card" data-card="halo" hidden>
     <h2>&#x1F4A1; Halo LED</h2>
     <div class="ctrl-slider">
       <label class="ctrl-toggle-row" for="halo-standby">
@@ -186,7 +193,7 @@
   </section>
 
   <!-- Quick-stats grid: live session telemetry -->
-  <section class="grid">
+  <section class="grid" id="stats-card" data-card="stats">
     <div class="stat">
       <div class="stat-label">Session</div>
       <div class="stat-value"><span id="stat-energy">--</span><span class="unit">kWh</span></div>
@@ -218,7 +225,7 @@
   <!-- Charging savings: the value of letting the assistant time-shift charging
        into cheaper hours + use solar. An estimate vs a configurable baseline —
        never shown as a guarantee. Hidden until a tariff is set. -->
-  <section class="card sv-card" id="savings-card" hidden>
+  <section class="card sv-card" id="savings-card" data-card="savings" hidden>
     <div class="sv-head">
       <h2>&#x1F4B0; Charging savings</h2>
       <span class="sv-pill" id="sv-baseline-pill"></span>
@@ -294,7 +301,7 @@
        (api/ha/config) and renders it with the shared ca_summary module. Hidden
        when the bridge / integration isn't available. Edit jumps to the
        Assistant page, where the existing setup is loaded for editing. -->
-  <section class="card asst-card" id="assistant-card" hidden>
+  <section class="card asst-card" id="assistant-card" data-card="assistant" hidden>
     <div class="asst-head">
       <h2>&#x1F916; Charge Assistant</h2>
       <span class="asst-badge" id="assistant-mode">Off</span>
@@ -304,7 +311,7 @@
   </section>
 
   <!-- Connection health -->
-  <section class="card">
+  <section class="card" id="connections-card" data-card="connections">
     <h2>Connections</h2>
     <div class="conn-row">
       <span class="conn-dot" id="dot-ble"></span>
@@ -327,7 +334,7 @@
   </section>
 
   <!-- Gateway / charger metadata -->
-  <section class="card">
+  <section class="card" id="deviceinfo-card" data-card="device-info">
     <h2>Device info</h2>
     <dl>
       <dt>Charger</dt><dd id="charger-name">--</dd>
@@ -340,7 +347,7 @@
   </section>
 
   <!-- Diagnostics (reconnect counters, less prominent) -->
-  <section class="card">
+  <section class="card" id="reconnect-card" data-card="reconnect">
     <h2>Reconnect counters</h2>
     <dl>
       <dt>BLE</dt><dd id="ble-reconn">--</dd>
@@ -351,7 +358,7 @@
 
   <!-- Charge schedules: create / edit / delete via the gateway BAPI
        (s_sch insert-or-update, clr_sch delete) proxied through /api/sched. -->
-  <section class="card" id="sched-card">
+  <section class="card" id="sched-card" data-card="schedules">
     <h2>Charge schedules</h2>
     <!-- Weekly timeline: 7 days x 24h, coloured by which schedule covers each
          hour (matches the gateway dashboard). Hidden when no schedules. -->
@@ -381,6 +388,8 @@
     <div id="sched-toast" class="ctrl-toast" hidden></div>
   </section>
 
+  </div><!-- /#card-deck -->
+
   <!-- OTA call-to-action -->
   <a href="ota" class="cta-link">⬆ Upload firmware (OTA)</a>
 
@@ -394,6 +403,7 @@
 
 <script src="static/cost.js"></script>
 <script src="static/ca_summary.js"></script>
+<script src="static/cards.js"></script>
 <script src="static/dashboard.js"></script>
 </body>
 </html>

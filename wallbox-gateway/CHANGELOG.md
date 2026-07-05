@@ -4,6 +4,25 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.46.0] - 2026-07-05
+
+### Added
+- **Customizable dashboard cards.** A new **⚙️ Cards** button (top-right of the
+  dashboard) opens a panel to **show/hide** each card and **drag to reorder**
+  them — Energy flow, Controls, Halo LED, Quick stats, Charging savings, Charge
+  Assistant, Connections, Device info, Reconnect counters and Charge schedules.
+  Your arrangement is saved in the browser (per device); **Reset to default**
+  restores the original layout. Cards your charger doesn't provide (no meter,
+  no Halo, integration not linked) are tagged *unavailable* and stay hidden
+  until they're available. System alerts/banners are pinned above the deck.
+
+## [0.45.0] - 2026-07-04
+
+### Added
+- **Solar-charging parity with the integration** on the Charge Assistant page:
+  the *use native Eco-Smart* toggle and the *when a managed charge finishes*
+  resume-mode select on the Solar / Smart + Solar steps.
+
 ## [0.44.0] - 2026-07-04
 
 ### Fixed
