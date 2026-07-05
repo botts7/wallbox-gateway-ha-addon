@@ -61,6 +61,7 @@
     surplus_start: "surplus_start",
     surplus_stop: "surplus_stop",
     surplus_debounce_min: "surplus_debounce_min",
+    resume_eco_mode: "resume_eco_mode",
     notify_service_s: "notify_service",
     // solar — dynamic current (Phase 2)
     min_current_a: "min_current_a",
@@ -82,6 +83,7 @@
     load_entity_ss: "load_entity",
     surplus_start_ss: "surplus_start",
     solar_max_soc: "solar_max_soc",
+    resume_eco_mode_ss: "resume_eco_mode",
     notify_service_ss: "notify_service",
   };
   const CHECKS = {
@@ -93,6 +95,8 @@
     solar_dynamic: "solar_dynamic",
     grid_export_negative: "grid_export_negative",
     grid_export_negative_ss: "grid_export_negative",
+    solar_use_native: "solar_use_native",
+    solar_use_native_ss: "solar_use_native",
   };
   const NUM_KEYS = new Set([
     "lead_hours", "tariff_below", "skip_above_pct", "soc_max_age_min",
@@ -124,12 +128,14 @@
       "surplus_start", "surplus_stop", "surplus_debounce_min", "notify_service",
       "solar_dynamic", "min_current_a", "max_current_a", "supply_voltage",
       "supply_phases", "load_limit_w", "load_power_entity",
+      "solar_use_native", "resume_eco_mode",
     ],
     smart_solar: [
       "soc_entity", "target_soc_pct", "departure_time", "battery_kwh",
       "charge_power_kw", "surplus_source", "surplus_entity", "grid_entity",
       "grid_export_negative", "solar_entity", "load_entity", "surplus_start",
       "solar_max_soc", "notify_service",
+      "solar_use_native", "resume_eco_mode",
     ],
     off: [],
   };
@@ -178,10 +184,12 @@
     solar: {
       surplus_start: 1.4, surplus_stop: 0.4, surplus_debounce_min: 3,
       min_current_a: 6, max_current_a: 32, supply_voltage: 230, supply_phases: 1,
+      solar_use_native: true, resume_eco_mode: "keep",
     },
     smart_solar: {
       target_soc_pct: 80, battery_kwh: 60, charge_power_kw: 7.4, surplus_start: 1.4,
       solar_max_soc: 100,
+      solar_use_native: true, resume_eco_mode: "keep",
     },
   };
   const OWNER_NAMES = {
@@ -551,6 +559,8 @@
     supply_phases: "Number of phases — used to convert surplus power to amps.",
     load_limit_w: "Trim charge current so total house draw stays under this (0 = off).",
     load_power_entity: "House/grid power sensor for the load limit (else the charger's own meter is used).",
+    solar_use_native: "When your charger has a built-in Eco-Smart (Full Green / Eco Smart) solar feature, let it follow the sun itself instead of Home Assistant driving start/stop. Turn off to force HA emulation (HA modulates the charge current to follow your surplus).",
+    resume_eco_mode: "After a managed charge ends, hand back to the charger's native mode. 'Leave as set' keeps whatever mode it was in; the others force that Eco-Smart mode.",
     notify_service_s: "HA notify service(s) for solar charge start/stop alerts. Optional.",
     poll_interval: "How often the integration reads the gateway (5–300 s).",
     window_enabled: "Only let the assistant charge during a set window — e.g. midnight–6am — so it never runs when power is expensive.",
@@ -743,6 +753,13 @@
     if ($("surplus_source_ss") && !$("surplus_source_ss").value) $("surplus_source_ss").value = "entity";
     if ($("grid_export_negative_ss")) $("grid_export_negative_ss").checked = ca.grid_export_negative !== false;
     toggleSurplusSourceSS();
+    // Native Eco-Smart preference (default ON) + resume-mode (default "keep"),
+    // in both Solar and Smart+Solar sections. Mirrors the default-on
+    // grid_export_negative checkbox and the surplus_source select defaulting.
+    $("solar_use_native").checked = ca.solar_use_native !== false;
+    if ($("solar_use_native_ss")) $("solar_use_native_ss").checked = ca.solar_use_native !== false;
+    if (!$("resume_eco_mode").value) $("resume_eco_mode").value = "keep";
+    if ($("resume_eco_mode_ss") && !$("resume_eco_mode_ss").value) $("resume_eco_mode_ss").value = "keep";
     // Auto-start grace + charging window (shared acting-mode card).
     if ($("autostart_grace_min")) $("autostart_grace_min").value = ca.autostart_grace_min || 0;
     Object.entries(WINDOW_FIELDS).forEach(([fid, key]) => {

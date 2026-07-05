@@ -652,6 +652,21 @@
             <div class="ca-input-suffix"><input type="number" id="surplus_debounce_min" min="0" placeholder="3"><span>min</span></div>
           </div>
         </div>
+        <label class="ca-check"><input type="checkbox" id="solar_use_native" checked> <span>Use the charger's built-in Eco-Smart when available</span></label>
+        <div class="ca-hint">When your charger has a built-in Eco-Smart (Full Green / Eco Smart) solar
+           feature, let it follow the sun itself instead of Home Assistant driving start/stop. Turn
+           off to force HA emulation (HA modulates the charge current to follow your surplus).</div>
+        <div class="ca-field">
+          <label>When the assistant finishes, return the charger to</label>
+          <select id="resume_eco_mode">
+            <option value="keep">Leave as set</option>
+            <option value="full_green">Full Green (solar only)</option>
+            <option value="eco_smart">Eco Smart (solar + grid)</option>
+            <option value="disabled">Disabled</option>
+          </select>
+          <div class="ca-hint">After a managed charge ends, hand back to the charger's native mode.
+             'Leave as set' keeps whatever mode it was in; the others force that Eco-Smart mode.</div>
+        </div>
       </div>
     </section>
 
@@ -838,6 +853,21 @@
           <label>Start at/above</label>
           <input type="number" id="surplus_start_ss" step="0.1" placeholder="1.4">
           <div class="ca-hint">Charge from solar once surplus rises to this (your sensor's units).</div>
+        </div>
+        <label class="ca-check"><input type="checkbox" id="solar_use_native_ss" checked> <span>Use the charger's built-in Eco-Smart when available</span></label>
+        <div class="ca-hint">When your charger has a built-in Eco-Smart (Full Green / Eco Smart) solar
+           feature, let it follow the sun itself instead of Home Assistant driving start/stop. Turn
+           off to force HA emulation (HA modulates the charge current to follow your surplus).</div>
+        <div class="ca-field">
+          <label>When the assistant finishes, return the charger to</label>
+          <select id="resume_eco_mode_ss">
+            <option value="keep">Leave as set</option>
+            <option value="full_green">Full Green (solar only)</option>
+            <option value="eco_smart">Eco Smart (solar + grid)</option>
+            <option value="disabled">Disabled</option>
+          </select>
+          <div class="ca-hint">After a managed charge ends, hand back to the charger's native mode.
+             'Leave as set' keeps whatever mode it was in; the others force that Eco-Smart mode.</div>
         </div>
       </div>
     </section>

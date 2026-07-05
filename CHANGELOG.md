@@ -4,6 +4,20 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.45.0] - 2026-07-05
+
+### Added
+
+- **Charge Assistant · native Eco-Smart controls** (Solar and Smart + Solar
+  modes) — matching two new integration options:
+  - **"Use the charger's built-in Eco-Smart when available"** (default on):
+    when the charger has a native Full Green / Eco Smart solar feature, let it
+    follow the sun itself instead of Home Assistant driving start/stop. Turn
+    off to force HA emulation (HA modulates charge current to follow surplus).
+  - **"When the assistant finishes, return the charger to"** — hand back to a
+    native mode after a managed charge ends: *Leave as set* (default),
+    *Full Green*, *Eco Smart*, or *Disabled*.
+
 ## [0.21.0] - 2026-06-20
 
 The cost-accuracy + charge-log release. The Add-on now bills charging
