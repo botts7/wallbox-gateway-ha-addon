@@ -1056,6 +1056,19 @@
       <div class="ca-hint">A manual start pauses Eco-Smart / your schedule. When the charge
          stops and the charger is left paused + idle, the integration clears the override so
          the charger's own Solar + schedule control resumes — no need to tap “Resume schedule”.</div>
+      <div class="ca-field">
+        <label>When the Assistant/Add-on stops controlling, return the charger to</label>
+        <select id="release_default">
+          <option value="keep">Leave as-is (default)</option>
+          <option value="stop">Stop charging (idle until something starts it)</option>
+          <option value="resume_schedule">Resume the charger's own schedule</option>
+          <option value="resume_eco">Resume Eco-Smart / Solar</option>
+        </select>
+        <div class="ca-hint">If the integration/add-on has been controlling charging and then
+           isn't (a mode was turned off, or a stray start left it running), hand the charger back to
+           this default so it's never left charging with nothing managing it. Only affects charges the
+           add-on owned — your own manual starts are never touched.</div>
+      </div>
     </div>
   </details>
 

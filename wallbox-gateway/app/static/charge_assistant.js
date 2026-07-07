@@ -668,6 +668,8 @@
     if (pi) pi.value = opts.poll_interval == null ? "" : opts.poll_interval;
     const ar = $("auto_resume_eco");
     if (ar) ar.checked = opts.auto_resume_eco !== false;   // default on
+    const rd = $("release_default");
+    if (rd) rd.value = opts.release_default || "keep";     // top-level: handback default
     applyConfig(ca);
     $("ca-form").hidden = false;
     $("ca-actionbar").hidden = false;
@@ -1440,6 +1442,8 @@
     }
     const ar = $("auto_resume_eco");
     if (ar) options.auto_resume_eco = !!ar.checked;   // top-level option (default on)
+    const rd = $("release_default");
+    if (rd) options.release_default = rd.value;       // top-level: handback default
     const payload = { options };
     if (host) payload.host = host;
     const r = await fetchJSON("api/ha/config", {

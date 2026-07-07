@@ -4,6 +4,17 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.47.0] - 2026-07-07
+
+### Added
+- **Charge Assistant → "When the Assistant/Add-on stops controlling, return the
+  charger to"** — a dropdown to choose what the charger does once the
+  integration/add-on has been the control owner but is no longer managing
+  charging (a mode was turned off, or a stray start left it running): *Leave
+  as-is* (default), *Stop charging*, *Resume the charger's own schedule*, or
+  *Resume Eco-Smart / Solar*. Only affects charges the add-on owned — your own
+  manual starts are never touched. (Needs integration ≥ 0.24.0.)
+
 ## [0.46.0] - 2026-07-05
 
 ### Added
