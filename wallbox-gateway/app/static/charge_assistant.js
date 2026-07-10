@@ -51,6 +51,8 @@
     commute_source: "commute_source",
     commute_odometer_entity: "commute_odometer_entity",
     commute_efficiency: "commute_efficiency",
+    commute_efficiency_source: "commute_efficiency_source",
+    commute_efficiency_entity: "commute_efficiency_entity",
     unknown_car: "unknown_car",
     notify_service_t: "notify_service",
     // solar
@@ -536,7 +538,9 @@
     commute_window_days: "How many days of charge history to average your daily use over.",
     commute_source: "Where daily use comes from. Charger energy needs no car integration. Odometer/SOC read your car integration's history — distance-true and they still count driving when you charge somewhere else.",
     commute_odometer_entity: "A total-distance (km) sensor from your car integration.",
+    commute_efficiency_source: "How the km→energy efficiency is set. Auto learns your real kWh/100km from odometer distance vs battery-level drops (self-calibrating); Fixed uses a set number; Sensor reads a consumption entity.",
     commute_efficiency: "Your car's real-world consumption — turns km/day into energy/day.",
+    commute_efficiency_entity: "A consumption/efficiency sensor from your car integration (kWh/100km).",
     departure_time: "Be ready by this time — charging starts just-in-time to reach target by then.",
     battery_kwh: "Battery capacity, used to estimate how long charging takes.",
     charge_power_kw: "Typical charge power, used to estimate charging duration.",
@@ -691,7 +695,8 @@
     if (sel && owner) sel.value = owner;
     // Capability gating: the original Zentri Pulsar can't do live current
     // control over BLE — disable dynamic-current for it.
-    applyCapabilities(r.ok && r.body ? !!r.body.zentri : false);
+    applyCapabilities(r.ok && r.body ? !!r.body.zentri : false,
+                      r.ok && r.body ? r.body.meter : undefined);
     updateOwnerWarn();
     updateSummary();
   }
@@ -714,7 +719,7 @@
     return false;
   }
 
-  function applyCapabilities(isZentri) {
+  function applyCapabilities(isZentri, hasMeter) {
     const warn = $("ca-dyn-warn");
     const dyn = $("solar_dynamic");
     if (warn) warn.hidden = !isZentri;
@@ -724,6 +729,15 @@
     } else if (dyn) {
       dyn.disabled = false;
     }
+    // No Power-Boost meter → no Eco-Smart / solar to restore, so grey out the
+    // "restore which Eco-Smart mode" pickers (the server already no-ops the
+    // restore without Eco-Smart). Missing/unknown meter → leave enabled.
+    ["resume_eco_mode", "resume_eco_mode_ss"].forEach((id) => {
+      const el = $(id);
+      if (!el) return;
+      if (hasMeter === false) { el.value = "keep"; el.disabled = true; }
+      else { el.disabled = false; }
+    });
   }
 
   function applyConfig(ca) {
@@ -765,6 +779,9 @@
     if ($("solar_use_native_ss")) $("solar_use_native_ss").checked = ca.solar_use_native !== false;
     if (!$("resume_eco_mode").value) $("resume_eco_mode").value = "keep";
     if ($("resume_eco_mode_ss") && !$("resume_eco_mode_ss").value) $("resume_eco_mode_ss").value = "keep";
+    // Efficiency source defaults to Auto (matches the integration default when
+    // odometer + SOC + battery are all set).
+    if ($("commute_efficiency_source") && !$("commute_efficiency_source").value) $("commute_efficiency_source").value = "auto";
     // Auto-start grace + charging window (shared acting-mode card).
     if ($("autostart_grace_min")) $("autostart_grace_min").value = ca.autostart_grace_min || 0;
     Object.entries(WINDOW_FIELDS).forEach(([fid, key]) => {
@@ -1083,6 +1100,15 @@
     const soc = $("commute-soc-hint");
     if (odo) odo.hidden = src !== "odometer";
     if (soc) soc.hidden = src !== "soc";
+    toggleCommuteEfficiency();
+  }
+
+  function toggleCommuteEfficiency() {
+    const es = ($("commute_efficiency_source") || {}).value || "auto";
+    const fx = $("commute-eff-fixed-wrap");
+    const sn = $("commute-eff-sensor-wrap");
+    if (fx) fx.hidden = es !== "fixed";
+    if (sn) sn.hidden = es !== "sensor";
   }
 
   // ── Vehicles (multi-car) ─────────────────────────────────────────────
@@ -1364,7 +1390,8 @@
       const uc = $("unknown_car");
       if (uc && uc.value) ca.unknown_car = uc.value;         // multi-car safety policy
       if ($("commute_enabled")) ca.commute_enabled = !!$("commute_enabled").checked;
-      ["commute_source", "commute_odometer_entity"].forEach((fid) => {
+      ["commute_source", "commute_odometer_entity",
+       "commute_efficiency_source", "commute_efficiency_entity"].forEach((fid) => {
         const el = $(fid); if (el && el.value) ca[fid] = el.value;
       });
       ["commute_reserve_pct", "commute_margin_pct", "commute_cover_days",
@@ -1559,6 +1586,7 @@
     $("cheapest_window").addEventListener("change", () => { toggleCheapest(); updateSummary(); });
     $("commute_enabled").addEventListener("change", () => { toggleCommute(); updateSummary(); });
     $("commute_source").addEventListener("change", () => { toggleCommuteSource(); updateSummary(); });
+    if ($("commute_efficiency_source")) $("commute_efficiency_source").addEventListener("change", () => { toggleCommuteEfficiency(); updateSummary(); });
     $("car-add").addEventListener("click", () => { addCarRow(); updateSummary(); });
     $("surplus_source").addEventListener("change", () => { toggleSurplusSource(); updateSummary(); });
     const sss = $("surplus_source_ss");

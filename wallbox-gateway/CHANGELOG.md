@@ -4,6 +4,18 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.50.0] - 2026-07-10
+
+### Added
+- **Commute efficiency source picker** (Charge Assistant, odometer learning):
+  choose **Auto** (default — learns your real kWh/100km from odometer distance
+  vs battery-level drops, self-calibrating), **Fixed** (a set number), or
+  **Sensor** (read a consumption entity). Requires integration 0.28.0+.
+
+### Changed
+- The "restore which Eco-Smart mode" pickers are now greyed out when the charger
+  has no Power-Boost meter (no solar/Eco-Smart to restore).
+
 ## [0.49.0] - 2026-07-10
 
 ### Added

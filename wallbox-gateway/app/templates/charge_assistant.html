@@ -503,8 +503,22 @@
             </div>
             <div class="ca-field">
               <label>Efficiency</label>
-              <div class="ca-input-suffix"><input type="number" id="commute_efficiency" min="5" max="50" step="0.5" placeholder="18"><span>kWh/100km</span></div>
-              <div class="ca-hint">Used to turn km/day into energy/day.</div>
+              <select id="commute_efficiency_source">
+                <option value="auto">Auto — learn it from your driving</option>
+                <option value="fixed">Fixed value</option>
+                <option value="sensor">From a sensor</option>
+              </select>
+              <div class="ca-hint">Turns km/day into energy/day. <b>Auto</b> self-calibrates from odometer distance vs battery-level drops; <b>Fixed</b> uses a set number; <b>Sensor</b> reads a consumption entity.</div>
+              <div class="ca-indent" id="commute-eff-fixed-wrap" hidden>
+                <div class="ca-input-suffix"><input type="number" id="commute_efficiency" min="5" max="50" step="0.5" placeholder="18"><span>kWh/100km</span></div>
+              </div>
+              <div class="ca-field ca-indent" id="commute-eff-sensor-wrap" hidden>
+                <div class="ca-picker">
+                  <select id="commute_efficiency_entity" data-domains="sensor"></select>
+                  <span class="ca-live" data-live-for="commute_efficiency_entity">&mdash;</span>
+                </div>
+                <div class="ca-hint">A consumption / efficiency sensor (kWh/100km).</div>
+              </div>
             </div>
           </div>
           <div class="ca-hint ca-indent" id="commute-soc-hint" hidden>Uses the
