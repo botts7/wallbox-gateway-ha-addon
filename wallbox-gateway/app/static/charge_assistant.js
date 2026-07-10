@@ -735,7 +735,10 @@
     ["resume_eco_mode", "resume_eco_mode_ss"].forEach((id) => {
       const el = $(id);
       if (!el) return;
-      if (hasMeter === false) { el.value = "keep"; el.disabled = true; }
+      // Grey it out on a no-meter charger, but DON'T overwrite the saved value —
+      // a disabled <select> still reports .value on save, so forcing "keep" here
+      // would silently erase the user's stored choice.
+      if (hasMeter === false) { el.disabled = true; }
       else { el.disabled = false; }
     });
   }
@@ -781,7 +784,9 @@
     if ($("resume_eco_mode_ss") && !$("resume_eco_mode_ss").value) $("resume_eco_mode_ss").value = "keep";
     // Efficiency source defaults to Auto (matches the integration default when
     // odometer + SOC + battery are all set).
-    if ($("commute_efficiency_source") && !$("commute_efficiency_source").value) $("commute_efficiency_source").value = "auto";
+    // Backward-compat: an install that already has a fixed efficiency stays on
+    // Fixed (don't silently switch it to auto-learning); Auto only for new configs.
+    if ($("commute_efficiency_source") && !$("commute_efficiency_source").value) $("commute_efficiency_source").value = (ca.commute_efficiency != null && ca.commute_efficiency !== "") ? "fixed" : "auto";
     // Auto-start grace + charging window (shared acting-mode card).
     if ($("autostart_grace_min")) $("autostart_grace_min").value = ca.autostart_grace_min || 0;
     Object.entries(WINDOW_FIELDS).forEach(([fid, key]) => {
@@ -977,8 +982,15 @@
         const d = cover === "1" ? "a day's" : `${cover} days'`;
         const src = ($("commute_source") || {}).value || "charger";
         const odo = $("commute_odometer_entity").value;
+        const esrc = ($("commute_efficiency_source") || {}).value || "auto";
+        const effEnt = $("commute_efficiency_entity") && $("commute_efficiency_entity").value;
+        const effPhrase = esrc === "auto"
+          ? " (efficiency learned from your driving)"
+          : esrc === "sensor"
+          ? (effEnt ? ` (efficiency from ${b(nameOf(effEnt))})` : "")
+          : ` (at ${b(($("commute_efficiency").value || "18") + " kWh/100km")})`;
         const srcPhrase = src === "odometer"
-          ? `from ${odo ? b(nameOf(odo)) : "your car's odometer"} (at ${b(($("commute_efficiency").value || "18") + " kWh/100km")})`
+          ? `from ${odo ? b(nameOf(odo)) : "your car's odometer"}${effPhrase}`
           : src === "soc"
           ? "from your car's battery-level drop"
           : "from charger energy used";
@@ -1390,12 +1402,16 @@
       const uc = $("unknown_car");
       if (uc && uc.value) ca.unknown_car = uc.value;         // multi-car safety policy
       if ($("commute_enabled")) ca.commute_enabled = !!$("commute_enabled").checked;
-      ["commute_source", "commute_odometer_entity",
-       "commute_efficiency_source", "commute_efficiency_entity"].forEach((fid) => {
+      const esrc = ($("commute_efficiency_source") || {}).value || "auto";
+      const strKeys = ["commute_source", "commute_odometer_entity", "commute_efficiency_source"];
+      if (esrc === "sensor") strKeys.push("commute_efficiency_entity");  // only relevant for sensor
+      strKeys.forEach((fid) => {
         const el = $(fid); if (el && el.value) ca[fid] = el.value;
       });
-      ["commute_reserve_pct", "commute_margin_pct", "commute_cover_days",
-       "commute_window_days", "commute_efficiency"].forEach((fid) => {
+      const numKeys = ["commute_reserve_pct", "commute_margin_pct", "commute_cover_days",
+                       "commute_window_days"];
+      if (esrc === "fixed") numKeys.push("commute_efficiency");          // only relevant for fixed
+      numKeys.forEach((fid) => {
         const el = $(fid);
         if (el && el.value !== "") { const n = Number(el.value); if (Number.isFinite(n)) ca[fid] = n; }
       });

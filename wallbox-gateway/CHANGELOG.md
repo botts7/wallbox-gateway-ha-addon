@@ -4,6 +4,21 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.51.0] - 2026-07-10
+
+### Fixed
+- **Efficiency source no longer silently switches existing users to Auto.** An
+  install that already has a fixed efficiency stays on **Fixed** on load; Auto is
+  the default only for a new config with no fixed value. (Matches integration
+  0.28.2.)
+- **No-meter grey-out no longer erases a saved Eco-Smart resume mode.** Greying
+  the `resume_eco_mode` pickers on a meter-less charger no longer forces them to
+  "keep" (a disabled select still saves its value, which was wiping the choice).
+- Commute summary now reflects the chosen efficiency source (learned / sensor /
+  fixed) instead of always citing the fixed kWh/100km.
+- Only the source-relevant efficiency key is saved (no stale
+  `commute_efficiency` / `commute_efficiency_entity` left behind on switch).
+
 ## [0.50.0] - 2026-07-10
 
 ### Added
