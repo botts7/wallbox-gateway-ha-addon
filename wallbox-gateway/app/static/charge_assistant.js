@@ -21,6 +21,7 @@
     lead_hours: "lead_hours",
     tariff_entity: "tariff_entity",
     tariff_below: "tariff_below",
+    solar_remind_kw: "solar_remind_kw",
     soc_entity: "soc_entity",
     skip_above_pct: "skip_above_pct",
     soc_max_age_min: "soc_max_age_min",
@@ -99,7 +100,7 @@
     solar_use_native_ss: "solar_use_native",
   };
   const NUM_KEYS = new Set([
-    "lead_hours", "tariff_below", "skip_above_pct", "soc_max_age_min",
+    "lead_hours", "tariff_below", "solar_remind_kw", "skip_above_pct", "soc_max_age_min",
     "scheduled_within_h", "escalate_min", "target_soc_pct", "battery_kwh",
     "charge_power_kw", "surplus_start", "surplus_stop", "surplus_debounce_min",
     "min_current_a", "max_current_a", "supply_voltage", "supply_phases",
@@ -112,7 +113,7 @@
   const MODE_KEYS = {
     reminder: [
       "triggers", "arrival_entity", "nightly_time", "lead_hours",
-      "tariff_entity", "tariff_below", "soc_entity", "skip_above_pct",
+      "tariff_entity", "tariff_below", "solar_remind_kw", "soc_entity", "skip_above_pct",
       "soc_max_age_min", "quiet_start", "quiet_end", "only_if_scheduled",
       "scheduled_within_h", "notify_service", "title", "tap_path", "message",
       "actionable", "escalate_min",
@@ -139,7 +140,7 @@
     ],
     off: [],
   };
-  const TRIGGERS = ["arrival", "nightly", "lead", "tariff"];
+  const TRIGGERS = ["arrival", "nightly", "lead", "tariff", "solar"];
 
   // Acting strategies drive charging (vs reminder which only notifies). The
   // shared "Charging window" card is shown for these. Window fields live in a
@@ -510,6 +511,8 @@
     "trig-tariff": "Remind me when the electricity price drops to/below a threshold.",
     tariff_entity: "A price sensor (e.g. Amber). The reminder fires when its value drops to your threshold.",
     tariff_below: "Notify when the price entity is at or below this value.",
+    "trig-solar": "Remind me to plug in when there's spare solar. Needs a surplus source set in the Solar settings; only fires while the car is unplugged.",
+    solar_remind_kw: "Nudge once surplus reaches this many kW. Blank uses your charge-start level (≈1.4 kW default).",
     soc_entity: "Your car's battery-level sensor. Used to skip reminders when already charged enough.",
     skip_above_pct: "Don't remind if the battery is already at/above this %.",
     soc_max_age_min: "Ignore the battery reading if it's older than this many minutes (stale data).",

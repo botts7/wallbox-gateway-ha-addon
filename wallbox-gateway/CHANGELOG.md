@@ -4,6 +4,16 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.49.0] - 2026-07-10
+
+### Added
+- **"Solar available" plug-in reminder trigger** in the Charge Assistant page.
+  The integration already supported a surplus-based "plug in for free solar"
+  nudge, but the primary Reminder-mode trigger list only exposed 4 of the 5
+  triggers — the solar one was missing, so it couldn't be enabled there. Added
+  the checkbox + surplus threshold (default ≈1.4 kW / your charge-start level).
+  Uses your configured surplus source and only fires while the car is unplugged.
+
 ## [0.48.0] - 2026-07-10
 
 ### Changed
