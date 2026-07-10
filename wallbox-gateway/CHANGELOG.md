@@ -4,6 +4,17 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.48.0] - 2026-07-10
+
+### Changed
+- Charge Assistant page: the "when the Assistant/Add-on stops controlling, return
+  the charger to" dropdown now defaults to **Resume Eco-Smart / Solar** (was
+  "Leave as-is"), matching the integration's new default. Option labels now make
+  the distinction clear — *Resume* hands the charger back to its own
+  schedule/solar (works even without solar — it just resumes the schedule),
+  while *Stop* halts the charge but leaves the charger idle/paused. Requires
+  integration 0.26.0+.
+
 ## [0.47.0] - 2026-07-07
 
 ### Added

@@ -669,7 +669,7 @@
     const ar = $("auto_resume_eco");
     if (ar) ar.checked = opts.auto_resume_eco !== false;   // default on
     const rd = $("release_default");
-    if (rd) rd.value = opts.release_default || "keep";     // top-level: handback default
+    if (rd) rd.value = opts.release_default || "resume_eco";  // top-level: handback default (hand back to charger's own schedule/solar)
     applyConfig(ca);
     $("ca-form").hidden = false;
     $("ca-actionbar").hidden = false;
