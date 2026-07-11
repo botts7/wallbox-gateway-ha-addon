@@ -4,6 +4,16 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.51.1] - 2026-07-11
+
+### Fixed
+- **"Schedules & Eco Smart paused" banner no longer false-triggers during solar
+  charging.** It was set from `r_dat.gen !== 0`, but `gen` isn't the override
+  flag on every charger — on the Pulsar MAX Pro it's accumulated green energy, so
+  the banner lit up whenever there was any solar and wouldn't clear on Resume. It
+  now reads the gateway's authoritative `schedule_paused` flag (firmware computes
+  it from `r_lse.control_mode == 1`, per-model). Requires gateway fw ≥ v3.2.0-rc.4.
+
 ## [0.51.0] - 2026-07-10
 
 ### Fixed

@@ -586,7 +586,11 @@ async function refresh() {
     const kw = (typeof st.cp === 'number') ? st.cp : null;
     const sessionKwh = (typeof st.en === 'number') ? st.en / 100 : null;
     const maxCur = (typeof st.cur === 'number') ? st.cur : null;
-    const schedulePaused = (typeof st.gen === 'number') && st.gen !== 0;
+    // Authoritative gateway flag (firmware computes it from r_lse.control_mode==1,
+    // per-model). st.gen is NOT the pause flag on every charger — on the MAX Pro
+    // it's accumulated green energy, so the old `st.gen !== 0` lit the banner
+    // during solar and never cleared on Resume.
+    const schedulePaused = !!(status.body && status.body.schedule_paused === true);
     setStatus(stateCode, schedulePaused, zentri);
     _pf.cp = kw;
     _pf.en = (typeof st.en === 'number') ? st.en : null;
