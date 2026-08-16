@@ -4,6 +4,22 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.52.0] - 2026-08-16
+
+### Added
+- **Feed-in / export tariff.** The tariff editor now has a "Feed-in / export
+  rate" field. Solar self-consumed for charging is valued *net* of this rate —
+  the export income you gave up by charging instead of exporting — so the solar
+  savings figure reflects the real benefit. Defaults to 0 (solar valued at the
+  full avoided-grid rate, unchanged). Works for flat and time-of-use tariffs.
+
+### Changed
+- **Savings now flow to Home Assistant.** The savings baseline you pick on the
+  dashboard is mirrored to the integration alongside the tariff, so the new HA
+  savings sensors (Charging savings 7-day/month, Solar savings, Off-peak
+  savings — integration v0.33.0) compare against the same counterfactual the
+  add-on shows. Requires integration v0.33.0+.
+
 ## [0.45.0] - 2026-07-05
 
 ### Added

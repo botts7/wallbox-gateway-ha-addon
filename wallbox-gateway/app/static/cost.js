@@ -292,8 +292,11 @@ window.WBCost = (function () {
       const bd = _sessionCost(t, bs);
       const kwh = (iv.wh || 0) / 1000;
       const shift = Math.max(0, _baselineCost(t, bs) - bd.total);
-      if (st >= weekAgo) { wkC += bd.total; wkK += kwh; wkSol += bd.saved || 0; wkSh += shift; }
-      if (st >= monthStart) { moC += bd.total; moK += kwh; moSol += bd.saved || 0; moSh += shift; }
+      // Solar value net of the feed-in/export rate: what we gave up by self-
+      // consuming instead of exporting. feedIn 0 -> gross avoided-grid value (#151).
+      const solar = Math.max(0, (bd.saved || 0) - (bd.green || 0) * (t.feedIn || 0));
+      if (st >= weekAgo) { wkC += bd.total; wkK += kwh; wkSol += solar; wkSh += shift; }
+      if (st >= monthStart) { moC += bd.total; moK += kwh; moSol += solar; moSh += shift; }
     });
     return {
       weekCost: wkC, monthCost: moC, weekKwh: wkK, monthKwh: moK,

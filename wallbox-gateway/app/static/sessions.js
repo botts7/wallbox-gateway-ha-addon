@@ -62,6 +62,11 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 function defaultTariff() {
   return {
     type: 'tou', currency: '$', provider: '', flatRate: 0.30,
+    // Feed-in / export rate (per kWh). Solar self-consumed for charging is
+    // valued net of the export income given up: green_kwh * (grid_rate -
+    // feedIn). 0 = no export tariff (solar valued at the full avoided grid
+    // rate). Rides into HA inside the mirrored tariff object (#151).
+    feedIn: 0,
     bands: DEFAULT_BANDS.map((b) => ({ ...b })),
     weekday: Array(24).fill('off'),
     weekend: Array(24).fill('off'),
@@ -361,9 +366,11 @@ function _summarizeFromLog(tariff) {
     const bd = _sessionCost(t, bs);
     const kwh = (iv.wh || 0) / 1000, green = bd.green || 0;
     const shift = Math.max(0, _baselineCost(t, bs) - bd.total);
-    if (st >= weekAgo) { wkCost += bd.total; wkK += kwh; wkSaved += bd.saved || 0; wkShift += shift; }
+    // Solar value net of the feed-in/export rate (#151). feedIn 0 -> gross.
+    const solar = Math.max(0, (bd.saved || 0) - green * (t.feedIn || 0));
+    if (st >= weekAgo) { wkCost += bd.total; wkK += kwh; wkSaved += solar; wkShift += shift; }
     if (st >= monthStart) {
-      moCost += bd.total; moK += kwh; moSaved += bd.saved || 0; moShift += shift;
+      moCost += bd.total; moK += kwh; moSaved += solar; moShift += shift;
       moGreen += green; moGrid += Math.max(0, kwh - green);
       for (const [k, v] of Object.entries(bd.byBand)) {
         monthBands[k] = monthBands[k] || { kwh: 0, cost: 0, name: v.name, color: v.color };
@@ -690,6 +697,7 @@ function openTariff() {
   if (!Array.isArray(_edit.seasons) || _edit.seasons.length < 2) _edit.seasons = defaultTariff().seasons;
   $('tm-provider').value = _edit.provider || '';
   $('tm-currency').value = _edit.currency || '$';
+  $('tm-feed-in').value = _edit.feedIn != null ? _edit.feedIn : '';
   $('tm-flat-rate').value = _edit.flatRate != null ? _edit.flatRate : '';
   document.querySelectorAll('input[name="tm-type"]').forEach((r) => { r.checked = (r.value === _edit.type); });
   $('tm-weekend-same').checked = !!_edit.weekendSame;
@@ -796,6 +804,7 @@ function cycleHour(which, h) {
 function saveTariffEdit() {
   _edit.provider = $('tm-provider').value.trim();
   _edit.currency = $('tm-currency').value.trim() || '$';
+  _edit.feedIn = parseFloat($('tm-feed-in').value) || 0;
   _edit.flatRate = parseFloat($('tm-flat-rate').value) || 0;
   _edit.weekendSame = $('tm-weekend-same').checked;
   _edit.seasonal = $('tm-seasonal').checked;
