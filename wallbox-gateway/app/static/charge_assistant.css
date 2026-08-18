@@ -372,7 +372,9 @@
   background: var(--bg, #0f1218);
   transition: border-color .14s, background .14s;
 }
-.ca-trigger.on { border-color: rgba(59,130,246,.45); background: var(--ca-accent-soft); }
+/* Enabled trigger: keep the panel dark (consistent with the others) and show it
+   is on with just an accent border — not a full blue fill. */
+.ca-trigger.on { border-color: var(--ca-accent); background: var(--bg, #0f1218); }
 .ca-trigger .ca-trigger-body {
   margin-top: 12px; display: flex; flex-direction: column; gap: 12px;
   border-top: 1px dashed var(--border, #2a2f3a); padding-top: 12px;

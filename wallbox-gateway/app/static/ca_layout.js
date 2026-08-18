@@ -92,6 +92,7 @@
     sizeSpacer();                                   // card grew — refresh scroll room
     links.forEach(function (l) { l.classList.remove("current"); });
     a.classList.add("current");
+    revealChip(a);                                  // keep the tapped chip in view
     suppressSpy = Date.now() + 700;                 // don't let the spy fight the click
     t.scrollIntoView({ behavior: "smooth", block: "start" });
     t.classList.remove("ca-flash"); void t.offsetWidth; t.classList.add("ca-flash");
@@ -109,7 +110,22 @@
     if (cur === lastCur) return;
     lastCur = cur;
     links.forEach(function (l) { l.classList.remove("current"); });
-    if (idMap[cur]) idMap[cur].classList.add("current");
+    if (idMap[cur]) { idMap[cur].classList.add("current"); revealChip(idMap[cur]); }
+  }
+
+  // Keep the active rail item in view: scroll the chip bar horizontally (mobile,
+  // the <ul> scrolls) or the rail vertically (desktop). Adjusts only the rail's
+  // own scroll — never the page — so following the page-scroll never fights it.
+  function revealChip(a) {
+    if (!a) return;
+    var ul = rail.querySelector("ul"); if (!ul) return;
+    var ar = a.getBoundingClientRect();
+    var ur = ul.getBoundingClientRect();                 // horizontal (chip bar)
+    if (ar.left < ur.left)        ul.scrollLeft -= (ur.left - ar.left) + 14;
+    else if (ar.right > ur.right) ul.scrollLeft += (ar.right - ur.right) + 14;
+    var rr = rail.getBoundingClientRect();               // vertical (desktop rail)
+    if (ar.top < rr.top)            rail.scrollTop -= (rr.top - ar.top) + 14;
+    else if (ar.bottom > rr.bottom) rail.scrollTop += (ar.bottom - rr.bottom) + 14;
   }
 
   // Bottom spacer so the LAST card can scroll up to the line (rail walks the tail
