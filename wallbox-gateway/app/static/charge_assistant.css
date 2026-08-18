@@ -372,9 +372,9 @@
   background: var(--bg, #0f1218);
   transition: border-color .14s, background .14s;
 }
-/* Enabled trigger: keep the panel dark (consistent with the others) and show it
-   is on with just an accent border — not a full blue fill. */
-.ca-trigger.on { border-color: var(--ca-accent); background: var(--bg, #0f1218); }
+/* Enabled trigger: identical to a disabled one (no blue ring / fill). The
+   checkbox + the fields that appear when ticked already signal it's on. */
+.ca-trigger.on { border-color: var(--border, #2a2f3a); background: var(--bg, #0f1218); }
 .ca-trigger .ca-trigger-body {
   margin-top: 12px; display: flex; flex-direction: column; gap: 12px;
   border-top: 1px dashed var(--border, #2a2f3a); padding-top: 12px;
