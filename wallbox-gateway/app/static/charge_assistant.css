@@ -552,3 +552,86 @@
   outline-offset: -2px;
   border-radius: 12px;
 }
+
+/* ── Two-pane body: sticky jump-nav rail + content column (ca_layout.js) ── */
+.ca-bodycol { min-width: 0; }
+.ca-rail[hidden] { display: none; }
+.ca-endspacer { height: 0; }                 /* JS sizes it (rail reaches the end) */
+.ca-card { scroll-margin-top: 70px; }        /* jumped card clears the mobile chip bar */
+
+@media (min-width: 960px) {
+  /* Widen the page so the rail sits beside a still-comfortable content column. */
+  .page-assistant main { max-width: 1096px; }
+  .ca-actionbar { padding: 12px max(18px, calc((100% - 1096px) / 2 + 18px)); }
+  .ca-body {
+    display: grid;
+    grid-template-columns: 186px minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  /* Rail hidden (off mode / single-card modes) → drop the empty rail track. */
+  .ca-body.ca-norail { grid-template-columns: 1fr; }
+  /* Sticky within the grid; stays pinned because .ca-endspacer keeps the column
+     tall. overflow:auto on the rail itself is safe (only ancestors break sticky). */
+  .ca-rail {
+    position: sticky;
+    top: 14px;
+    align-self: start;
+    max-height: calc(100vh - 28px);
+    overflow: auto;
+  }
+}
+
+.ca-rail-title {
+  font-family: var(--ca-display);
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text2, #94a3b8);
+  margin: 2px 0 10px 12px;
+}
+.ca-rail ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.ca-rail a {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 12px; border-radius: 9px;
+  color: var(--text2, #94a3b8); text-decoration: none; font-size: 13px;
+  border-left: 2px solid transparent;
+  transition: color .14s, background .14s, border-color .14s;
+}
+.ca-rail a .rd {
+  width: 7px; height: 7px; border-radius: 999px;
+  background: var(--border, #2a2f3a); flex: 0 0 auto; transition: background .14s, box-shadow .14s;
+}
+.ca-rail a:hover { color: var(--text, #e6e8ec); background: var(--elevated, #1b2029); }
+.ca-rail a.current {
+  color: var(--text, #e6e8ec);
+  border-left-color: var(--ca-accent);
+  background: linear-gradient(90deg, var(--ca-accent-soft), transparent);
+}
+.ca-rail a.current .rd { background: var(--ca-accent); box-shadow: 0 0 8px var(--ca-accent); }
+
+/* Mobile: the rail becomes a horizontal sticky chip bar above the cards. */
+@media (max-width: 959px) {
+  .ca-rail {
+    position: sticky; top: 0; z-index: 20;
+    margin: 0 0 14px; padding: 10px 0;
+    background: color-mix(in srgb, var(--bg, #0f1218) 82%, transparent);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border, #2a2f3a);
+  }
+  .ca-rail-title { display: none; }
+  .ca-rail ul { flex-direction: row; gap: 7px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .ca-rail ul::-webkit-scrollbar { display: none; }
+  .ca-rail a { white-space: nowrap; border: 1px solid var(--border, #2a2f3a); border-radius: 999px; padding: 7px 13px; }
+  .ca-rail a.current { border-color: var(--ca-accent); }
+}
+
+/* Flash the card you jump to (feedback even when the page can't scroll further). */
+@keyframes caFlashRing {
+  0%   { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+  18%  { box-shadow: 0 0 0 2px var(--ca-accent), 0 0 26px -2px rgba(59,130,246,.6); }
+  100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+}
+.ca-card.ca-flash { animation: caFlashRing 1.1s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .ca-card.ca-flash { animation: none; border-color: var(--ca-accent); }
+}
