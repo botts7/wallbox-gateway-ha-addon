@@ -270,6 +270,14 @@ function initSavingsUI() {
     const m = modeSel ? modeSel.value : 'plug_in';
     const ft = fixed ? (fixed.value || '00:00') : '00:00';
     try { localStorage.setItem(SV_BASELINE_KEY, JSON.stringify({ mode: m, fixedTime: ft })); } catch (e) {}
+    // Mirror the baseline to the integration so its savings sensors compare
+    // against the same counterfactual the add-on shows (#151). Best-effort.
+    try {
+      fetch('api/ha/config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ options: { baseline: { mode: m, fixedTime: ft } } }),
+      }).catch(function () {});
+    } catch (e) {}
     if (fixedWrap) fixedWrap.hidden = m !== 'fixed_time';
     if (window.WBCost) WBCost.refresh().then(() => { updateCostTiles(); updateSavings(); }).catch(() => {});
   };
