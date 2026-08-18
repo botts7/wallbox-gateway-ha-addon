@@ -134,7 +134,13 @@
     if (!spacer) return;
     var last = ids.length ? document.getElementById(ids[ids.length - 1]) : null;
     if (!last) { spacer.style.height = "0px"; return; }
-    var need = window.innerHeight - last.getBoundingClientRect().height - 140;
+    var H = parseFloat(spacer.style.height) || 0;
+    var contentH = document.documentElement.scrollHeight - H;   // height sans our spacer
+    // Keep it one page: if everything already fits on screen, add NO scroll room.
+    if (contentH <= window.innerHeight + 4) { spacer.style.height = "0px"; return; }
+    // Otherwise add just enough that the last card's top can reach the highlight line.
+    var absTop = last.getBoundingClientRect().top + window.scrollY;
+    var need = (absTop - 100 + window.innerHeight) - contentH;
     spacer.style.height = Math.max(0, need) + "px";
   }
 
