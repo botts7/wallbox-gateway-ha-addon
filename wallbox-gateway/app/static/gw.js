@@ -87,13 +87,30 @@
   window.wbIsPlain = isPlain;
   window.wbHaReadable = haReadable;
 
+  // The right-aligned control cluster in the header. Created on demand and any
+  // page's "Cards" button is moved into it, so the Cards button, theme toggle
+  // and gateway switcher all sit together on the right.
+  function headerRight() {
+    var header = document.querySelector("header");
+    if (!header) return null;
+    var grp = header.querySelector(".wb-header-right");
+    if (!grp) {
+      grp = document.createElement("div");
+      grp.className = "wb-header-right";
+      header.appendChild(grp);
+      var cards = document.getElementById("cards-customize");
+      if (cards) grp.appendChild(cards);   // move the Cards button into the cluster
+    }
+    return grp;
+  }
+
   // Header "Themed / Plain" toggle. Only shown when HA's theme is readable (i.e.
   // running inside ingress) — outside HA there's nothing to mirror. Persists the
   // choice and applies it live, no reload.
   function injectThemeToggle() {
     if (!haReadable()) return;
-    var header = document.querySelector("header");
-    if (!header || document.getElementById("wb-theme-toggle")) return;
+    var grp = headerRight();
+    if (!grp || document.getElementById("wb-theme-toggle")) return;
     var btn = document.createElement("button");
     btn.id = "wb-theme-toggle";
     btn.className = "wb-theme-toggle";
@@ -110,11 +127,12 @@
       applyThemePref();
       relabel();
     });
-    header.appendChild(btn);
+    grp.appendChild(btn);   // Cards button (if any) then the theme toggle
   }
 
   // Populate the header IP + inject the switcher when >1 gateway is configured.
   function init() {
+    if (document.getElementById("cards-customize")) headerRight();  // right-align Cards even outside ingress
     injectThemeToggle();
     realFetch("api/gateways").then(function (r) { return r.json(); }).then(function (d) {
       var gws = (d && d.gateways) || [];
@@ -147,7 +165,7 @@
         sessionStorage.setItem("wb_gw", sel.value);
         location.reload();   // simplest correct reload of all per-gateway state
       });
-      header.appendChild(sel);
+      (headerRight() || header).appendChild(sel);
     }).catch(function () { _resolveReady(null); /* no switcher if the list can't load */ });
   }
   if (document.readyState === "loading") {

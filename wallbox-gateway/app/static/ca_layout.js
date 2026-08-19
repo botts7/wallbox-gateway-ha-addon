@@ -107,6 +107,12 @@
       var el = document.getElementById(ids[i]);
       if (el && el.getBoundingClientRect().top - line <= 0) cur = ids[i];
     }
+    // At the true page bottom the last (often short/collapsed) cards can't scroll
+    // their tops past the line, so highlight the final item explicitly there.
+    if (window.innerHeight + Math.ceil(window.scrollY) >=
+        document.documentElement.scrollHeight - 2) {
+      cur = ids[ids.length - 1];
+    }
     if (cur === lastCur) return;
     lastCur = cur;
     links.forEach(function (l) { l.classList.remove("current"); });
@@ -128,20 +134,12 @@
     else if (ar.bottom > rr.bottom) rail.scrollTop += (ar.bottom - rr.bottom) + 14;
   }
 
-  // Bottom spacer so the LAST card can scroll up to the line (rail walks the tail
-  // instead of snapping). Lives inside .ca-bodycol so the rail stays sticky to it.
+  // No artificial bottom spacer: it produced a near-viewport of blank when the
+  // last card was short (a collapsed <details>), and the last item only lit deep
+  // in that emptiness. The spy's bottom-detection now highlights the final item
+  // at the true page bottom instead, so the page ends right after the last card.
   function sizeSpacer() {
-    if (!spacer) return;
-    var last = ids.length ? document.getElementById(ids[ids.length - 1]) : null;
-    if (!last) { spacer.style.height = "0px"; return; }
-    var H = parseFloat(spacer.style.height) || 0;
-    var contentH = document.documentElement.scrollHeight - H;   // height sans our spacer
-    // Keep it one page: if everything already fits on screen, add NO scroll room.
-    if (contentH <= window.innerHeight + 4) { spacer.style.height = "0px"; return; }
-    // Otherwise add just enough that the last card's top can reach the highlight line.
-    var absTop = last.getBoundingClientRect().top + window.scrollY;
-    var need = (absTop - 100 + window.innerHeight) - contentH;
-    spacer.style.height = Math.max(0, need) + "px";
+    if (spacer) spacer.style.height = "0px";
   }
 
   // Default-collapse empty secondary cards, once, after setupCollapsible wired heads.

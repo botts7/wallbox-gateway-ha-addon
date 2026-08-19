@@ -64,10 +64,18 @@ body {
 header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
   padding: 14px 20px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+}
+/* Right-aligned control cluster (Cards button + theme toggle + gateway switcher),
+   grouped by gw.js so they sit together on the right regardless of page. */
+.wb-header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 header h1 {
   margin: 0;
@@ -88,7 +96,6 @@ header span#gw-ip {
 /* Multi-gateway switcher (injected by gw.js, only when >1 gateway). Sits on the
    right of the header, next to the IP. */
 select.wb-gw-switch {
-  margin-left: auto;
   background: var(--elevated);
   color: var(--text);
   border: 1px solid var(--border);
@@ -103,7 +110,6 @@ select.wb-gw-switch:focus { outline: none; border-color: var(--accent); }
 
 /* Header "Themed / Plain" toggle (injected by gw.js when HA's theme is readable) */
 .wb-theme-toggle {
-  margin-left: auto;
   background: var(--elevated);
   color: var(--text);
   border: 1px solid var(--border);
@@ -114,7 +120,6 @@ select.wb-gw-switch:focus { outline: none; border-color: var(--accent); }
   transition: border-color .14s, background .14s;
 }
 .wb-theme-toggle:hover { border-color: var(--primary); }
-.wb-theme-toggle + select.wb-gw-switch { margin-left: 8px; }
 
 /* Masonry-style layout: cards flow into balanced columns (one column on
    phones, more as the window widens) with no ragged full-width gaps. Each
