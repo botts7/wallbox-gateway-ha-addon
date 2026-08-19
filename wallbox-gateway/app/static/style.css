@@ -17,7 +17,7 @@
   --text:      #e2e8f0;
   --text2:     #94a3b8;
   --text3:     #64748b;
-  --primary:   #3b82f6;
+  --primary:   var(--ha-accent, #3b82f6);   /* HA theme accent (set by gw.js) → falls back to blue */
   --accent:    #4fc3f7;
   --success:   #22c55e;
   --warning:   #f59e0b;

@@ -9,8 +9,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&display=swap');
 
 .page-assistant {
-  --ca-accent: #3b82f6;
-  --ca-accent-soft: rgba(59, 130, 246, .14);
+  /* Accent tracks HA's theme (--ha-accent set by gw.js); falls back to blue. */
+  --ca-accent: var(--ha-accent, #3b82f6);
+  --ca-accent-soft: color-mix(in srgb, var(--ha-accent, #3b82f6) 14%, transparent);
   --ca-green: #22c55e;
   --ca-radius: 16px;
   --ca-radius-sm: 11px;

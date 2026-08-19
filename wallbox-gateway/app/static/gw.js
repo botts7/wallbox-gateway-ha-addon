@@ -29,6 +29,31 @@
     return realFetch(url, opts);
   };
 
+  // ── Match Home Assistant's accent ──────────────────────────────────────
+  // The add-on runs inside HA's ingress iframe. When the parent frame is
+  // same-origin-readable we lift HA's LIVE theme accent (--primary-color) into
+  // --ha-accent, which the stylesheets consume (falling back to the add-on's
+  // blue). So the add-on picks up the user's actual HA theme colour, not just
+  // our default. Cross-origin / sandboxed setups throw and we silently keep the
+  // default. Retried briefly in case HA applies its theme a tick after load.
+  function syncHaAccent() {
+    try {
+      if (window.parent === window || !window.parent.document) return false;
+      var cs = window.parent.getComputedStyle(window.parent.document.documentElement);
+      var accent = (cs.getPropertyValue("--primary-color") || "").trim();
+      if (!accent) return false;
+      document.documentElement.style.setProperty("--ha-accent", accent);
+      document.documentElement.setAttribute("data-ha-accent", "1");
+      return true;
+    } catch (e) { return false; }   // cross-origin / sandboxed — keep the default
+  }
+  if (!syncHaAccent()) {
+    var _haTries = 0;
+    var _haTimer = setInterval(function () {
+      if (syncHaAccent() || ++_haTries >= 5) clearInterval(_haTimer);
+    }, 400);
+  }
+
   // Populate the header IP + inject the switcher when >1 gateway is configured.
   function init() {
     realFetch("api/gateways").then(function (r) { return r.json(); }).then(function (d) {
