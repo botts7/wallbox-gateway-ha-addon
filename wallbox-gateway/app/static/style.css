@@ -10,14 +10,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&display=swap');
 
 :root {
-  --bg:        #0f1117;
-  --surface:   #1a1d28;
-  --elevated:  #232736;
-  --border:    #2a2d3a;
-  --text:      #e2e8f0;
-  --text2:     #94a3b8;
+  /* Colours track Home Assistant's active theme via the --ha-* variables gw.js
+     lifts from the parent frame; each falls back to the add-on's own dark value
+     when HA can't be read (older HA / sandboxed / opened outside ingress). */
+  --bg:        var(--ha-bg, #0f1117);
+  --surface:   var(--ha-surface, #1a1d28);
+  --elevated:  var(--ha-elevated, #232736);
+  --border:    var(--ha-border, #2a2d3a);
+  --text:      var(--ha-text, #e2e8f0);
+  --text2:     var(--ha-text2, #94a3b8);
   --text3:     #64748b;
-  --primary:   var(--ha-accent, #3b82f6);   /* HA theme accent (set by gw.js) → falls back to blue */
+  --primary:   var(--ha-accent, #3b82f6);
   --accent:    #4fc3f7;
   --success:   #22c55e;
   --warning:   #f59e0b;
@@ -29,12 +32,13 @@
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg:        #f5f7fa;
-    --surface:   #ffffff;
-    --elevated:  #eef2f7;
-    --border:    #d8dfe8;
-    --text:      #1e293b;
-    --text2:     #475569;
+    /* HA theme (--ha-*) still wins when present; otherwise a light OS default. */
+    --bg:        var(--ha-bg, #f5f7fa);
+    --surface:   var(--ha-surface, #ffffff);
+    --elevated:  var(--ha-elevated, #eef2f7);
+    --border:    var(--ha-border, #d8dfe8);
+    --text:      var(--ha-text, #1e293b);
+    --text2:     var(--ha-text2, #475569);
     --text3:     #64748b;
     --accent:    #1d4ed8;
   }
@@ -48,9 +52,13 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  background: var(--bg);
+  /* Adopt HA's page background (its gradient, when the theme sets one) so the
+     add-on sits on the same backdrop as the rest of HA; solid --bg otherwise. */
+  background: var(--ha-page-bg, var(--bg));
+  background-attachment: fixed;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
 }
 
 header {

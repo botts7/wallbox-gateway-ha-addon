@@ -29,28 +29,41 @@
     return realFetch(url, opts);
   };
 
-  // ── Match Home Assistant's accent ──────────────────────────────────────
-  // The add-on runs inside HA's ingress iframe. When the parent frame is
-  // same-origin-readable we lift HA's LIVE theme accent (--primary-color) into
-  // --ha-accent, which the stylesheets consume (falling back to the add-on's
-  // blue). So the add-on picks up the user's actual HA theme colour, not just
-  // our default. Cross-origin / sandboxed setups throw and we silently keep the
-  // default. Retried briefly in case HA applies its theme a tick after load.
-  function syncHaAccent() {
+  // ── Match Home Assistant's theme ────────────────────────────────────────
+  // The add-on runs inside HA's ingress iframe (same-origin, unsandboxed), so we
+  // lift HA's LIVE theme palette — accent, page background (incl. gradients),
+  // card/surface, text and border colours — from the parent frame into --ha-*
+  // variables, which the stylesheets consume (falling back to the add-on's own
+  // dark defaults). The add-on then adopts the user's actual HA theme. Cross-
+  // origin / sandboxed / older HA setups throw and we silently keep the default.
+  // Retried briefly in case HA applies its theme a tick after the iframe loads.
+  function syncHaTheme() {
     try {
       if (window.parent === window || !window.parent.document) return false;
       var cs = window.parent.getComputedStyle(window.parent.document.documentElement);
-      var accent = (cs.getPropertyValue("--primary-color") || "").trim();
-      if (!accent) return false;
-      document.documentElement.style.setProperty("--ha-accent", accent);
-      document.documentElement.setAttribute("data-ha-accent", "1");
+      var v = function (n) { return (cs.getPropertyValue(n) || "").trim(); };
+      var accent = v("--primary-color");
+      if (!accent) return false;   // HA theme not applied yet — retry
+      var S = document.documentElement.style;
+      var map = {
+        "--ha-accent":   accent,
+        "--ha-bg":       v("--primary-background-color"),
+        "--ha-page-bg":  v("--lovelace-background") || v("--primary-background-color"),
+        "--ha-surface":  v("--card-background-color") || v("--ha-card-background"),
+        "--ha-elevated": v("--secondary-background-color"),
+        "--ha-text":     v("--primary-text-color"),
+        "--ha-text2":    v("--secondary-text-color"),
+        "--ha-border":   v("--divider-color"),
+      };
+      Object.keys(map).forEach(function (k) { if (map[k]) S.setProperty(k, map[k]); });
+      document.documentElement.setAttribute("data-ha-theme", "1");
       return true;
-    } catch (e) { return false; }   // cross-origin / sandboxed — keep the default
+    } catch (e) { return false; }   // cross-origin / sandboxed — keep defaults
   }
-  if (!syncHaAccent()) {
+  if (!syncHaTheme()) {
     var _haTries = 0;
     var _haTimer = setInterval(function () {
-      if (syncHaAccent() || ++_haTries >= 5) clearInterval(_haTimer);
+      if (syncHaTheme() || ++_haTries >= 5) clearInterval(_haTimer);
     }, 400);
   }
 
