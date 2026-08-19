@@ -642,7 +642,7 @@ a { color: var(--accent); }
 /* ---- Top nav ---- */
 .topnav {
   display: flex; gap: 4px; max-width: 1360px; margin: 0 auto;
-  padding: 8px 18px 0; flex-wrap: wrap;
+  padding: 8px 18px 0; flex-wrap: wrap; align-items: center;
 }
 .topnav a {
   display: inline-flex; align-items: center; gap: 6px;
@@ -659,6 +659,29 @@ a { color: var(--accent); }
   white-space: nowrap;
 }
 .nav-next[hidden] { display: none; }
+
+/* Charge-control owner status, compacted into the nav row (index.html) instead
+   of a full-width banner below — saves a row of vertical space. Right-aligned,
+   single line; the detail is dropped on narrow screens to stay compact. */
+.topnav .nav-banner {
+  margin-left: auto; display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px; border: 1px solid var(--border); border-radius: 9px;
+  background: var(--surface); font-size: 12.5px; min-width: 0; cursor: help;
+}
+.topnav .nav-banner[hidden] { display: none; }
+.topnav .nav-banner .banner-icon { font-size: 15px; line-height: 1; }
+.topnav .nav-banner .banner-body {
+  display: flex; flex-flow: row nowrap; align-items: baseline; gap: 6px; min-width: 0;
+}
+.topnav .nav-banner strong { font-weight: 600; color: var(--text); white-space: nowrap; }
+.topnav .nav-banner .banner-detail {
+  color: var(--text2); white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; max-width: 44ch;
+}
+@media (max-width: 820px) {
+  .topnav .nav-banner { margin-left: auto; }
+  .topnav .nav-banner .banner-detail { display: none; }
+}
 
 /* ---- Sessions page ---- */
 .stat-value.cost::before { content: '$'; color: var(--success); }

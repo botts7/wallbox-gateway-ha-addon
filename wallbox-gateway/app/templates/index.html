@@ -22,6 +22,16 @@
   <a href="charge-assistant">&#x1F916; Assistant</a>
   <a href="ota">&#x2B06; OTA</a>
   <span class="nav-next" id="nav-next" hidden title="Next scheduled charge">&#x1F5D3;&#xFE0F;&nbsp;<span id="nav-next-time">--</span></span>
+  <!-- Charge-control owner status, compacted into the nav row to save vertical
+       space (populated by dashboard.js). External owners pause the native
+       schedules while active. -->
+  <section class="banner nav-banner" id="control-owner" hidden>
+    <span class="banner-icon" id="co-icon">&#x1F39B;&#xFE0F;</span>
+    <div class="banner-body">
+      <strong id="co-title">Charge control</strong>
+      <span class="banner-detail" id="co-detail"></span>
+    </div>
+  </section>
 </nav>
 
 <main>
@@ -63,16 +73,7 @@
     </div>
   </div>
 
-  <!-- Charge-control owner banner: appears when something other than the
-       charger's own schedule is in charge (control_owner from /api/status).
-       External owners pause the native schedules while they control. -->
-  <section class="banner" id="control-owner" hidden>
-    <span class="banner-icon" id="co-icon">&#x1F39B;&#xFE0F;</span>
-    <div class="banner-body">
-      <strong id="co-title">Charge control</strong>
-      <span class="banner-detail" id="co-detail"></span>
-    </div>
-  </section>
+  <!-- (Charge-control owner status now lives compacted in the topnav row above.) -->
 
   <!-- Schedule paused banner: shows when r_dat.gen != 0 (manual
        override of schedule / Eco Smart). The Resume button calls

@@ -86,10 +86,11 @@ function updateControlOwner(s) {
   const owner = s && s.control_owner;
   const info = _CO_INFO[owner];
   if (!info) { el.hidden = true; return; }   // wallbox_schedule / unknown -> hidden
-  el.className = 'banner';
+  el.className = 'banner nav-banner';        // keep nav-banner so it stays compact in the nav row
   setText('co-icon', info.icon);
   setText('co-title', info.title);
   setText('co-detail', info.detail);
+  el.title = info.detail ? (info.title + ' — ' + info.detail) : info.title;  // full text on hover (detail is truncated/hidden when narrow)
   el.hidden = false;
 }
 function updateChargeReminder(s) {

@@ -4,6 +4,26 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.53.0] - 2026-08-19
+
+### Changed
+- **Redesigned Charge Assistant config page** — a guided layout with a sticky
+  jump-nav rail (mobile chip bar), scroll-spy highlighting, and empty cards
+  collapsed by default so each mode opens compact. No settings changed.
+- **Consistent look across every page** — Dashboard, Sessions, OTA and the
+  Charge Assistant now share one design system.
+- **Matches your Home Assistant theme.** Inside HA the add-on adopts your
+  active theme (accent, background, cards, text). A **Themed / Plain** header
+  toggle switches back to the add-on's own dark look, remembered per browser.
+- **Tidier dashboard** — the "Manual control only" status now sits in the top
+  nav row (full text on hover) instead of a full-width banner.
+
+### Fixed
+- Page styles no longer go stale after an add-on update (assets are
+  cache-busted on rebuild).
+- Header controls are grouped on the right and the gateway IP no longer
+  collides with the title.
+
 ## [0.52.0] - 2026-08-16
 
 ### Added
