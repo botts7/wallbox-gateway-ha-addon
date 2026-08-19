@@ -126,6 +126,14 @@
        gateway's own Settings page. (Reminder mode still works — it only notifies.)</p>
   </div>
 
+  <!-- ── Two-pane body: sticky jump-nav rail + content column ───────────
+       The rail is populated by ca_layout.js from the active mode's visible
+       cards. Everything from the off-state through Integration settings is the
+       content column; the hero + owner warning above stay full-width. -->
+  <div class="ca-body">
+  <nav id="ca-rail" class="ca-rail" aria-label="Jump to a section" hidden></nav>
+  <div class="ca-bodycol">
+
   <!-- Empty-state shown only when mode = off -->
   <div class="ca-offstate" data-section="off">
     <div class="ca-offstate-icon">&#x1F50C;</div>
@@ -296,7 +304,7 @@
 
   <!-- ── Smart-charge (target SOC) mode ─────────────────────────── -->
   <div class="ca-mode-section" data-section="target_soc">
-    <section class="ca-card">
+    <section class="ca-card ca-start-collapsed">
       <div class="ca-card-head">
         <span class="ca-card-icon" style="--chip:#6366f1">&#x1F697;</span>
         <div class="ca-card-titles">
@@ -441,7 +449,7 @@
       </div>
     </section>
 
-    <section class="ca-card">
+    <section class="ca-card ca-start-collapsed">
       <div class="ca-card-head">
         <span class="ca-card-icon" style="--chip:#16a34a">&#x1F4B0;</span>
         <div class="ca-card-titles">
@@ -466,7 +474,7 @@
       </div>
     </section>
 
-    <section class="ca-card">
+    <section class="ca-card ca-start-collapsed">
       <div class="ca-card-head">
         <span class="ca-card-icon" style="--chip:#0ea5e9">&#x1F698;</span>
         <div class="ca-card-titles">
@@ -555,7 +563,7 @@
       </div>
     </section>
 
-    <section class="ca-card">
+    <section class="ca-card ca-start-collapsed">
       <div class="ca-card-head">
         <span class="ca-card-icon" style="--chip:#14b8a6">&#x1F50B;</span>
         <div class="ca-card-titles">
@@ -934,7 +942,7 @@
   </section>
 
   <!-- ── Charging window (Smart charge / Smart+Solar only — shown by JS) ──── -->
-  <section class="ca-card ca-acting-card" data-modes="target_soc,smart_solar" hidden>
+  <section class="ca-card ca-acting-card ca-start-collapsed" data-modes="target_soc,smart_solar" hidden>
     <div class="ca-card-head">
       <span class="ca-card-icon" style="--chip:#0ea5e9">&#x23F0;</span>
       <div class="ca-card-titles">
@@ -971,7 +979,7 @@
   </section>
 
   <!-- ── Plug-in reminders LAYER (acting strategies only) ───────── -->
-  <section class="ca-card ca-acting-card" data-acting hidden>
+  <section class="ca-card ca-acting-card ca-start-collapsed" data-acting hidden>
     <div class="ca-card-head">
       <span class="ca-card-icon" style="--chip:#3b82f6">&#x1F514;</span>
       <div class="ca-card-titles">
@@ -1100,6 +1108,13 @@
     </div>
   </details>
 
+  <!-- Bottom scroll room so the last card can reach the highlight line (the rail
+       walks the tail instead of snapping). Inside the column so the rail stays
+       sticky to the very end. ca_layout.js sizes it. -->
+  <div class="ca-endspacer" aria-hidden="true"></div>
+  </div><!-- /ca-bodycol -->
+  </div><!-- /ca-body -->
+
   </div><!-- /ca-form -->
 
   <p class="ca-footnote">Basic charger setup (host, credentials) lives in the
@@ -1120,5 +1135,6 @@
 
 <script src="static/ca_summary.js?v={{ ASSET_V }}"></script>
 <script src="static/charge_assistant.js?v={{ ASSET_V }}"></script>
+<script src="static/ca_layout.js?v={{ ASSET_V }}"></script>
 </body>
 </html>

@@ -29,8 +29,111 @@
     return realFetch(url, opts);
   };
 
+  // ── Match Home Assistant's theme ────────────────────────────────────────
+  // The add-on runs inside HA's ingress iframe (same-origin, unsandboxed), so we
+  // lift HA's LIVE theme palette — accent, page background (incl. gradients),
+  // card/surface, text and border colours — from the parent frame into --ha-*
+  // variables, which the stylesheets consume (falling back to the add-on's own
+  // dark defaults). The add-on then adopts the user's actual HA theme. Cross-
+  // origin / sandboxed / older HA setups throw and we silently keep the default.
+  // Retried briefly in case HA applies its theme a tick after the iframe loads.
+  function syncHaTheme() {
+    try {
+      if (window.parent === window || !window.parent.document) return false;
+      var cs = window.parent.getComputedStyle(window.parent.document.documentElement);
+      var v = function (n) { return (cs.getPropertyValue(n) || "").trim(); };
+      var accent = v("--primary-color");
+      if (!accent) return false;   // HA theme not applied yet — retry
+      var S = document.documentElement.style;
+      var map = {
+        "--ha-accent":   accent,
+        "--ha-bg":       v("--primary-background-color"),
+        "--ha-page-bg":  v("--lovelace-background") || v("--primary-background-color"),
+        "--ha-surface":  v("--card-background-color") || v("--ha-card-background"),
+        "--ha-elevated": v("--secondary-background-color"),
+        "--ha-text":     v("--primary-text-color"),
+        "--ha-text2":    v("--secondary-text-color"),
+        "--ha-border":   v("--divider-color"),
+      };
+      Object.keys(map).forEach(function (k) { if (map[k]) S.setProperty(k, map[k]); });
+      document.documentElement.setAttribute("data-ha-theme", "1");
+      return true;
+    } catch (e) { return false; }   // cross-origin / sandboxed — keep defaults
+  }
+  var HA_VARS = ["--ha-accent", "--ha-bg", "--ha-page-bg", "--ha-surface",
+                 "--ha-elevated", "--ha-text", "--ha-text2", "--ha-border"];
+  function isPlain() { try { return localStorage.getItem("wb_theme_plain") === "1"; } catch (e) { return false; } }
+  function clearHaVars() {
+    var S = document.documentElement.style;
+    HA_VARS.forEach(function (k) { S.removeProperty(k); });
+    document.documentElement.removeAttribute("data-ha-theme");
+  }
+  // Whether HA's theme is readable at all (inside ingress, same-origin parent).
+  function haReadable() {
+    try { return window.parent !== window &&
+      !!window.parent.getComputedStyle(window.parent.document.documentElement)
+        .getPropertyValue("--primary-color").trim(); } catch (e) { return false; }
+  }
+  // Apply the saved preference: Plain = the add-on's own dark palette (clear the
+  // --ha-* overrides); otherwise mirror HA's theme.
+  function applyThemePref() { if (isPlain()) { clearHaVars(); return true; } return syncHaTheme(); }
+  if (!applyThemePref()) {
+    var _haTries = 0;
+    var _haTimer = setInterval(function () {
+      if (applyThemePref() || ++_haTries >= 5) clearInterval(_haTimer);
+    }, 400);
+  }
+  window.wbApplyThemePref = applyThemePref;
+  window.wbIsPlain = isPlain;
+  window.wbHaReadable = haReadable;
+
+  // The right-aligned control cluster in the header. Created on demand and any
+  // page's "Cards" button is moved into it, so the Cards button, theme toggle
+  // and gateway switcher all sit together on the right.
+  function headerRight() {
+    var header = document.querySelector("header");
+    if (!header) return null;
+    var grp = header.querySelector(".wb-header-right");
+    if (!grp) {
+      grp = document.createElement("div");
+      grp.className = "wb-header-right";
+      header.appendChild(grp);
+      var cards = document.getElementById("cards-customize");
+      if (cards) grp.appendChild(cards);   // move the Cards button into the cluster
+    }
+    return grp;
+  }
+
+  // Header "Themed / Plain" toggle. Only shown when HA's theme is readable (i.e.
+  // running inside ingress) — outside HA there's nothing to mirror. Persists the
+  // choice and applies it live, no reload.
+  function injectThemeToggle() {
+    if (!haReadable()) return;
+    var grp = headerRight();
+    if (!grp || document.getElementById("wb-theme-toggle")) return;
+    var btn = document.createElement("button");
+    btn.id = "wb-theme-toggle";
+    btn.className = "wb-theme-toggle";
+    btn.type = "button";
+    function relabel() {
+      btn.textContent = "✦ " + (isPlain() ? "Plain" : "Themed");
+      btn.title = isPlain()
+        ? "Using the add-on's own look — click to match your Home Assistant theme"
+        : "Matching your Home Assistant theme — click for the add-on's plain look";
+    }
+    relabel();
+    btn.addEventListener("click", function () {
+      try { localStorage.setItem("wb_theme_plain", isPlain() ? "0" : "1"); } catch (e) {}
+      applyThemePref();
+      relabel();
+    });
+    grp.appendChild(btn);   // Cards button (if any) then the theme toggle
+  }
+
   // Populate the header IP + inject the switcher when >1 gateway is configured.
   function init() {
+    if (document.getElementById("cards-customize")) headerRight();  // right-align Cards even outside ingress
+    injectThemeToggle();
     realFetch("api/gateways").then(function (r) { return r.json(); }).then(function (d) {
       var gws = (d && d.gateways) || [];
       window.wbGateways = gws;
@@ -62,7 +165,7 @@
         sessionStorage.setItem("wb_gw", sel.value);
         location.reload();   // simplest correct reload of all per-gateway state
       });
-      header.appendChild(sel);
+      (headerRight() || header).appendChild(sel);
     }).catch(function () { _resolveReady(null); /* no switcher if the list can't load */ });
   }
   if (document.readyState === "loading") {

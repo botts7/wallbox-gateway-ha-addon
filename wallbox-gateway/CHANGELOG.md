@@ -4,6 +4,41 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.53.0] - 2026-08-19
+
+### Changed
+- **Charge Assistant config page redesigned** into a guided layout: a sticky
+  jump-nav rail (desktop) / horizontal chip bar (mobile) that lists the active
+  mode's cards with scroll-spy highlighting, and empty secondary cards default
+  to collapsed so each mode opens compact. No config fields or save/load
+  behaviour changed.
+- **Cross-page visual consistency pass.** Dashboard, Sessions, OTA and the
+  Charge Assistant now share one design system (display font, unified
+  card/inner radii, button and active-nav styling).
+- **The add-on now matches your Home Assistant theme.** Running inside HA's
+  ingress frame, it adopts your active theme's palette — accent, page background
+  (including gradients), card/surface, text and border colours — instead of a
+  fixed dark look. A header **Themed / Plain** toggle (shown only inside HA)
+  switches back to the add-on's own palette; the choice is remembered per
+  browser.
+- **"Manual control only" status moved into the top nav row** (next to the page
+  buttons) instead of a full-width banner, saving a row of vertical space; the
+  full description is available on hover.
+
+### Fixed
+- Static assets (JS/CSS) on the Dashboard, Sessions and OTA pages are now
+  cache-busted on rebuild, so a new add-on version no longer serves stale
+  styles.
+- Header controls (Cards, theme toggle, gateway switcher) are grouped on the
+  right and the gateway IP no longer collides with the title.
+
+## [0.52.0] - 2026-08-18
+
+### Added
+- **Feed-in / export tariff and savings baseline (#151).** Configure an export
+  tariff and a cost baseline so the integration can surface charging cost and
+  savings, and bridge those baseline settings through to Home Assistant.
+
 ## [0.51.1] - 2026-07-11
 
 ### Fixed
