@@ -60,15 +60,62 @@
       return true;
     } catch (e) { return false; }   // cross-origin / sandboxed — keep defaults
   }
-  if (!syncHaTheme()) {
+  var HA_VARS = ["--ha-accent", "--ha-bg", "--ha-page-bg", "--ha-surface",
+                 "--ha-elevated", "--ha-text", "--ha-text2", "--ha-border"];
+  function isPlain() { try { return localStorage.getItem("wb_theme_plain") === "1"; } catch (e) { return false; } }
+  function clearHaVars() {
+    var S = document.documentElement.style;
+    HA_VARS.forEach(function (k) { S.removeProperty(k); });
+    document.documentElement.removeAttribute("data-ha-theme");
+  }
+  // Whether HA's theme is readable at all (inside ingress, same-origin parent).
+  function haReadable() {
+    try { return window.parent !== window &&
+      !!window.parent.getComputedStyle(window.parent.document.documentElement)
+        .getPropertyValue("--primary-color").trim(); } catch (e) { return false; }
+  }
+  // Apply the saved preference: Plain = the add-on's own dark palette (clear the
+  // --ha-* overrides); otherwise mirror HA's theme.
+  function applyThemePref() { if (isPlain()) { clearHaVars(); return true; } return syncHaTheme(); }
+  if (!applyThemePref()) {
     var _haTries = 0;
     var _haTimer = setInterval(function () {
-      if (syncHaTheme() || ++_haTries >= 5) clearInterval(_haTimer);
+      if (applyThemePref() || ++_haTries >= 5) clearInterval(_haTimer);
     }, 400);
+  }
+  window.wbApplyThemePref = applyThemePref;
+  window.wbIsPlain = isPlain;
+  window.wbHaReadable = haReadable;
+
+  // Header "Themed / Plain" toggle. Only shown when HA's theme is readable (i.e.
+  // running inside ingress) — outside HA there's nothing to mirror. Persists the
+  // choice and applies it live, no reload.
+  function injectThemeToggle() {
+    if (!haReadable()) return;
+    var header = document.querySelector("header");
+    if (!header || document.getElementById("wb-theme-toggle")) return;
+    var btn = document.createElement("button");
+    btn.id = "wb-theme-toggle";
+    btn.className = "wb-theme-toggle";
+    btn.type = "button";
+    function relabel() {
+      btn.textContent = "✦ " + (isPlain() ? "Plain" : "Themed");
+      btn.title = isPlain()
+        ? "Using the add-on's own look — click to match your Home Assistant theme"
+        : "Matching your Home Assistant theme — click for the add-on's plain look";
+    }
+    relabel();
+    btn.addEventListener("click", function () {
+      try { localStorage.setItem("wb_theme_plain", isPlain() ? "0" : "1"); } catch (e) {}
+      applyThemePref();
+      relabel();
+    });
+    header.appendChild(btn);
   }
 
   // Populate the header IP + inject the switcher when >1 gateway is configured.
   function init() {
+    injectThemeToggle();
     realFetch("api/gateways").then(function (r) { return r.json(); }).then(function (d) {
       var gws = (d && d.gateways) || [];
       window.wbGateways = gws;

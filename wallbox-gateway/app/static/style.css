@@ -101,6 +101,21 @@ select.wb-gw-switch {
 select.wb-gw-switch:hover { border-color: var(--accent); }
 select.wb-gw-switch:focus { outline: none; border-color: var(--accent); }
 
+/* Header "Themed / Plain" toggle (injected by gw.js when HA's theme is readable) */
+.wb-theme-toggle {
+  margin-left: auto;
+  background: var(--elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+  transition: border-color .14s, background .14s;
+}
+.wb-theme-toggle:hover { border-color: var(--primary); }
+.wb-theme-toggle + select.wb-gw-switch { margin-left: 8px; }
+
 /* Masonry-style layout: cards flow into balanced columns (one column on
    phones, more as the window widens) with no ragged full-width gaps. Each
    card stays whole. Uses the desktop width without stranding small cards
