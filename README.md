@@ -12,9 +12,11 @@ Home Assistant Add-on for managing the
 Adds a sidebar panel to Home Assistant for the gateway: live
 charging state, controls (Start / Stop / Lock / Unlock / Max
 current), connection health for BLE / WiFi / MQTT, and a
-drag-and-drop OTA firmware upload. Same dark theme as the
-gateway's own `/dashboard` — they're meant to feel like one
-product.
+drag-and-drop OTA firmware upload. The panel **matches your active
+Home Assistant theme** (accent, background, cards, text) so it
+feels native — with a header **Themed / Plain** toggle to fall back
+to its own dark look. A **guided Charge Assistant** config page
+(mode picker + jump-nav) rounds out the experience.
 
 It also surfaces the gateway's **schedule editor** + weekly
 **schedule timeline**, an HA-style **Solar / Grid → Vehicle
