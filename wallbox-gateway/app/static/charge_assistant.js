@@ -699,6 +699,7 @@
     // Capability gating: the original Zentri Pulsar can't do live current
     // control over BLE — disable dynamic-current for it.
     applyCapabilities(r.ok && r.body ? !!r.body.zentri : false,
+                      r.ok && r.body ? r.body.eco_smart : undefined,
                       r.ok && r.body ? r.body.meter : undefined);
     updateOwnerWarn();
     updateSummary();
@@ -722,7 +723,7 @@
     return false;
   }
 
-  function applyCapabilities(isZentri, hasMeter) {
+  function applyCapabilities(isZentri, ecoSmart, hasMeter) {
     const warn = $("ca-dyn-warn");
     const dyn = $("solar_dynamic");
     if (warn) warn.hidden = !isZentri;
@@ -732,17 +733,19 @@
     } else if (dyn) {
       dyn.disabled = false;
     }
-    // No Power-Boost meter → no Eco-Smart / solar to restore, so grey out the
-    // "restore which Eco-Smart mode" pickers (the server already no-ops the
-    // restore without Eco-Smart). Missing/unknown meter → leave enabled.
+    // Grey out the "restore which Eco-Smart mode" pickers when the charger has
+    // no Eco-Smart (the server already no-ops the restore without it). Prefer
+    // the firmware's explicit `eco_smart` capability (#163/#175); fall back to
+    // the no-Power-Boost-meter proxy on older firmware that doesn't report it.
+    // Unknown (both undefined) → leave enabled.
+    const noEco = (ecoSmart === false) ||
+                  (ecoSmart === undefined && hasMeter === false);
     ["resume_eco_mode", "resume_eco_mode_ss"].forEach((id) => {
       const el = $(id);
       if (!el) return;
-      // Grey it out on a no-meter charger, but DON'T overwrite the saved value —
-      // a disabled <select> still reports .value on save, so forcing "keep" here
-      // would silently erase the user's stored choice.
-      if (hasMeter === false) { el.disabled = true; }
-      else { el.disabled = false; }
+      // DON'T overwrite the saved value — a disabled <select> still reports its
+      // .value on save, so forcing "keep" here would erase the user's choice.
+      el.disabled = noEco;
     });
   }
 

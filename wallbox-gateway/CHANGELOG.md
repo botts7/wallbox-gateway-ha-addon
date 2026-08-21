@@ -4,6 +4,15 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+- **Eco-Smart mode pickers grey out on the charger's real capability (#163).**
+  The "return the charger to …" Eco-Smart pickers were greyed on a no-meter
+  proxy; they now use the firmware's explicit `eco_smart` capability flag (more
+  accurate — a charger can have a meter but no Eco-Smart), falling back to the
+  meter proxy only on older firmware that doesn't report it.
+
 ## [0.54.0] - 2026-08-20
 
 ### Added
