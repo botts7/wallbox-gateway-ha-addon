@@ -4,6 +4,22 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.55.0] - 2026-08-22
+
+### Changed
+- **Sessions page + Dashboard visual polish.** The Sessions page now leads with a
+  rich **This-month hero** (big energy figure, cost + solar savings, and a
+  grid-vs-solar split bar) beside the weekly heatmap, with Costs & Recent-sessions
+  below — a stable, equal-height two-column layout. All sections (and the
+  Dashboard cards) gained **icon-chip headers**, so every page shares the Charge
+  Assistant's visual language. Recent-sessions shows more rows to fill the card.
+  Cosmetic only; no data or behaviour change.
+- **Eco-Smart mode pickers grey out on the charger's real capability (#163).**
+  The "return the charger to …" Eco-Smart pickers were greyed on a no-meter
+  proxy; they now use the firmware's explicit `eco_smart` capability flag (more
+  accurate — a charger can have a meter but no Eco-Smart), falling back to the
+  meter proxy only on older firmware that doesn't report it.
+
 ## [0.54.0] - 2026-08-20
 
 ### Added

@@ -28,44 +28,71 @@
     <p>Set <code>gateway_ip</code> in the Add-on's Configuration tab and restart the Add-on.</p>
   </section>
 
-  <!-- Totals -->
-  <section class="card">
-    <h2>Totals</h2>
-    <div class="grid">
-      <div class="stat"><div class="stat-label">All time</div><div class="stat-value"><span id="tile-allt">--</span><span class="unit">kWh</span></div></div>
-      <div class="stat"><div class="stat-label">This week</div><div class="stat-value"><span id="tile-week">--</span><span class="unit">kWh</span></div></div>
-      <div class="stat"><div class="stat-label">This month</div><div class="stat-value"><span id="tile-month">--</span><span class="unit">kWh</span></div></div>
+  <!-- Hero: the focal summary (this month energy + cost), week / all-time as
+       secondary. Elements keep their ids so sessions.js populates them as before. -->
+  <section class="sess-hero">
+    <div class="eyebrow">&#x1F4C8; This month</div>
+    <div class="hero-big"><span id="tile-month">--</span><span class="u">kWh</span></div>
+    <div class="hero-cost" id="hero-cost" hidden><span id="tile-month-cost">--</span> <span class="hero-saved" id="hero-saved"></span></div>
+    <div class="hero-split" id="hero-split" hidden>
+      <div class="hero-bar"><span class="hero-bar-grid" id="hero-bar-grid"></span><span class="hero-bar-solar" id="hero-bar-solar"></span></div>
+      <div class="hero-split-legend">
+        <span>&#x26A1; Grid <b id="hero-grid-pct">--</b></span>
+        <span>&#x2600;&#xFE0F; Solar <b id="hero-solar-pct">--</b></span>
+      </div>
     </div>
-    <div class="cost-breakdown" id="src-split" hidden></div>
-    <div class="grid" id="cost-row" hidden>
-      <div class="stat"><div class="stat-label">Week cost</div><div class="stat-value cost"><span id="tile-week-cost">--</span></div></div>
-      <div class="stat"><div class="stat-label">Month cost</div><div class="stat-value cost"><span id="tile-month-cost">--</span></div></div>
-    </div>
-    <div class="cost-breakdown" id="cost-breakdown" hidden></div>
-    <div class="tariff-summary">
-      <div id="tariff-text" class="tariff-text">No tariff set — costs hidden.</div>
-      <button type="button" class="ctrl-btn" id="tariff-edit">&#x2699;&#xFE0F; Tariff</button>
+    <div class="hero-secondary">
+      <div class="s"><div class="l">This week</div><div class="v"><span id="tile-week">--</span> kWh</div></div>
+      <div class="s"><div class="l">All time</div><div class="v"><span id="tile-allt">--</span> kWh</div></div>
     </div>
   </section>
 
   <!-- Weekly heatmap -->
-  <section class="card">
-    <h2>Weekly heatmap</h2>
-    <div class="sess-sub">Energy by hour, placed in the actual charging window (schedule-aware).</div>
-    <div class="hm-wrap"><div id="heatmap" class="hm-grid"></div></div>
-    <div class="hm-legend">
-      <span>Low</span>
-      <div class="hm-scale"><i style="background:var(--elevated)"></i><i style="background:rgba(59,130,246,.2)"></i><i style="background:rgba(59,130,246,.5)"></i><i style="background:var(--primary)"></i><i style="background:#1d4ed8"></i></div>
-      <span>High</span>
+  <section class="card" id="card-heatmap">
+    <div class="chead">
+      <span class="card-icon" style="--chip:#f59e0b">&#x1F525;</span>
+      <div style="flex:1"><h2>Weekly heatmap</h2><div class="chead-desc">Energy by hour, schedule-aware</div></div>
+    </div>
+    <div class="cbody">
+      <div class="hm-wrap"><div id="heatmap" class="hm-grid"></div></div>
+      <div class="hm-legend">
+        <span>Low</span>
+        <div class="hm-scale"><i style="background:var(--elevated)"></i><i style="background:rgba(59,130,246,.2)"></i><i style="background:rgba(59,130,246,.5)"></i><i style="background:var(--primary)"></i><i style="background:#1d4ed8"></i></div>
+        <span>High</span>
+      </div>
     </div>
   </section>
 
+  <!-- Costs & tariff -->
+  <section class="card" id="card-costs">
+    <div class="chead">
+      <span class="card-icon" style="--chip:#8b5cf6">&#x2699;&#xFE0F;</span>
+      <div style="flex:1"><h2>Costs &amp; tariff</h2><div class="chead-desc">Rates, per-window cost &amp; solar split</div></div>
+    </div>
+    <div class="cbody">
+      <div class="cost-breakdown" id="src-split" hidden></div>
+      <div class="grid" id="cost-row" hidden>
+        <div class="stat"><div class="stat-label">Week cost</div><div class="stat-value cost"><span id="tile-week-cost">--</span></div></div>
+      </div>
+      <div class="cost-breakdown" id="cost-breakdown" hidden></div>
+      <div class="tariff-summary">
+        <div id="tariff-text" class="tariff-text">No tariff set — costs hidden.</div>
+        <button type="button" class="ctrl-btn" id="tariff-edit">&#x2699;&#xFE0F; Tariff</button>
+      </div>
+    </div>
+  </section>
+
+
   <!-- Recent sessions -->
-  <section class="card">
-    <h2>Recent sessions</h2>
-    <div class="sess-sub">Time shown = when the car was plugged in.</div>
-    <div id="sess-list" class="sess-list"><span class="sched-empty">Loading…</span></div>
-    <button type="button" class="ctrl-btn" id="csv-btn" style="margin-top:12px">&#x1F4E5; Export CSV</button>
+  <section class="card" id="card-sessions">
+    <div class="chead">
+      <span class="card-icon" style="--chip:#22c55e">&#x1F4CB;</span>
+      <div style="flex:1"><h2>Recent sessions</h2><div class="chead-desc">Time = when the car was plugged in</div></div>
+    </div>
+    <div class="cbody">
+      <div id="sess-list" class="sess-list"><span class="sched-empty">Loading…</span></div>
+      <button type="button" class="ctrl-btn" id="csv-btn" style="margin-top:12px">&#x1F4E5; Export CSV</button>
+    </div>
   </section>
 
   <p class="hint">Long-term graphs: use the Home Assistant Energy dashboard.</p>
