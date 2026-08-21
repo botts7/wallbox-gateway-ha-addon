@@ -4,6 +4,18 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.54.0] - 2026-08-20
+
+### Added
+- **Solar-by-day + keep your night schedule (#152).** In **Solar** mode the
+  Charging-window card now offers *"Keep my charger's own night schedule"*. Set
+  your daytime solar hours and turn it on: Home Assistant charges on solar
+  surplus during the day, while the charger's built-in off-peak schedule (any
+  that runs outside those hours) keeps running on the charger itself — so you
+  still get a cheap night charge even if Home Assistant is offline. Only
+  schedules that overlap your daytime hours are paused. The live summary spells
+  out exactly what will happen. Needs integration v0.34.0+.
+
 ## [0.53.0] - 2026-08-19
 
 ### Changed
