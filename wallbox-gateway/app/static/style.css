@@ -298,6 +298,58 @@ main > * {
   border-radius: 2px;
 }
 
+/* ── Icon-chip card heads + collapsible sections (shared; matches the Charge
+   Assistant's .ca-card look so every page speaks one visual language). Cards
+   opt in by using `.chead`/`.card-icon` instead of a bare <h2>. ─────────────── */
+.card-icon {
+  flex: 0 0 auto;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  font-size: 19px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--chip, var(--primary)) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chip, var(--primary)) 42%, transparent);
+}
+.chead { display: flex; align-items: center; gap: 11px; margin: 0 0 12px 0; }
+.chead h2 { margin: 0; flex: 1; }
+.chead h2::before { display: none; }        /* the chip replaces the accent bar */
+.chead-desc { font-size: 11.5px; color: var(--text2); font-weight: 400; margin-top: 2px; }
+
+/* Sessions hero — a focal summary that replaces the flat 3-tile Totals grid. */
+.sess-hero {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column;   /* fill the stretched card height */
+  background: radial-gradient(600px 240px at 88% -40%,
+      color-mix(in srgb, var(--primary) 22%, transparent), transparent 62%), var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 17px 18px; margin-bottom: 12px;
+}
+.sess-hero .eyebrow { display: flex; align-items: center; gap: 8px; font-size: 11.5px;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--text2); font-weight: 700; margin-bottom: 10px; }
+.sess-hero .hero-big { font-family: var(--display); font-weight: 800; letter-spacing: -.02em;
+  font-size: 58px; line-height: .95; display: flex; align-items: baseline; gap: 10px; }
+.sess-hero .hero-big .u { font-size: 22px; color: var(--text2); font-weight: 700; }
+.sess-hero .hero-cost { color: var(--success); font-weight: 700; font-size: 17px; margin-top: 8px; }
+.sess-hero .hero-cost[hidden] { display: none; }
+.sess-hero .hero-cost .hero-saved { color: var(--text2); font-weight: 600; font-size: 13.5px; }
+
+/* Grid vs solar split bar */
+.sess-hero .hero-split { margin-top: 18px; }
+.sess-hero .hero-split[hidden] { display: none; }
+.sess-hero .hero-bar { display: flex; height: 9px; border-radius: 999px; overflow: hidden;
+  background: var(--elevated); }
+.sess-hero .hero-bar > span { height: 100%; transition: width .4s ease; }
+.sess-hero .hero-bar .hero-bar-grid  { background: var(--primary); }   /* grid = blue ⚡ */
+.sess-hero .hero-bar .hero-bar-solar { background: #f59e0b; }          /* solar = amber ☀️ */
+.sess-hero .hero-split-legend { display: flex; justify-content: space-between; margin-top: 7px;
+  font-size: 12px; color: var(--text2); }
+.sess-hero .hero-split-legend b { color: var(--text); font-weight: 700; }
+
+.sess-hero .hero-secondary { display: flex; gap: 26px; margin-top: auto; padding-top: 18px; flex-wrap: wrap;
+  border-top: 1px solid var(--border); }
+.sess-hero .hero-secondary .l { font-size: 10.5px; letter-spacing: .03em; text-transform: uppercase; color: var(--text2); }
+.sess-hero .hero-secondary .v { font-family: var(--display); font-weight: 700; font-size: 18px; margin-top: 3px; }
+
 /* Connection rows */
 .conn-row {
   display: grid;
@@ -734,12 +786,14 @@ a { color: var(--accent); }
   display: grid;
   grid-template-columns: 1fr;
   gap: 14px;
-  align-items: start;
+  align-items: stretch;   /* paired cards in a row share the same height */
 }
 .page-sessions main > * { margin: 0; }
 @media (min-width: 1000px) {
+  /* Two even columns: hero | heatmap on the top row, Costs | Recent below.
+     Fixed placement (DOM order hero, heatmap, costs, recent) → nothing jumps. */
   .page-sessions main {
-    grid-template-columns: minmax(220px, 0.9fr) minmax(360px, 1.5fr) minmax(280px, 1fr);
+    grid-template-columns: 1fr 1fr;
   }
   .page-sessions main > p.hint,
   .page-sessions #not-configured { grid-column: 1 / -1; }

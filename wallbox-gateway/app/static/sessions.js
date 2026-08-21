@@ -414,17 +414,38 @@ function recompute() {
   setText('tile-month', mo.toFixed(1));
   renderSourceSplit(moGrid, moGreen, tariff ? moSaved : 0, tariff && tariff.currency || '$', tariff && L ? L.moCost : null);
   updateTariffSummary(tariff);
-  const row = $('cost-row'), cb = $('cost-breakdown');
+  const row = $('cost-row'), cb = $('cost-breakdown'), heroCost = $('hero-cost');
   const cur = (tariff && tariff.currency) || '$';
   if (tariff) {
     row.hidden = false;
+    if (heroCost) heroCost.hidden = false;   // month cost inline in the hero
     setText('tile-week-cost', cur + wkCost.toFixed(2));
     setText('tile-month-cost', cur + moCost.toFixed(2));
     renderCostBreakdown(monthBands, cur);
   } else {
     row.hidden = true;
+    if (heroCost) heroCost.hidden = true;
     if (cb) cb.hidden = true;
   }
+  // Rich hero: this-month grid/solar split bar + (when priced) solar savings.
+  const heroSplit = $('hero-split');
+  if (heroSplit) {
+    const totKwh = moGrid + moGreen;
+    if (totKwh > 0) {
+      const solarPct = Math.round((moGreen / totKwh) * 100);
+      const gridPct = 100 - solarPct;
+      setText('hero-grid-pct', gridPct + '%');
+      setText('hero-solar-pct', solarPct + '%');
+      const gb = $('hero-bar-grid'); if (gb) gb.style.width = gridPct + '%';
+      const sb = $('hero-bar-solar'); if (sb) sb.style.width = solarPct + '%';
+      heroSplit.hidden = false;
+    } else {
+      heroSplit.hidden = true;
+    }
+  }
+  const heroSaved = $('hero-saved');
+  if (heroSaved) heroSaved.textContent = (tariff && moSaved > 0)
+    ? ('· saved ' + cur + moSaved.toFixed(2) + ' on solar') : '';
   // Publish the cost summary so the Dashboard can show week/month cost tiles
   // without duplicating the tariff/cost engine (single source of truth here).
   try {
@@ -579,7 +600,7 @@ function buildHeatmap() {
 }
 
 // ---- recent session list (collapsed to a few, with expand) ----
-const SESS_COLLAPSED = 5;
+const SESS_COLLAPSED = 8;   // enough rows to fill the card next to the taller Costs card
 let _sessExpanded = false;
 function renderList() {
   const list = $('sess-list'); if (!list) return;

@@ -157,7 +157,7 @@
 
   <!-- Controls: charge start/stop, lock/unlock, max current -->
   <section class="card controls" id="controls-card" data-card="controls">
-    <h2>Controls</h2>
+    <div class="chead"><span class="card-icon" style="--chip:#4da3ff">⚡</span><h2>Controls</h2></div>
     <div class="ctrl-row">
       <button id="btn-start" class="ctrl-btn ctrl-success" onclick="sendCmd('start', this)">&#x25B6; Start</button>
       <button id="btn-stop"  class="ctrl-btn ctrl-danger"  onclick="sendCmd('stop',  this)">&#x23F9; Stop</button>
@@ -313,7 +313,7 @@
 
   <!-- Connection health -->
   <section class="card" id="connections-card" data-card="connections">
-    <h2>Connections</h2>
+    <div class="chead"><span class="card-icon" style="--chip:#34d399">🛜</span><h2>Connections</h2></div>
     <div class="conn-row">
       <span class="conn-dot" id="dot-ble"></span>
       <span class="conn-label">BLE</span>
@@ -336,7 +336,7 @@
 
   <!-- Gateway / charger metadata -->
   <section class="card" id="deviceinfo-card" data-card="device-info">
-    <h2>Device info</h2>
+    <div class="chead"><span class="card-icon" style="--chip:#8b5cf6">📇</span><h2>Device info</h2></div>
     <dl>
       <dt>Charger</dt><dd id="charger-name">--</dd>
       <dt>Firmware</dt><dd id="charger-fw">--</dd>
@@ -349,7 +349,7 @@
 
   <!-- Diagnostics (reconnect counters, less prominent) -->
   <section class="card" id="reconnect-card" data-card="reconnect">
-    <h2>Reconnect counters</h2>
+    <div class="chead"><span class="card-icon" style="--chip:#f59e0b">🔄</span><h2>Reconnect counters</h2></div>
     <dl>
       <dt>BLE</dt><dd id="ble-reconn">--</dd>
       <dt>MQTT</dt><dd id="mqtt-reconn">--</dd>
@@ -360,7 +360,7 @@
   <!-- Charge schedules: create / edit / delete via the gateway BAPI
        (s_sch insert-or-update, clr_sch delete) proxied through /api/sched. -->
   <section class="card" id="sched-card" data-card="schedules">
-    <h2>Charge schedules</h2>
+    <div class="chead"><span class="card-icon" style="--chip:#6366f1">🗓️</span><h2>Charge schedules</h2></div>
     <!-- Weekly timeline: 7 days x 24h, coloured by which schedule covers each
          hour (matches the gateway dashboard). Hidden when no schedules. -->
     <div id="sch-timeline-wrap" class="sch-tl-wrap" hidden>
