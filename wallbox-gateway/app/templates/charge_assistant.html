@@ -941,8 +941,8 @@
     </div>
   </section>
 
-  <!-- ── Charging window (Smart charge / Smart+Solar only — shown by JS) ──── -->
-  <section class="ca-card ca-acting-card ca-start-collapsed" data-modes="target_soc,smart_solar" hidden>
+  <!-- ── Charging window (Smart charge / Smart+Solar / Solar — shown by JS) ── -->
+  <section class="ca-card ca-acting-card ca-start-collapsed" data-modes="target_soc,smart_solar,solar" hidden>
     <div class="ca-card-head">
       <span class="ca-card-icon" style="--chip:#0ea5e9">&#x23F0;</span>
       <div class="ca-card-titles">
@@ -952,6 +952,16 @@
       </div>
     </div>
     <div class="ca-card-body">
+      <!-- Solar coexistence (#152): shown first in Solar mode so it's not buried.
+           Keep the charger's OWN off-peak schedule running at night while HA does
+           daytime solar. Needs a daytime window (the checkbox below). -->
+      <div data-modes="solar" hidden>
+        <label class="ca-check"><input type="checkbox" id="keep_native_schedule"> <span>&#x1F311; Keep my charger's own night schedule</span></label>
+        <div class="ca-hint">HA charges on solar during your daytime hours (set the window below);
+           your charger's built-in off-peak schedule keeps running <em>outside</em> those hours on
+           the charger itself — a cheap night charge <strong>even if Home Assistant is offline</strong>.
+           Only native schedules that overlap your daytime hours are paused.</div>
+      </div>
       <label class="ca-check"><input type="checkbox" id="window_enabled"> <span>Only charge during a set window</span></label>
       <div id="window-wrap" hidden>
         <div class="ca-row">
@@ -965,15 +975,18 @@
           </div>
         </div>
         <div class="ca-hint" id="window-dur"></div>
-        <label class="ca-check"><input type="checkbox" id="window_overrun"> <span>Keep charging past the window until the target is reached</span></label>
-        <label class="ca-check"><input type="checkbox" id="window_prestart"> <span>Start before the window if needed to be ready by departure</span></label>
-        <label class="ca-check"><input type="checkbox" id="window_cost_warn"> <span>Notify me when a charge runs outside the window</span></label>
-        <div class="ca-hint">The window <strong>bounds the charge</strong>: it starts just-in-time to finish
-           by the <em>end</em> of the window and <strong>stops at the window end</strong>. The window can cross
-           midnight (e.g. 23:00 → 07:00). To let a departure deadline push charging
-           <em>outside</em> the cheap window, turn on “keep charging past the window” (overrun) and/or
-           “start before the window” (pre-start) above — otherwise the window wins and the car may not
-           reach target if the cheap hours are too short.</div>
+        <!-- Grid-target relaxations — only meaningful for Smart charge / Smart+Solar. -->
+        <div data-modes="target_soc,smart_solar" hidden>
+          <label class="ca-check"><input type="checkbox" id="window_overrun"> <span>Keep charging past the window until the target is reached</span></label>
+          <label class="ca-check"><input type="checkbox" id="window_prestart"> <span>Start before the window if needed to be ready by departure</span></label>
+          <label class="ca-check"><input type="checkbox" id="window_cost_warn"> <span>Notify me when a charge runs outside the window</span></label>
+          <div class="ca-hint">The window <strong>bounds the charge</strong>: it starts just-in-time to finish
+             by the <em>end</em> of the window and <strong>stops at the window end</strong>. The window can cross
+             midnight (e.g. 23:00 → 07:00). To let a departure deadline push charging
+             <em>outside</em> the cheap window, turn on “keep charging past the window” (overrun) and/or
+             “start before the window” (pre-start) above — otherwise the window wins and the car may not
+             reach target if the cheap hours are too short.</div>
+        </div>
       </div>
     </div>
   </section>

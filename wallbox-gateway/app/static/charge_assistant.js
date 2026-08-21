@@ -156,6 +156,9 @@
   const WINDOW_CHECKS = {
     window_enabled: "window_enabled", window_overrun: "window_overrun",
     window_prestart: "window_prestart", window_cost_warn: "window_cost_warn",
+    // Solar coexistence (#152): keep the charger's own night schedule running.
+    // Gathered for all acting modes but the engine only honours it in Solar.
+    keep_native_schedule: "keep_native_schedule",
   };
 
   // Plug-in reminder LAYER — saved as a nested `reminder` sub-dict so it can
@@ -838,6 +841,8 @@
     const wd = $("window-desc");
     if (wd) wd.textContent = (mode === "smart_solar")
       ? "Limits GRID top-up to cheap hours (e.g. midnight–6am). Solar still charges anytime there's surplus."
+      : (mode === "solar")
+      ? "Your daytime solar hours (e.g. 8am–5pm). HA charges on surplus within them; outside them you can keep the charger's own night schedule running (below)."
       : "Restrict charging to cheap hours (e.g. midnight–6am) so it never runs when power is expensive.";
     const form = $("ca-form");
     if (form) form.dataset.mode = mode;
@@ -1055,7 +1060,7 @@
         s += $("load_limit_w").value && Number($("load_limit_w").value) > 0
           ? `, keeping total house draw under ${b($("load_limit_w").value + " W")}.` : ".";
       }
-      return s + windowClause() + reminderLayerClause();
+      return s + windowClause() + coexistClause() + reminderLayerClause();
     }
 
     if (currentMode === "smart_solar") {
@@ -1339,6 +1344,18 @@
     if (extra.length) s += ", " + extra.join(" and ");
     s += ".";
     return s;
+  }
+
+  // Solar coexistence (#152): the charger's own off-peak schedule keeps running
+  // outside the daytime window. Only meaningful in Solar with a window set.
+  function coexistClause() {
+    const keep = $("keep_native_schedule");
+    if (currentMode !== "solar" || !keep || !keep.checked) return "";
+    const en = $("window_enabled");
+    if (!en || !en.checked || !$("window_start").value || !$("window_end").value) {
+      return " Set a daytime window above to keep your charger's night schedule.";
+    }
+    return " Your charger's own schedule keeps running outside those hours (even if HA is offline).";
   }
 
   // Be honest about forecast availability — cheapest-window is impossible

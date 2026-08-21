@@ -57,6 +57,18 @@ def _inject_asset_v():
     return {"ASSET_V": v}
 
 
+@app.after_request
+def _no_store_html(resp):
+    """Never let the browser/ingress cache an HTML page — otherwise a rebuilt
+    add-on keeps serving the old markup until a manual hard-refresh (the ?v
+    cache-buster only covers JS/CSS, not the page itself). Matches the firmware
+    dashboard's no-store policy. Static assets keep their short max-age."""
+    ctype = resp.headers.get("Content-Type", "")
+    if ctype.startswith("text/html"):
+        resp.headers["Cache-Control"] = "no-store, max-age=0"
+    return resp
+
+
 def _gateway_error(exc: Exception) -> Tuple[dict, int]:
     if isinstance(exc, GatewayNotConfigured):
         return {"error": "not_configured", "detail": str(exc)}, 503
