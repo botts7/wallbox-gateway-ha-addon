@@ -95,7 +95,7 @@ def _cfg():
 # READS it (never blocks a poll on a BLE round-trip).
 import threading
 import time as _time
-from next_charge import compute_next_charge
+from next_charge import compute_next_charge, plug_reminder_due
 
 _SCHED_TTL = 300.0
 _sched_cache: dict = {}          # gateway ip -> {"ts", "schedules", "tz"}
@@ -240,8 +240,15 @@ def api_status():
     try:
         if isinstance(status, dict):
             schedules, tz = _cached_schedules(cfg)
-            status["next_scheduled_charge_local"] = compute_next_charge(
-                schedules, tz, _time.time())
+            now = _time.time()
+            nc = compute_next_charge(schedules, tz, now)
+            status["next_scheduled_charge_local"] = nc
+            # Recompute the plug-in reminder against the tz-correct next charge;
+            # None => leave the firmware's plug_reminder flag as the fallback.
+            plug = plug_reminder_due(
+                nc, status.get("rem_lead"), status.get("car_connected"), now)
+            if plug is not None:
+                status["plug_reminder_local"] = plug
     except Exception:
         pass
     return jsonify(status)

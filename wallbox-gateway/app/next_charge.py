@@ -67,3 +67,25 @@ def compute_next_charge(schedules, tz_name, now_epoch):
                     best = inst
                 break  # earliest occurrence for this schedule
     return best
+
+
+def plug_reminder_due(next_local, rem_lead, car_connected, now_epoch):
+    """Whether to nudge the user to plug in: a charge is due within ``rem_lead``
+    minutes AND the car is NOT connected, evaluated against the tz-correct
+    ``next_local`` epoch (not the firmware's UTC value).
+
+    Returns ``True``/``False`` when determinable, or ``None`` when it can't be
+    computed (missing lead / no next charge / unknown plug state) so the caller
+    falls back to the firmware's plug_reminder flag.
+    """
+    if not isinstance(rem_lead, (int, float)) or isinstance(rem_lead, bool):
+        return None
+    if rem_lead <= 0:
+        return False
+    if not isinstance(next_local, (int, float)) or next_local <= 0:
+        return None
+    if not isinstance(car_connected, bool):
+        return None
+    if car_connected:
+        return False
+    return 0 < (int(next_local) - int(now_epoch)) <= int(rem_lead) * 60

@@ -121,9 +121,12 @@ function updateChargeReminder(s) {
     else nav.hidden = true;
   }
   // Banner: reserved for the plug-in WARNING only (the routine reminder now
-  // lives in the nav bar, so it doesn't take a full banner row).
+  // lives in the nav bar, so it doesn't take a full banner row). Prefer the
+  // backend's tz-correct plug_reminder_local; the firmware's plug_reminder is
+  // UTC-timed (a day off for local-midnight schedules).
+  const plug = (typeof s.plug_reminder_local === 'boolean') ? s.plug_reminder_local : s.plug_reminder;
   if (el) {
-    if (s.plug_reminder) {
+    if (plug) {
       el.className = 'banner banner-warn';
       setText('charge-reminder-icon', '\u{1F50C}');
       setText('charge-reminder-title', 'Not plugged in');
