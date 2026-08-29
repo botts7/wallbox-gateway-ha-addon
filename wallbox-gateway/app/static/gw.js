@@ -130,8 +130,65 @@
     grp.appendChild(btn);   // Cards button (if any) then the theme toggle
   }
 
+  // Brand mark in the header + a mobile hamburger for the nav. The nav markup
+  // lives in each template; we add (once) a brand icon and a burger toggle so
+  // the nav collapses on phones instead of wrapping/scrolling. CSS shows the
+  // burger and hides the links until `.nav-open` only at mobile widths.
+  function setupBrandAndNav() {
+    var header = document.querySelector("header");
+    var h1 = header && header.querySelector("h1");
+    if (header && h1 && !header.querySelector(".brand-icon")) {
+      var img = document.createElement("img");
+      img.className = "brand-icon";
+      img.src = "static/icon.svg";
+      img.alt = "";
+      header.insertBefore(img, h1);
+    }
+    var nav = document.querySelector(".topnav");
+    if (nav && !nav.querySelector(".nav-burger")) {
+      var burger = document.createElement("button");
+      burger.type = "button";
+      burger.className = "nav-burger";
+      burger.setAttribute("aria-label", "Menu");
+      burger.setAttribute("aria-expanded", "false");
+      burger.textContent = "☰";                     // hamburger glyph
+      var active = nav.querySelector("a.active");
+      var label = document.createElement("span");
+      label.className = "nav-current";
+      label.textContent = active ? active.textContent.trim() : "Menu";
+      nav.insertBefore(label, nav.firstChild);
+      nav.insertBefore(burger, nav.firstChild);
+      burger.addEventListener("click", function () {
+        var open = nav.classList.toggle("nav-open");
+        burger.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+      // Tapping a link closes the menu (SPA-style feel even though it navigates).
+      nav.addEventListener("click", function (e) {
+        if (e.target.closest("a")) { nav.classList.remove("nav-open"); burger.setAttribute("aria-expanded", "false"); }
+      });
+    }
+  }
+
+  // Responsive width — HA's ingress iframe often lays the page out WIDER than the
+  // phone (its viewport meta doesn't take effect), so CSS @media breakpoints
+  // never fire on mobile. Instead we read the REAL device width from the HA
+  // frontend (the iframe's parent) and toggle an `.wb-narrow` class the styles
+  // key off. Falls back to our own innerWidth outside ingress.
+  function applyNarrow() {
+    var w = window.innerWidth || 9999;
+    try {
+      if (window.parent && window.parent !== window && window.parent.innerWidth) {
+        w = Math.min(w, window.parent.innerWidth);
+      }
+    } catch (e) { /* cross-origin — keep our own width */ }
+    document.documentElement.classList.toggle("wb-narrow", w <= 620);
+  }
+
   // Populate the header IP + inject the switcher when >1 gateway is configured.
   function init() {
+    setupBrandAndNav();
+    applyNarrow();
+    window.addEventListener("resize", applyNarrow, { passive: true });
     if (document.getElementById("cards-customize")) headerRight();  // right-align Cards even outside ingress
     injectThemeToggle();
     realFetch("api/gateways").then(function (r) { return r.json(); }).then(function (d) {

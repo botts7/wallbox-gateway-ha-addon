@@ -4,6 +4,44 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.55.1] - 2026-08-29
+
+### Fixed
+- **Charge-schedule days were shown one day late.** The charger's `days` bitmask
+  is Sunday-first (bit 0 = Sunday), matching the official Wallbox app, but the
+  add-on numbered it Monday-first — so a Sunday schedule displayed as Monday and
+  a Mon–Fri schedule as Tue–Sat. The Dashboard schedule chips, weekly timeline,
+  and the day-picker in the editor are now Sunday-first, and the Sessions/Costs
+  window-matcher uses the same convention (no functional change to what the
+  charger stores — display/attribution only).
+- **"Next scheduled charge" showed the wrong day for local-midnight schedules.**
+  The charger stores a schedule's `days` as the *local* weekday but its `start`
+  as a UTC time, so a Sydney "Sunday 00:00" schedule (14:00 UTC) was being read a
+  day late ("Monday"). The add-on **backend** now computes the next charge in the
+  charger's own timezone using Python's real time-zone database (`zoneinfo`,
+  seeded by the charger's `g_tzn` zone — no hard-coded offsets) and folds it into
+  `/api/status`, so the dashboard shows the correct day on first paint with no
+  client-side catch-up. A background thread keeps a small schedule cache warm, so
+  status polls never wait on the charger. (The firmware's own `/api/status`
+  value stays UTC-based; the HA integration's sensor is a separate follow-up.)
+
+### Changed
+- **Schedule/heatmap day order is Monday→Sunday.** Days now read Mon…Sun so the
+  weekend (Sat, Sun) sits together, while the underlying Sunday-first bit mapping
+  stays correct (display order is decoupled from the bit index).
+- **Robust timezone handling for the heatmap, costs and seasons.** Day/hour/month
+  binning in the charger's timezone now uses `Intl.DateTimeFormat.formatToParts`
+  instead of re-parsing a locale string back into a `Date`
+  (`new Date(d.toLocaleString(...))`) — the old approach is implementation-defined
+  and could silently mis-bin around midnight / DST in some browsers. Shared
+  helper across `sessions.js` and `cost.js`; the formatter rebuilds when the
+  charger's timezone (`g_tzn`) is learned.
+- **Mobile layout.** The header and nav now collapse cleanly on phones: a brand
+  icon replaces the emoji, the page menu becomes a hamburger, and the layout is
+  driven by the real device width (read from the HA frontend) instead of the
+  ingress iframe's wider viewport, so the Sessions hero and cards render and fit
+  on a phone. Removed the header battery emoji; OTA page title no longer wraps.
+
 ## [0.55.0] - 2026-08-22
 
 ### Changed

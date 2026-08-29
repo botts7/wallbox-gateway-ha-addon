@@ -37,14 +37,43 @@ window.WBCost = (function () {
     }
   }
 
-  function tzDayHour(epoch) {
+  // Robust epoch -> calendar parts in CHARGER_TZ via Intl.formatToParts (stable
+  // across engines and DST) — see sessions.js for the rationale. Cached formatter
+  // rebuilds when CHARGER_TZ changes (set from the charger's g_tzn after boot).
+  const _DOW = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  let _tzFmt = null, _tzFmtZone = null;
+  function _tzFormatter() {
+    if (_tzFmt && _tzFmtZone === CHARGER_TZ) return _tzFmt;
+    const opts = { weekday: 'short', year: 'numeric', month: 'numeric', day: '2-digit',
+                   hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+    try { _tzFmt = new Intl.DateTimeFormat('en-US', Object.assign({ timeZone: CHARGER_TZ }, opts)); }
+    catch (e) { _tzFmt = new Intl.DateTimeFormat('en-US', opts); }  // bad TZ -> browser-local
+    _tzFmtZone = CHARGER_TZ;
+    return _tzFmt;
+  }
+  // epoch -> {day:0-6(Sun=0), hour:0-23, minute, second, month:0-11, year} in TZ.
+  function tzParts(epoch) {
+    const d = new Date(epoch * 1000);
     try {
-      const local = new Date(new Date(epoch * 1000).toLocaleString('en-US', { timeZone: CHARGER_TZ }));
-      return { day: local.getDay(), hour: local.getHours() };
+      const p = {};
+      for (const part of _tzFormatter().formatToParts(d)) p[part.type] = part.value;
+      let hour = parseInt(p.hour, 10);
+      if (isNaN(hour) || hour === 24) hour = 0;   // some engines emit '24' at midnight
+      const day = _DOW[p.weekday];
+      return {
+        day: (day === undefined ? d.getDay() : day),
+        hour,
+        minute: parseInt(p.minute, 10) || 0,
+        second: parseInt(p.second, 10) || 0,
+        month: (parseInt(p.month, 10) || (d.getMonth() + 1)) - 1,  // 0-based, matches getMonth()
+        year: parseInt(p.year, 10) || d.getFullYear(),
+      };
     } catch (e) {
-      const d = new Date(epoch * 1000); return { day: d.getDay(), hour: d.getHours() };
+      return { day: d.getDay(), hour: d.getHours(), minute: d.getMinutes(),
+               second: d.getSeconds(), month: d.getMonth(), year: d.getFullYear() };
     }
   }
+  function tzDayHour(epoch) { const p = tzParts(epoch); return { day: p.day, hour: p.hour }; }
 
   // ---- tariff model (mirrors sessions.js) ----
   function _monthInSeason(month, season) {
@@ -53,9 +82,7 @@ window.WBCost = (function () {
   }
   function _seasonFor(tariff, epoch) {
     if (!tariff.seasonal || !Array.isArray(tariff.seasons)) return null;
-    let month;
-    try { month = new Date(new Date(epoch * 1000).toLocaleString('en-US', { timeZone: CHARGER_TZ })).getMonth(); }
-    catch (e) { month = new Date(epoch * 1000).getMonth(); }
+    const month = tzParts(epoch).month;
     for (const s of tariff.seasons) { if (_monthInSeason(month, s)) return s.id; }
     return null;
   }
@@ -107,7 +134,9 @@ window.WBCost = (function () {
     const n = parseInt(String(v), 10) || 0;
     return Math.floor(n / 100) * 60 + (n % 100);
   }
-  function _monBit(epoch) { return ((new Date(epoch * 1000).getUTCDay() + 6) % 7); }
+  // Charger day-bitmask is Sunday-first (bit0=Sun..bit6=Sat), so getUTCDay()
+  // (0=Sun) is already the bit index — no Monday shift.
+  function _dayBit(epoch) { return new Date(epoch * 1000).getUTCDay(); }
 
   function _governingStart(ts, dur) {
     if (!_scheduleWindows.length) return null;
@@ -117,7 +146,7 @@ window.WBCost = (function () {
       let cand = dayStart + w.startMinUTC * 60;
       if (ts >= cand + w.lenS) cand += 86400;
       for (let g = 0; g < 8; g++) {
-        if (w.days & (1 << _monBit(cand))) break;
+        if (w.days & (1 << _dayBit(cand))) break;
         cand += 86400;
       }
       const start = Math.max(ts, cand);
@@ -204,10 +233,8 @@ window.WBCost = (function () {
     return (parseInt(m[0], 10) || 0) * 60 + (parseInt(m[1], 10) || 0);
   }
   function _localMidnight(epoch) {
-    try {
-      const l = new Date(new Date(epoch * 1000).toLocaleString('en-US', { timeZone: CHARGER_TZ }));
-      return epoch - (l.getHours() * 3600 + l.getMinutes() * 60 + l.getSeconds());
-    } catch (e) { return Math.floor(epoch / 86400) * 86400; }
+    const p = tzParts(epoch);
+    return epoch - (p.hour * 3600 + p.minute * 60 + p.second);
   }
   function _fixedStart(ts, hhmm) {
     let start = _localMidnight(ts) + _hhmmToMin(hhmm) * 60;
@@ -329,6 +356,58 @@ window.WBCost = (function () {
     return summary;
   }
 
+  // Charger-tz UTC offset (minutes east of UTC) at `epoch`, taken from the
+  // platform's real tz database via Intl — DST-correct, nothing hardcoded.
+  // "Wall clock in tz composed as if UTC" minus the real UTC instant = offset.
+  function tzOffsetMin(epoch) {
+    try {
+      const d = new Date(epoch * 1000);
+      const p = {};
+      for (const x of _tzFormatter().formatToParts(d)) p[x.type] = x.value;
+      let hr = parseInt(p.hour, 10); if (hr === 24 || isNaN(hr)) hr = 0;
+      const asUTC = Date.UTC(+p.year, (parseInt(p.month, 10) || 1) - 1, +p.day,
+                             hr, +p.minute || 0, +p.second || 0);
+      return Math.round((asUTC - d.getTime()) / 60000);
+    } catch (e) { return 0; }
+  }
+
+  // Next scheduled charge as a UTC epoch, computed from the ENABLED native
+  // schedules in the charger's LOCAL time. The charger stores `days` as the
+  // local weekday (bit0=Sun) but `start` as a UTC minute-of-day, so we convert
+  // each start to a local time-of-day (via the Intl-derived offset) before
+  // pairing it with the local day bit. This is why the firmware's UTC-only
+  // value landed a local-midnight window on the wrong day. Returns 0 when no
+  // schedule/timezone is loaded yet (caller falls back to the firmware value).
+  function nextChargeEpoch(nowEpoch) {
+    nowEpoch = nowEpoch || Math.floor(Date.now() / 1000);
+    if (!_scheduleWindows.length) return 0;
+    const off = tzOffsetMin(nowEpoch);
+    const lp = tzParts(nowEpoch);                       // charger-local now
+    const nowMow = lp.day * 1440 + lp.hour * 60 + lp.minute;
+    let best = Infinity;
+    _scheduleWindows.forEach((w) => {
+      if (!w.days) return;
+      const localStart = (((w.startMinUTC + off) % 1440) + 1440) % 1440;
+      for (let d = 0; d < 7; d++) {
+        if (!((w.days >> d) & 1)) continue;
+        let delta = (d * 1440 + localStart) - nowMow;
+        if (delta < 0) delta += 7 * 1440;               // soonest future occurrence
+        if (delta < best) best = delta;
+      }
+    });
+    if (!isFinite(best)) return 0;
+    // now stays UTC; local-minute delta == elapsed real minutes barring a DST
+    // jump inside the next week (self-corrects on the next refresh).
+    return nowEpoch - lp.second + best * 60;
+  }
+
+  // Format an epoch in the CHARGER's timezone (so the weekday shown matches the
+  // schedule the user set, regardless of the viewing browser's timezone).
+  function fmtLocal(epoch, opts) {
+    try { return new Date(epoch * 1000).toLocaleString(undefined, Object.assign({ timeZone: CHARGER_TZ }, opts)); }
+    catch (e) { return new Date(epoch * 1000).toLocaleString(undefined, opts); }
+  }
+
   // Test hook: lets a headless/browser test inject the windows that are
   // normally fetched, then exercise the pure cost/baseline math directly.
   const _debug = {
@@ -342,5 +421,5 @@ window.WBCost = (function () {
     summarizeFromLog: (tariff) => summarizeFromLog(tariff),
   };
 
-  return { refresh: refresh, _debug: _debug };
+  return { refresh: refresh, nextChargeEpoch: nextChargeEpoch, fmtLocal: fmtLocal, _debug: _debug };
 })();

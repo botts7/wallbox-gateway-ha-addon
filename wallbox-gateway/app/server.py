@@ -85,6 +85,76 @@ def _cfg():
     return config_for(request.args.get("gw"))
 
 
+# ── Charger-local "next scheduled charge" ───────────────────────────────────
+# The firmware computes next_scheduled_charge in UTC, which lands a local-
+# midnight schedule on the wrong day. We recompute it here with a real tz
+# database from the charger's own schedules (r_schs) + zone (g_tzn) and fold it
+# into /api/status as next_scheduled_charge_local, so the UI shows the right day
+# on first paint — no client-side catch-up. Schedules change rarely, so a
+# background thread refreshes a small per-gateway cache and the status route only
+# READS it (never blocks a poll on a BLE round-trip).
+import threading
+import time as _time
+from next_charge import compute_next_charge
+
+_SCHED_TTL = 300.0
+_sched_cache: dict = {}          # gateway ip -> {"ts", "schedules", "tz"}
+_sched_lock = threading.Lock()
+
+
+def _fetch_schedules(cfg) -> None:
+    """Read r_schs + g_tzn from the gateway and update the cache. Best-effort —
+    keeps the previous good values on a transient BLE miss."""
+    key = getattr(cfg, "ip", "") or ""
+    schedules = tz = None
+    try:
+        r = fetch_json(cfg, "/api/command?action=bapi&met=r_schs&par=null&wait=6000", timeout=10.0)
+        rr = (r or {}).get("r")
+        if isinstance(rr, dict):
+            schedules = rr.get("schedules")
+        elif isinstance(rr, list):
+            schedules = rr
+    except Exception:
+        schedules = None
+    try:
+        t = fetch_json(cfg, "/api/command?action=bapi&met=g_tzn&par=null&wait=6000", timeout=8.0)
+        tz = ((t or {}).get("r") or {}).get("timezone")
+    except Exception:
+        tz = None
+    with _sched_lock:
+        prev = _sched_cache.get(key) or {}
+        _sched_cache[key] = {
+            "ts": _time.time(),
+            "schedules": schedules if schedules is not None else prev.get("schedules"),
+            "tz": tz or prev.get("tz"),
+        }
+
+
+def _cached_schedules(cfg):
+    key = getattr(cfg, "ip", "") or ""
+    with _sched_lock:
+        ent = _sched_cache.get(key)
+        if ent:
+            return ent.get("schedules"), ent.get("tz")
+    return None, None
+
+
+def _sched_warmer() -> None:
+    """Refresh every configured gateway's schedule cache on a TTL, starting
+    immediately so the value is ready by the time a browser connects."""
+    while True:
+        try:
+            for g in gateways():
+                if getattr(g, "configured", False):
+                    _fetch_schedules(g)
+        except Exception:
+            pass
+        _time.sleep(_SCHED_TTL)
+
+
+threading.Thread(target=_sched_warmer, name="sched-warmer", daemon=True).start()
+
+
 @app.route("/api/gateways")
 def api_gateways():
     """The configured gateways, for the UI's gateway switcher. Never returns the
@@ -161,10 +231,20 @@ def api_health():
 def api_status():
     cfg = _cfg()
     try:
-        return jsonify(fetch_json(cfg, "/api/status"))
+        status = fetch_json(cfg, "/api/status")
     except Exception as e:
         body, code = _gateway_error(e)
         return jsonify(body), code
+    # Fold in the charger-local next charge (best-effort; never fail the status
+    # on it). Reads the cached schedules only — no BLE round-trip on this path.
+    try:
+        if isinstance(status, dict):
+            schedules, tz = _cached_schedules(cfg)
+            status["next_scheduled_charge_local"] = compute_next_charge(
+                schedules, tz, _time.time())
+    except Exception:
+        pass
+    return jsonify(status)
 
 
 @app.route("/api/charge_log")

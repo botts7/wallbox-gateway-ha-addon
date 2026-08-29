@@ -6,7 +6,10 @@
 
 const $ = (id) => document.getElementById(id);
 const setText = (id, v) => { const el = $(id); if (el) el.textContent = (v ?? '--'); };
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];   // indexed by getDay() (0=Sun)
+// Heatmap row order — Monday first so the weekend (Sat, Sun) sits together at the
+// bottom. Values are getDay() indices, not row positions.
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const CACHE_KEY = 'wb-addon-sessions-v2';  // v2: includes gen (green energy) + gap-fill retry
 const RATE_KEY = 'wb-addon-rate-v1';
 
@@ -33,15 +36,47 @@ let _scheduleWindows = [];
 // browser's — so times are correct even when viewed from a phone in another
 // timezone, and match the gateway's own dashboard. Falls back to browser TZ.
 let CHARGER_TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) { return 'UTC'; } })();
-// epoch -> {day:0-6 (Sun=0), hour:0-23} in CHARGER_TZ
-function tzDayHour(epoch) {
+// Robust epoch -> calendar parts in CHARGER_TZ. Uses Intl.formatToParts (stable
+// across engines and DST) instead of re-parsing a locale string back into a Date
+// (`new Date(d.toLocaleString(...))`), which is implementation-defined and can be
+// silently wrong in some locales / around DST transitions. The formatter is
+// cached and rebuilt only when CHARGER_TZ changes (it's set from the charger's
+// g_tzn after boot). Locale pinned to en-US so weekday names are always English.
+const _DOW = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+let _tzFmt = null, _tzFmtZone = null;
+function _tzFormatter() {
+  if (_tzFmt && _tzFmtZone === CHARGER_TZ) return _tzFmt;
+  const opts = { weekday: 'short', year: 'numeric', month: 'numeric',
+                 hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+  try { _tzFmt = new Intl.DateTimeFormat('en-US', Object.assign({ timeZone: CHARGER_TZ }, opts)); }
+  catch (e) { _tzFmt = new Intl.DateTimeFormat('en-US', opts); }  // bad TZ -> browser-local
+  _tzFmtZone = CHARGER_TZ;
+  return _tzFmt;
+}
+// epoch -> {day:0-6(Sun=0), hour:0-23, minute, second, month:0-11, year} in TZ.
+function tzParts(epoch) {
+  const d = new Date(epoch * 1000);
   try {
-    const local = new Date(new Date(epoch * 1000).toLocaleString('en-US', { timeZone: CHARGER_TZ }));
-    return { day: local.getDay(), hour: local.getHours() };
+    const p = {};
+    for (const part of _tzFormatter().formatToParts(d)) p[part.type] = part.value;
+    let hour = parseInt(p.hour, 10);
+    if (isNaN(hour) || hour === 24) hour = 0;   // some engines emit '24' at midnight
+    const day = _DOW[p.weekday];
+    return {
+      day: (day === undefined ? d.getDay() : day),
+      hour,
+      minute: parseInt(p.minute, 10) || 0,
+      second: parseInt(p.second, 10) || 0,
+      month: (parseInt(p.month, 10) || (d.getMonth() + 1)) - 1,  // 0-based, matches getMonth()
+      year: parseInt(p.year, 10) || d.getFullYear(),
+    };
   } catch (e) {
-    const d = new Date(epoch * 1000); return { day: d.getDay(), hour: d.getHours() };
+    return { day: d.getDay(), hour: d.getHours(), minute: d.getMinutes(),
+             second: d.getSeconds(), month: d.getMonth(), year: d.getFullYear() };
   }
 }
+// epoch -> {day:0-6 (Sun=0), hour:0-23} in CHARGER_TZ
+function tzDayHour(epoch) { const p = tzParts(epoch); return { day: p.day, hour: p.hour }; }
 function fmtTime(epoch, opts) {
   try { return new Date(epoch * 1000).toLocaleString(undefined, Object.assign({ timeZone: CHARGER_TZ }, opts)); }
   catch (e) { return new Date(epoch * 1000).toLocaleString(undefined, opts); }
@@ -86,9 +121,7 @@ function _monthInSeason(month, season) {
 }
 function _seasonFor(tariff, epoch) {
   if (!tariff.seasonal || !Array.isArray(tariff.seasons)) return null;
-  let month;
-  try { month = new Date(new Date(epoch * 1000).toLocaleString('en-US', { timeZone: CHARGER_TZ })).getMonth(); }
-  catch (e) { month = new Date(epoch * 1000).getMonth(); }
+  const month = tzParts(epoch).month;
   for (const s of tariff.seasons) { if (_monthInSeason(month, s)) return s.id; }
   return null;  // shoulder months -> default band.rate
 }
@@ -164,9 +197,10 @@ function _parseHHMM(v) {
   const n = parseInt(String(v), 10) || 0;
   return Math.floor(n / 100) * 60 + (n % 100);
 }
-// UTC weekday (0=Sun..6=Sat) -> Mon-indexed bit (0=Mon..6=Sun), matching the
-// charger's day bitmask.
-function _monBit(epoch) { return ((new Date(epoch * 1000).getUTCDay() + 6) % 7); }
+// UTC weekday as the charger's day-bitmask bit. The charger is Sunday-first
+// (bit0=Sun..bit6=Sat, verified against the Wallbox app), so getUTCDay() (0=Sun)
+// is already the bit index — no Monday shift.
+function _dayBit(epoch) { return new Date(epoch * 1000).getUTCDay(); }
 
 // Infer the real charge-START epoch for a session that has no firmware
 // interval, using the enabled native schedule: the car waits and charges in
@@ -180,7 +214,7 @@ function _governingStart(ts, dur) {
     let cand = dayStart + w.startMinUTC * 60;
     if (ts >= cand + w.lenS) cand += 86400;  // window already passed today -> next day
     for (let g = 0; g < 8; g++) {            // honour the schedule's day-of-week set
-      if (w.days & (1 << _monBit(cand))) break;
+      if (w.days & (1 << _dayBit(cand))) break;
       cand += 86400;
     }
     const start = Math.max(ts, cand);        // plugged in mid-window -> start now
@@ -312,10 +346,8 @@ function loadBaseline() {
 }
 function _hhmmToMin(v) { const m = String(v || '').split(':'); return (parseInt(m[0], 10) || 0) * 60 + (parseInt(m[1], 10) || 0); }
 function _localMidnightS(epoch) {
-  try {
-    const l = new Date(new Date(epoch * 1000).toLocaleString('en-US', { timeZone: CHARGER_TZ }));
-    return epoch - (l.getHours() * 3600 + l.getMinutes() * 60 + l.getSeconds());
-  } catch (e) { return Math.floor(epoch / 86400) * 86400; }
+  const p = tzParts(epoch);
+  return epoch - (p.hour * 3600 + p.minute * 60 + p.second);
 }
 function _fixedStart(ts, hhmm) { let s = _localMidnightS(ts) + _hhmmToMin(hhmm) * 60; if (s < ts) s += 86400; return s; }
 function _baselineCost(tariff, s) {
@@ -585,7 +617,7 @@ function buildHeatmap() {
   };
   hm.appendChild(cell('hm-hd'));
   for (let h = 0; h < 24; h++) hm.appendChild(cell('hm-hd', h % 6 === 0 ? h : ''));
-  for (let d = 0; d < 7; d++) {
+  for (const d of DAY_ORDER) {          // Mon→Sun rows; grid[] is getDay()-indexed
     hm.appendChild(cell('hm-day', DAYS[d]));
     for (let h = 0; h < 24; h++) {
       const v = grid[d][h], it = max > 0 ? v / max : 0;

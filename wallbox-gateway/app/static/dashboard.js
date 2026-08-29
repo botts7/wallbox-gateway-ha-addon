@@ -36,11 +36,16 @@ function fmtUptime(seconds) {
   return `${h}h ${m % 60}m`;
 }
 
-// Charge-reminder banner (#127). next_scheduled_charge (UTC epoch) +
-// plug_reminder come straight from /api/status — gateway-computed, no
-// charger round-trip. Times render in the browser's locale.
+// Charge-reminder banner (#127). plug_reminder comes from /api/status; the next
+// charge time is computed by WBCost in the CHARGER's local timezone (see
+// updateChargeReminder) — the firmware's UTC-only value mislands local-midnight
+// windows on the wrong day. Rendered in the charger's timezone so the weekday
+// matches the schedule the user set, not the viewing browser's locale.
 function fmtChargeTime(epoch) {
   try {
+    if (window.WBCost && WBCost.fmtLocal) {
+      return WBCost.fmtLocal(epoch, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    }
     return new Date(epoch * 1000).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
   } catch (e) {
     return new Date(epoch * 1000).toLocaleString();
@@ -102,7 +107,14 @@ function updateChargeReminder(s) {
     if (nav) nav.hidden = true;
     return;
   }
-  const nsc = s.next_scheduled_charge;
+  // Charger-local next charge only — NEVER the firmware's next_scheduled_charge
+  // (computed in UTC, it mislands a local-midnight window on the wrong day). The
+  // backend folds the correct value into /api/status as next_scheduled_charge_local
+  // (right on first paint); WBCost is a client-side fallback for a cold backend
+  // cache or an older gateway. If neither is ready we show nothing — a brief
+  // blank beats flashing the wrong day and correcting it.
+  let nsc = (typeof s.next_scheduled_charge_local === 'number') ? s.next_scheduled_charge_local : 0;
+  if (!nsc && window.WBCost && WBCost.nextChargeEpoch) nsc = WBCost.nextChargeEpoch();
   // Nav bar: the routine "next scheduled charge" time (informational).
   if (nav) {
     if (nsc) { setText('nav-next-time', fmtChargeTime(nsc)); nav.hidden = false; }
@@ -854,7 +866,14 @@ function showNotifs() {
 // sid) and clr_sch ({"sid":[N]}) — the same proven shapes the gateway's own
 // dashboard sends. Times are entered/displayed LOCAL and stored as the UTC
 // HHMM the charger keeps (matching the gateway dashboard's conversion).
-const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+// The charger's `days` bitmask is Sunday-first: bit0=Sun … bit6=Sat (verified
+// against the official Wallbox app — a Sunday schedule reads days=1, Mon-Fri
+// reads days=62). DAY_NAMES is indexed by BIT, so it must lead with Sunday.
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+// Display order — Monday first so the weekend (Sat, Sun) sits together at the
+// end. Values are the charger's day BITS (Sun=0 … Sat=6), NOT row positions, so
+// labels/reads stay correct while the visual order is Mon→Sun.
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 let _schedules = [];
 let _editingSid = null;
 
@@ -871,11 +890,11 @@ function utcToLocal(hhmm) {            // "1400"/HHMM UTC -> "HH:MM" local
   d.setUTCHours(+s.slice(0, 2) || 0, +s.slice(2) || 0, 0, 0);
   return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
 }
-function daysBitsToArray(bits) {       // bitmask (bit0=Mon..bit6=Sun) -> [0/1 x7]
+function daysBitsToArray(bits) {       // bitmask (bit0=Sun..bit6=Sat) -> [0/1 x7]
   const a = []; for (let i = 0; i < 7; i++) a.push((bits >> i) & 1); return a;
 }
 function daysLabel(bits) {
-  const on = []; for (let i = 0; i < 7; i++) if ((bits >> i) & 1) on.push(DAY_NAMES[i]);
+  const on = []; for (const b of DAY_ORDER) if ((bits >> b) & 1) on.push(DAY_NAMES[b]);
   if (on.length === 7) return 'Every day';
   if (on.length === 0) return 'No days';
   return on.join(' ');
@@ -894,7 +913,7 @@ function buildScheduleTimeline() {
   if (!wrap || !grid || !legend) return;
   if (!_schedules.length) { wrap.hidden = true; return; }
   wrap.hidden = false;
-  // cells[day][hour] = list of schedule indexes covering it (Mon..Sun, bit0=Mon)
+  // cells[day][hour] = list of schedule indexes covering it (Sun..Sat, bit0=Sun)
   const cells = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => []));
   _schedules.forEach((s, i) => {
     if (!s.enabled) return;
@@ -918,8 +937,8 @@ function buildScheduleTimeline() {
   // header: corner + hour ticks
   grid.appendChild(cell('sch-tl-hd'));
   for (let h = 0; h < 24; h++) grid.appendChild(cell('sch-tl-hd', h % 6 === 0 ? h : ''));
-  // day rows
-  for (let d = 0; d < 7; d++) {
+  // day rows — Mon→Sun display order; cells[] is bit-indexed so labels/data align
+  for (const d of DAY_ORDER) {
     grid.appendChild(cell('sch-tl-day', DAY_NAMES[d]));
     for (let h = 0; h < 24; h++) {
       const c = cells[d][h];
@@ -1006,7 +1025,9 @@ function openSchedForm(s) {
   $('sf-start').value = s ? utcToLocal(s.start) : '23:00';
   $('sf-stop').value = s ? utcToLocal(s.stop) : '07:00';
   const bits = s ? s.days : 0;
-  $('sf-days').querySelectorAll('input').forEach((c, i) => { c.checked = !!((bits >> i) & 1); });
+  // index by the checkbox's charger BIT (data-day), not DOM position — the day
+  // pickers are shown Mon→Sun but stored Sunday-first.
+  $('sf-days').querySelectorAll('input').forEach((c) => { c.checked = !!((bits >> (+c.dataset.day)) & 1); });
   $('sf-cur').value = s ? (s.mcr || 32) : 32;
   $('sf-cur-v').textContent = $('sf-cur').value;
   $('sf-en').checked = s ? !!s.enabled : true;
@@ -1020,7 +1041,10 @@ function schedToast(msg, kind) {
 }
 
 async function saveSchedule() {
-  const daysArr = Array.from($('sf-days').querySelectorAll('input')).map((c) => c.checked ? 1 : 0);
+  // Build a Sunday-first bit array (index = charger BIT) from the checkboxes'
+  // data-day, independent of their Mon→Sun display order.
+  const daysArr = [0, 0, 0, 0, 0, 0, 0];
+  $('sf-days').querySelectorAll('input').forEach((c) => { if (c.checked) daysArr[+c.dataset.day] = 1; });
   if (!daysArr.some(Boolean)) { schedToast('Pick at least one day', 'err'); return; }
   let sid = _editingSid;
   if (sid === null) sid = _schedules.length ? Math.max(..._schedules.map((s) => s.sid)) + 1 : 0;
@@ -1059,10 +1083,10 @@ async function deleteSchedule(sid) {
 (function initSchedUI() {
   const days = $('sf-days');
   if (days) {
-    DAY_NAMES.forEach((name, i) => {
+    DAY_ORDER.forEach((b) => {          // Mon→Sun display; data-day is the charger BIT
       const l = document.createElement('label'); l.className = 'sched-day';
-      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.day = i;
-      const sp = document.createElement('span'); sp.textContent = name;
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.day = b;
+      const sp = document.createElement('span'); sp.textContent = DAY_NAMES[b];
       l.appendChild(cb); l.appendChild(sp);
       days.appendChild(l);
     });
