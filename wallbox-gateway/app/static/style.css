@@ -84,10 +84,7 @@ header h1 {
   font-weight: 700;
   letter-spacing: -0.01em;
 }
-header h1::before {
-  content: "🔋";
-  margin-right: 8px;
-}
+/* (brand icon in the header replaces the old battery emoji) */
 header span#gw-ip {
   font-family: ui-monospace, "SF Mono", Consolas, monospace;
   color: var(--text3);
@@ -704,6 +701,33 @@ a { color: var(--accent); }
 }
 .topnav a:hover { color: var(--text); background: var(--elevated); }
 .topnav a.active { color: var(--text); background: var(--elevated); border-color: var(--border); }
+
+/* Brand mark in the header (injected by gw.js). Burger + current-page label are
+   desktop-hidden — they only appear at mobile widths. */
+.brand-icon { width: 26px; height: 26px; border-radius: 7px; flex: 0 0 auto; }
+.nav-burger, .nav-current { display: none; }
+
+/* Narrow layout. gw.js sets `.wb-narrow` on <html> from the REAL device width
+   (the HA frontend / iframe parent) because @media is unreliable inside HA's
+   ingress iframe. Compact header (wraps so nothing is cut off) + a hamburger
+   nav (links collapse; tap the burger to drop the page list). */
+html.wb-narrow header { padding: 10px 14px; gap: 8px; flex-wrap: wrap; }
+html.wb-narrow header h1 { font-size: 15px; }
+html.wb-narrow .brand-icon { width: 24px; height: 24px; }
+html.wb-narrow header span#gw-ip { display: none; }          /* free header room */
+html.wb-narrow .wb-header-right { gap: 6px; }
+html.wb-narrow .wb-theme-toggle { padding: 6px 10px; }        /* keep it on-screen */
+html.wb-narrow .topnav { flex-wrap: wrap; padding: 8px 12px; gap: 6px; align-items: center; }
+html.wb-narrow .nav-burger { display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 36px; border: 1px solid var(--border); border-radius: 9px;
+  background: var(--surface); color: var(--text); font-size: 18px; line-height: 1;
+  cursor: pointer; flex: 0 0 auto; }
+html.wb-narrow .nav-current { display: inline-flex; align-items: center; font-weight: 600;
+  font-size: 14.5px; color: var(--text); }
+html.wb-narrow .topnav a { display: none; }                   /* links hidden until opened */
+html.wb-narrow .topnav.nav-open a { display: flex; flex-basis: 100%; justify-content: flex-start;
+  padding: 11px 12px; font-size: 14px; }
+html.wb-narrow .topnav.nav-open .nav-current { display: none; }
 .nav-next {
   margin-left: auto; display: inline-flex; align-items: center; gap: 4px;
   padding: 7px 12px; font-size: 13px; font-weight: 600; color: var(--text2);
@@ -788,7 +812,13 @@ a { color: var(--accent); }
   gap: 14px;
   align-items: stretch;   /* paired cards in a row share the same height */
 }
-.page-sessions main > * { margin: 0; }
+.page-sessions main > * { margin: 0; min-width: 0; }   /* let grid cards shrink below content (no h-overflow on mobile) */
+.page-sessions .hm-wrap { overflow-x: auto; }           /* the 24-col heatmap scrolls inside its card instead of widening the page */
+/* Scale the big hero figure down on narrow devices so it never overflows. */
+html.wb-narrow .sess-hero { padding: 15px 16px; }
+html.wb-narrow .sess-hero .hero-big { font-size: 44px; }
+html.wb-narrow .sess-hero .hero-big .u { font-size: 18px; }
+html.wb-narrow .page-sessions main { grid-template-columns: 1fr; }   /* stack on phones even if the ingress iframe reports a wide width */
 @media (min-width: 1000px) {
   /* Two even columns: hero | heatmap on the top row, Costs | Recent below.
      Fixed placement (DOM order hero, heatmap, costs, recent) → nothing jumps. */

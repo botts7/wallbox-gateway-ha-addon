@@ -3,7 +3,9 @@ FROM ${BUILD_FROM}
 
 ENV LANG=C.UTF-8
 
-RUN apk add --no-cache python3 py3-pip py3-flask py3-requests \
+# tzdata: the IANA timezone database, so Python's zoneinfo can resolve the
+# charger's zone (g_tzn) for the charger-local "next scheduled charge" calc.
+RUN apk add --no-cache python3 py3-pip py3-flask py3-requests tzdata \
     && ( apk add --no-cache py3-websocket-client \
          || pip3 install --no-cache-dir --break-system-packages websocket-client \
          || pip3 install --no-cache-dir websocket-client \
