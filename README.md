@@ -56,6 +56,13 @@ Roadmap:
   week/month cost tiles · tariff **effective-dates** (past costs don't
   change when rates do) · next-charge in the nav bar · last-charge-burst
   readout
+- **v0.22.0–v0.55.x** *(current)* — guided **Charge Assistant** (Off /
+  Reminder / Smart / Solar modes · cheapest-window planner · dynamic current ·
+  commute target) · cost engine reads the gateway charge-log directly (green vs
+  grid split · per-session energy) · solar-by-day + native-schedule-by-night
+  coexistence · masonry dashboard layout · firmware **Update** entity ·
+  schedules & reminders in the charger's local timezone · matched-pair version
+  guardrails with the integration
 - **v1.0.0** — submit to community-hassio-addons for upstream
   store listing
 
