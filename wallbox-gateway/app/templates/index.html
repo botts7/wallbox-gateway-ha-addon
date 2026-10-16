@@ -360,7 +360,16 @@
   <!-- Charge schedules: create / edit / delete via the gateway BAPI
        (s_sch insert-or-update, clr_sch delete) proxied through /api/sched. -->
   <section class="card" id="sched-card" data-card="schedules">
-    <div class="chead"><span class="card-icon" style="--chip:#6366f1">🗓️</span><h2>Charge schedules</h2></div>
+    <div class="chead"><span class="card-icon" style="--chip:#6366f1">🗓️</span><h2>Charge schedules</h2>
+      <div id="wk-start" title="Which day the week starts on (display only — does not change the schedule)"
+           style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)">
+        <span style="margin-right:2px">Week starts</span>
+        <button type="button" data-ws="mon"
+          style="font:inherit;font-size:11px;padding:2px 9px;border:1px solid var(--border,#334155);background:transparent;color:var(--text2);border-radius:6px;cursor:pointer">Mon</button>
+        <button type="button" data-ws="sun"
+          style="font:inherit;font-size:11px;padding:2px 9px;border:1px solid var(--border,#334155);background:transparent;color:var(--text2);border-radius:6px;cursor:pointer">Sun</button>
+      </div>
+    </div>
     <!-- Weekly timeline: 7 days x 24h, coloured by which schedule covers each
          hour (matches the gateway dashboard). Hidden when no schedules. -->
     <div id="sch-timeline-wrap" class="sch-tl-wrap" hidden>
