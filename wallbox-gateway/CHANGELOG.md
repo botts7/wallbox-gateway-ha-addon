@@ -4,6 +4,31 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.57.1] - 2026-10-16
+
+### Fixed
+- Number fields in the Charge Assistant now clamp to their own min/max on save,
+  so a stray out-of-range value (for example a balance level above 100%) can't
+  be stored.
+
+## [0.57.0] - 2026-10-16
+
+### Added
+- **Week-start toggle (Mon / Sun)** in the Charge schedules card. Reorders the
+  schedule editor and the sessions heatmap to start the week on your chosen day.
+  Display only, remembered per browser, and never changes what is sent to the
+  charger (the charger still stores days Sunday-first).
+
+## [0.56.0] - 2026-10-16
+
+### Added
+- **"Hand back to solar" card** (Smart charge). Treat the SOC target as an
+  overnight grid floor rather than a hard cap, then hand control back to the
+  charger's native Eco-Smart solar so free surplus fills the pack through the
+  day. Needs the matching integration v0.37.0.
+- **"Battery balance" card** (Smart charge). Periodic full charge every N days
+  (configurable level and interval) for LFP cell rebalancing.
+
 ## [0.55.2] - 2026-08-29
 
 ### Fixed

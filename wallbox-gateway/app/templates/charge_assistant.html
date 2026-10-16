@@ -451,6 +451,53 @@
 
     <section class="ca-card ca-start-collapsed">
       <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#f59e0b">&#x2600;&#xFE0F;</span>
+        <div class="ca-card-titles">
+          <h2>Hand back to solar <span class="ca-opt">floor, not a cap</span></h2>
+          <p class="ca-card-desc">Treat your target as an overnight grid <b>floor</b>,
+             not a hard cap. Once the assistant tops up to it, control hands back to
+             the charger's own Eco-Smart solar so free surplus keeps filling the
+             battery through the day. It never stops a charge it didn't start.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <label class="ca-check"><input type="checkbox" id="handback_solar"> <span>&#x2600;&#xFE0F; Hand back to the charger's own solar between top-ups</span></label>
+        <div class="ca-hint">Needs a charger with native Eco-Smart. Pairs with Commute
+           charging: cheap grid to your commute minimum overnight, free solar for the rest.</div>
+      </div>
+    </section>
+
+    <section class="ca-card ca-start-collapsed">
+      <div class="ca-card-head">
+        <span class="ca-card-icon" style="--chip:#22c55e">&#x1F50B;</span>
+        <div class="ca-card-titles">
+          <h2>Battery balance <span class="ca-opt">LFP care</span></h2>
+          <p class="ca-card-desc">Periodically charge to full so the battery can
+             rebalance its cells and recalibrate the SOC reading — recommended for LFP
+             packs. Everyday nights still use your normal target.</p>
+        </div>
+      </div>
+      <div class="ca-card-body">
+        <label class="ca-check"><input type="checkbox" id="balance_enabled"> <span>&#x1F50B; Periodic full charge to balance the battery</span></label>
+        <div class="ca-indent" id="balance-wrap" hidden>
+          <div class="ca-row">
+            <div class="ca-field">
+              <label>Balance level</label>
+              <div class="ca-input-suffix"><input type="number" id="balance_target_pct" min="50" max="100" placeholder="100"><span>%</span></div>
+            </div>
+            <div class="ca-field">
+              <label>Every</label>
+              <div class="ca-input-suffix"><input type="number" id="balance_interval_days" min="1" max="90" step="1" placeholder="7"><span>days</span></div>
+            </div>
+          </div>
+          <div class="ca-hint">The clock starts when you enable this, so the first
+             balance lands one interval later (no surprise full charge the first night).</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ca-card ca-start-collapsed">
+      <div class="ca-card-head">
         <span class="ca-card-icon" style="--chip:#16a34a">&#x1F4B0;</span>
         <div class="ca-card-titles">
           <h2>Cheapest hours <span class="ca-opt">price-aware</span></h2>

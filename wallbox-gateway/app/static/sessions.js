@@ -7,9 +7,17 @@
 const $ = (id) => document.getElementById(id);
 const setText = (id, v) => { const el = $(id); if (el) el.textContent = (v ?? '--'); };
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];   // indexed by getDay() (0=Sun)
-// Heatmap row order — Monday first so the weekend (Sat, Sun) sits together at the
-// bottom. Values are getDay() indices, not row positions.
-const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+// Heatmap row order follows the user's week-start preference (shared with the
+// dashboard's schedule editor via localStorage). Values are getDay() indices,
+// not row positions. Default Monday-first so the weekend sits together.
+function wbWeekStart() {
+  try { return localStorage.getItem('wb-week-start') === 'sun' ? 'sun' : 'mon'; }
+  catch (e) { return 'mon'; }
+}
+function wbDayOrder() {
+  return wbWeekStart() === 'sun' ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0];
+}
+let DAY_ORDER = wbDayOrder();
 const CACHE_KEY = 'wb-addon-sessions-v2';  // v2: includes gen (green energy) + gap-fill retry
 const RATE_KEY = 'wb-addon-rate-v1';
 
@@ -570,6 +578,8 @@ function renderSourceSplit(grid, green, saved, cur, cost) {
 // ---- heatmap (day x hour kWh intensity), browser-local ----
 function buildHeatmap() {
   const hm = $('heatmap'); if (!hm) return;
+  DAY_ORDER = wbDayOrder();   // follow the current week-start preference
+
   const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
   let max = 0;
   const step = 300;

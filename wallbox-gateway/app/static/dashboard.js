@@ -873,10 +873,18 @@ function showNotifs() {
 // against the official Wallbox app — a Sunday schedule reads days=1, Mon-Fri
 // reads days=62). DAY_NAMES is indexed by BIT, so it must lead with Sunday.
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-// Display order — Monday first so the weekend (Sat, Sun) sits together at the
-// end. Values are the charger's day BITS (Sun=0 … Sat=6), NOT row positions, so
-// labels/reads stay correct while the visual order is Mon→Sun.
-const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+// Display order — values are the charger's day BITS (Sun=0 … Sat=6), NOT row
+// positions, so labels/reads stay correct whatever the visual order. The week
+// start is a user preference (shared across the dashboard + sessions pages via
+// localStorage); default Monday-first so the weekend (Sat, Sun) sits together.
+function wbWeekStart() {
+  try { return localStorage.getItem('wb-week-start') === 'sun' ? 'sun' : 'mon'; }
+  catch (e) { return 'mon'; }
+}
+function wbDayOrder() {
+  return wbWeekStart() === 'sun' ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0];
+}
+let DAY_ORDER = wbDayOrder();
 let _schedules = [];
 let _editingSid = null;
 
@@ -1082,18 +1090,51 @@ async function deleteSchedule(sid) {
   loadSchedules();
 }
 
-// Build the day checkboxes once + wire the form buttons.
-(function initSchedUI() {
+// (Re)build the day checkboxes in the current DAY_ORDER, preserving any current
+// selection by charger BIT so a week-start change mid-edit doesn't lose ticks.
+function buildDayCheckboxes() {
   const days = $('sf-days');
-  if (days) {
-    DAY_ORDER.forEach((b) => {          // Mon→Sun display; data-day is the charger BIT
-      const l = document.createElement('label'); l.className = 'sched-day';
-      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.day = b;
-      const sp = document.createElement('span'); sp.textContent = DAY_NAMES[b];
-      l.appendChild(cb); l.appendChild(sp);
-      days.appendChild(l);
-    });
-  }
+  if (!days) return;
+  const was = {};
+  days.querySelectorAll('input').forEach((c) => { was[+c.dataset.day] = c.checked; });
+  days.textContent = '';
+  DAY_ORDER.forEach((b) => {           // display order; data-day is the charger BIT
+    const l = document.createElement('label'); l.className = 'sched-day';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.day = b;
+    if (was[b]) cb.checked = true;
+    const sp = document.createElement('span'); sp.textContent = DAY_NAMES[b];
+    l.appendChild(cb); l.appendChild(sp);
+    days.appendChild(l);
+  });
+}
+
+// Apply a new week-start preference: persist it, recompute the order, and
+// re-render every day-ordered surface on this page.
+function setWeekStart(v) {
+  try { localStorage.setItem('wb-week-start', v === 'sun' ? 'sun' : 'mon'); } catch (e) {}
+  DAY_ORDER = wbDayOrder();
+  buildDayCheckboxes();
+  renderSchedules();
+  updateWeekStartToggle();
+}
+
+function updateWeekStartToggle() {
+  const cur = wbWeekStart();
+  document.querySelectorAll('#wk-start [data-ws]').forEach((b) => {
+    const on = b.dataset.ws === cur;
+    b.style.background = on ? 'var(--accent, #6366f1)' : 'transparent';
+    b.style.color = on ? '#fff' : 'var(--text2)';
+    b.style.borderColor = on ? 'var(--accent, #6366f1)' : 'var(--border, #334155)';
+  });
+}
+
+// Build the day checkboxes once + wire the form buttons + week-start toggle.
+(function initSchedUI() {
+  buildDayCheckboxes();
+  document.querySelectorAll('#wk-start [data-ws]').forEach((b) => {
+    b.addEventListener('click', () => setWeekStart(b.dataset.ws));
+  });
+  updateWeekStartToggle();
   const cur = $('sf-cur');
   if (cur) cur.addEventListener('input', (e) => { $('sf-cur-v').textContent = e.target.value; });
   const add = $('btn-add-sched'); if (add) add.addEventListener('click', () => openSchedForm(null));

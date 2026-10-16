@@ -43,6 +43,9 @@
     trip_target_pct: "trip_target_pct",
     trip_until: "trip_until",
     price_cap: "price_cap",
+    // target — hand back to native solar + periodic battery balance
+    balance_target_pct: "balance_target_pct",
+    balance_interval_days: "balance_interval_days",
     // target — commute-based adaptive target (learn daily use)
     commute_reserve_pct: "commute_reserve_pct",
     commute_margin_pct: "commute_margin_pct",
@@ -94,6 +97,8 @@
     actionable: "actionable",
     commute_enabled: "commute_enabled",
     target_autostart: "target_autostart",
+    handback_solar: "handback_solar",
+    balance_enabled: "balance_enabled",
     cheapest_window: "cheapest_window",
     solar_dynamic: "solar_dynamic",
     grid_export_negative: "grid_export_negative",
@@ -107,6 +112,7 @@
     "charge_power_kw", "surplus_start", "surplus_stop", "surplus_debounce_min",
     "min_current_a", "max_current_a", "supply_voltage", "supply_phases",
     "load_limit_w", "trip_target_pct", "price_cap", "solar_max_soc",
+    "balance_target_pct", "balance_interval_days",
     "commute_reserve_pct", "commute_margin_pct", "commute_cover_days",
     "commute_window_days", "commute_efficiency",
   ]);
@@ -122,7 +128,9 @@
     ],
     target_soc: [
       "soc_entity", "target_soc_pct", "target_autostart", "departure_time",
-      "battery_kwh", "charge_power_kw", "cheapest_window", "price_entity",
+      "battery_kwh", "charge_power_kw", "handback_solar",
+      "balance_enabled", "balance_target_pct", "balance_interval_days",
+      "cheapest_window", "price_entity",
       "trip_target_pct", "trip_until", "price_cap", "notify_service",
     ],
     solar: [
@@ -773,6 +781,7 @@
     toggleScheduledWithin();
     toggleCheapest();
     toggleCommute();
+    toggleBalance();
     // Surplus-source defaults (entity mode; grid-export-negative defaults on).
     if (!$("surplus_source").value) $("surplus_source").value = "entity";
     $("grid_export_negative").checked = ca.grid_export_negative !== false;
@@ -1114,6 +1123,11 @@
     toggleCommuteSource();
   }
 
+  function toggleBalance() {
+    const w = $("balance-wrap");
+    if (w && $("balance_enabled")) w.hidden = !$("balance_enabled").checked;
+  }
+
   function toggleCommuteSource() {
     const src = ($("commute_source") || {}).value || "charger";
     const odo = $("commute-odo-wrap");
@@ -1390,8 +1404,14 @@
     let v = el.value;
     if (v === "" || v == null) return undefined;
     if (NUM_KEYS.has(key)) {
-      const n = Number(v);
-      return Number.isFinite(n) ? n : undefined;
+      let n = Number(v);
+      if (!Number.isFinite(n)) return undefined;
+      // Clamp to the input's own declared range so a stray value (e.g. a
+      // balance level of 200% past the max of 100) can never be saved.
+      const mn = parseFloat(el.min), mx = parseFloat(el.max);
+      if (Number.isFinite(mn)) n = Math.max(mn, n);
+      if (Number.isFinite(mx)) n = Math.min(mx, n);
+      return n;
     }
     return v;
   }
@@ -1621,6 +1641,7 @@
     $("only_if_scheduled").addEventListener("change", () => { toggleScheduledWithin(); updateSummary(); });
     $("cheapest_window").addEventListener("change", () => { toggleCheapest(); updateSummary(); });
     $("commute_enabled").addEventListener("change", () => { toggleCommute(); updateSummary(); });
+    if ($("balance_enabled")) $("balance_enabled").addEventListener("change", () => { toggleBalance(); updateSummary(); });
     $("commute_source").addEventListener("change", () => { toggleCommuteSource(); updateSummary(); });
     if ($("commute_efficiency_source")) $("commute_efficiency_source").addEventListener("change", () => { toggleCommuteEfficiency(); updateSummary(); });
     $("car-add").addEventListener("click", () => { addCarRow(); updateSummary(); });
