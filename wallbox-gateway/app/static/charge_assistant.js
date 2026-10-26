@@ -197,7 +197,9 @@
     },
     solar: {
       surplus_start: 1.4, surplus_stop: 0.4, surplus_debounce_min: 3,
-      min_current_a: 6, max_current_a: 32, supply_voltage: 230, supply_phases: 1,
+      // max_current_a left empty: the integration then uses the charger's
+      // full limit (40 A on a US Pulsar Plus, #39).
+      min_current_a: 6, supply_voltage: 230, supply_phases: 1,
       solar_use_native: true, resume_eco_mode: "keep",
     },
     smart_solar: {
@@ -572,7 +574,7 @@
     surplus_debounce_min: "Surplus must hold past the threshold this long before acting (rides out clouds).",
     solar_dynamic: "Advanced: modulate the charge current to track surplus instead of plain on/off.",
     min_current_a: "Lowest charge current the assistant will set (charger min is 6 A).",
-    max_current_a: "Highest charge current the assistant will set (charger max is 32 A).",
+    max_current_a: "Highest charge current the assistant will set. Leave empty for your charger's full limit.",
     supply_voltage: "Your supply voltage — used to convert surplus power to amps.",
     supply_phases: "Number of phases — used to convert surplus power to amps.",
     load_limit_w: "Trim charge current so total house draw stays under this (0 = off).",
@@ -709,6 +711,15 @@
     applyCapabilities(r.ok && r.body ? !!r.body.zentri : false,
                       r.ok && r.body ? r.body.eco_smart : undefined,
                       r.ok && r.body ? r.body.meter : undefined);
+    // Current fields follow the charger's own limit (40 A on a US Pulsar Plus),
+    // not a fixed 32 A (#39). Only when the charger data actually loaded.
+    const ch = await fetchJSON("api/charger");
+    if (ch.ok && ch.body) {
+      const rt = (ch.body.realtime && ch.body.realtime.r) || null;
+      const st = (ch.body.status && ch.body.status.r) || null;
+      wbCurrentLimits.applyCeiling(wbCurrentLimits.ceilingFrom(rt, st),
+                                   ["min_current_a", "max_current_a"]);
+    }
     updateOwnerWarn();
     updateSummary();
   }
@@ -1068,7 +1079,7 @@
       if (live) s += ` (now ${b(live)})`;
       s += `, and pause when it falls to ${b($("surplus_stop").value || "the stop")}.`;
       if ($("solar_dynamic").checked) {
-        s += ` I'll modulate the current ${b(($("min_current_a").value || "6") + "–" + ($("max_current_a").value || "32") + " A")} to track the surplus`;
+        s += ` I'll modulate the current ${b(($("min_current_a").value || "6") + "–" + ($("max_current_a").value || $("max_current_a").placeholder || "32") + " A")} to track the surplus`;
         s += $("load_limit_w").value && Number($("load_limit_w").value) > 0
           ? `, keeping total house draw under ${b($("load_limit_w").value + " W")}.` : ".";
       }

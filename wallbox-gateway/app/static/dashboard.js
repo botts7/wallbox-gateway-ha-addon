@@ -610,6 +610,9 @@ async function refresh() {
     const kw = (typeof st.cp === 'number') ? st.cp : null;
     const sessionKwh = (typeof st.en === 'number') ? st.en / 100 : null;
     const maxCur = (typeof st.cur === 'number') ? st.cur : null;
+    // Current controls follow the charger's own limit (40 A on a US Pulsar
+    // Plus), not a fixed 32 A (#39).
+    wbCurrentLimits.applyCeiling(wbCurrentLimits.ceilingFrom(rt, st), ['cur-slider', 'sf-cur']);
     // Authoritative gateway flag (firmware computes it from r_lse.control_mode==1,
     // per-model). st.gen is NOT the pause flag on every charger — on the MAX Pro
     // it's accumulated green energy, so the old `st.gen !== 0` lit the banner
@@ -1039,7 +1042,8 @@ function openSchedForm(s) {
   // index by the checkbox's charger BIT (data-day), not DOM position — the day
   // pickers are shown Mon→Sun but stored Sunday-first.
   $('sf-days').querySelectorAll('input').forEach((c) => { c.checked = !!((bits >> (+c.dataset.day)) & 1); });
-  $('sf-cur').value = s ? (s.mcr || 32) : 32;
+  const curMax = Number($('sf-cur').max) || 32;  // the charger's limit
+  $('sf-cur').value = s ? (s.mcr || curMax) : curMax;
   $('sf-cur-v').textContent = $('sf-cur').value;
   $('sf-en').checked = s ? !!s.enabled : true;
   $('sched-form').hidden = false;

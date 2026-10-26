@@ -4,6 +4,17 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.57.2] - 2026-10-26
+
+### Fixed
+- **Chargers above 32 A (US Pulsar Plus, 40 A / 48 A) can use their full
+  current from the add-on.** The dashboard's max-current slider, the schedule
+  editor's current slider and the Charge Assistant's min / max current fields
+  were fixed at 32 A. They now follow the charger's own reported limit
+  (`max_available_current`), which also respects an installer limit below
+  32 A. The Charge Assistant's max current now defaults to empty, meaning the
+  charger's full limit (needs integration 0.37.4; older versions keep 32 A).
+
 ## [0.57.1] - 2026-10-16
 
 ### Fixed

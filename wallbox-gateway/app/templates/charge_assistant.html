@@ -771,11 +771,11 @@
         <div class="ca-row">
           <div class="ca-field">
             <label>Min current</label>
-            <div class="ca-input-suffix"><input type="number" id="min_current_a" min="6" max="32" placeholder="6"><span>A</span></div>
+            <div class="ca-input-suffix"><input type="number" id="min_current_a" min="6" max="80" placeholder="6"><span>A</span></div>
           </div>
           <div class="ca-field">
             <label>Max current</label>
-            <div class="ca-input-suffix"><input type="number" id="max_current_a" min="6" max="32" placeholder="32"><span>A</span></div>
+            <div class="ca-input-suffix"><input type="number" id="max_current_a" min="6" max="80" placeholder="32"><span>A</span></div>
           </div>
         </div>
         <div class="ca-row">
@@ -1194,6 +1194,7 @@
 </main>
 
 <script src="static/ca_summary.js?v={{ ASSET_V }}"></script>
+<script src="static/current_limits.js?v={{ ASSET_V }}"></script>
 <script src="static/charge_assistant.js?v={{ ASSET_V }}"></script>
 <script src="static/ca_layout.js?v={{ ASSET_V }}"></script>
 </body>
