@@ -4,6 +4,14 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.57.3] - 2026-10-27
+
+### Added
+- **"Finish before the window ends by" setting** in the Charge Assistant's
+  charging window (default 30 min). Smart charge plans to finish that long
+  before the cheap window closes, so a late start or a slower real charge
+  rate still lands inside it. Needs integration 0.37.5; older versions ignore it.
+
 ## [0.57.2] - 2026-10-26
 
 ### Fixed
