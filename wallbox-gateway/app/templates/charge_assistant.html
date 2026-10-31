@@ -1024,6 +1024,10 @@
         <div class="ca-hint" id="window-dur"></div>
         <!-- Grid-target relaxations — only meaningful for Smart charge / Smart+Solar. -->
         <div data-modes="target_soc,smart_solar" hidden>
+          <div class="ca-field">
+            <label>Finish before the window ends by</label>
+            <div class="ca-input-suffix"><input type="number" id="window_finish_buffer_min" min="0" max="180" step="5" placeholder="30"><span>min</span></div>
+          </div>
           <label class="ca-check"><input type="checkbox" id="window_overrun"> <span>Keep charging past the window until the target is reached</span></label>
           <label class="ca-check"><input type="checkbox" id="window_prestart"> <span>Start before the window if needed to be ready by departure</span></label>
           <label class="ca-check"><input type="checkbox" id="window_cost_warn"> <span>Notify me when a charge runs outside the window</span></label>

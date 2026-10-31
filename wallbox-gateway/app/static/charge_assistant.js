@@ -586,6 +586,7 @@
     window_enabled: "Only let the assistant charge during a set window — e.g. midnight–6am — so it never runs when power is expensive.",
     window_start: "Start of the cheap window (local time). Can be later than the end to cross midnight.",
     window_end: "End of the cheap window (local time).",
+    window_finish_buffer_min: "Plan to finish this many minutes before the window ends (default 30), so a late start or a slower real charge rate still lands inside the cheap window.",
     window_overrun: "If the target isn't reached by the window end, keep charging past it until it is.",
     window_prestart: "If a departure is set and the cheap window is too short, start before it so you're still ready in time.",
     window_cost_warn: "Send a notification whenever a charge runs outside the cheap window (a pricier period), so you can stop it if you'd rather wait.",
@@ -818,6 +819,10 @@
     Object.entries(WINDOW_FIELDS).forEach(([fid, key]) => {
       const el = $(fid); if (el) el.value = ca[key] == null ? "" : ca[key];
     });
+    // Finish buffer before the window end (integration 0.37.5+; empty = 30 min).
+    if ($("window_finish_buffer_min")) {
+      $("window_finish_buffer_min").value = ca.window_finish_buffer_min == null ? "" : ca.window_finish_buffer_min;
+    }
     Object.entries(WINDOW_CHECKS).forEach(([fid, key]) => {
       const el = $(fid); if (el) el.checked = !!ca[key];
     });
@@ -1499,6 +1504,10 @@
       Object.entries(WINDOW_FIELDS).forEach(([fid, key]) => {
         const el = $(fid); if (el && el.value) ca[key] = el.value;
       });
+      const fb = $("window_finish_buffer_min");
+      if (fb && fb.value !== "" && Number.isFinite(Number(fb.value))) {
+        ca.window_finish_buffer_min = Math.max(0, Math.min(180, Math.round(Number(fb.value))));
+      }
       Object.entries(WINDOW_CHECKS).forEach(([fid, key]) => {
         const el = $(fid); if (el) ca[key] = !!el.checked;
       });
