@@ -4,7 +4,7 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.57.3] - 2026-10-27
+## [0.57.3] - 2026-10-31
 
 ### Added
 - **"Finish before the window ends by" setting** in the Charge Assistant's
