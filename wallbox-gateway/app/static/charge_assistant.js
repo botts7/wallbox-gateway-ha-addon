@@ -696,6 +696,7 @@
     $("ca-actionbar").hidden = false;
     snapshotSaved();   // form now mirrors the saved config → Active-now + clean
     loadOwner();
+    loadSolarEntries();   // forecast integrations for the solar plan checkboxes
   }
 
   // Charge-control owner — read the gateway's current value and reflect it in
@@ -827,6 +828,7 @@
       const el = $(fid); if (el) el.checked = !!ca[key];
     });
     toggleWindow();
+    applySolarPlan(ca);
     // Plug-in reminder layer (nested `reminder` sub-dict).
     const rl = (ca.reminder && typeof ca.reminder === "object") ? ca.reminder : {};
     if ($("rl_enabled")) $("rl_enabled").checked = !!rl.enabled;
@@ -1137,6 +1139,80 @@
     const w = $("commute-wrap");
     if (w) w.hidden = !$("commute_enabled").checked;
     toggleCommuteSource();
+  }
+
+  // ── Plan around tomorrow's solar (integration solar_planner) ─────────────
+  const SOLAR_PLAN_NUMS = ["solar_floor_pct", "solar_home_threshold_pct", "solar_baseline_kw",
+                           "solar_efficiency_pct", "solar_min_history_days"];
+  let solarEntries = [];          // installed forecast config entries
+  let solarEntriesChosen = [];    // saved selection ([] = all)
+
+  function renderSolarEntries() {
+    const box = $("solar_forecast_entries");
+    if (!box) return;
+    if (!solarEntries.length) {
+      box.innerHTML = '<div class="ca-hint">No forecast integration found. Add Forecast.Solar, ' +
+        'Solcast or Open-Meteo in Home Assistant, or use an outlook sensor.</div>';
+      return;
+    }
+    box.innerHTML = solarEntries.map((e) => {
+      const on = !solarEntriesChosen.length || solarEntriesChosen.includes(e.entry_id);
+      return `<label class="ca-check"><input type="checkbox" data-solar-entry="${esc(e.entry_id)}"${on ? " checked" : ""}> ` +
+             `<span>${esc(e.title || e.domain)} <span class="ca-opt">${esc(e.domain)}</span></span></label>`;
+    }).join("");
+  }
+
+  async function loadSolarEntries() {
+    const r = await fetchJSON("api/ha/solar_forecast_entries");
+    solarEntries = (r.ok && Array.isArray(r.body.entries)) ? r.body.entries : [];
+    renderSolarEntries();
+  }
+
+  function toggleSolarPlan() {
+    const mode = ($("solar_plan") || {}).value || "off";
+    const wrap = $("solar-plan-wrap");
+    if (wrap) wrap.hidden = mode === "off";
+    const src = ($("solar_source") || {}).value || "auto";
+    const showForecast = src !== "sensor";
+    const showSensor = src !== "forecast";
+    ["solar-forecast-entries-wrap", "solar-production-wrap", "solar-forecast-tuning"].forEach((id) => {
+      const el = $(id); if (el) el.hidden = !showForecast;
+    });
+    const so = $("solar-outlook-wrap"); if (so) so.hidden = !showSensor;
+  }
+
+  function applySolarPlan(ca) {
+    if (!$("solar_plan")) return;
+    $("solar_plan").value = ca.solar_plan || "off";
+    $("solar_source").value = ca.solar_source || "auto";
+    $("solar_outlook_entity").value = ca.solar_outlook_entity || "";
+    $("solar_production_entity").value = ca.solar_production_entity || "";
+    SOLAR_PLAN_NUMS.forEach((fid) => {
+      const el = $(fid); if (el) el.value = ca[fid] == null ? "" : ca[fid];
+    });
+    $("solar_plan_notify").checked = ca.solar_plan_notify !== false;   // default on
+    solarEntriesChosen = Array.isArray(ca.solar_forecast_entries) ? ca.solar_forecast_entries : [];
+    renderSolarEntries();
+    toggleSolarPlan();
+  }
+
+  function gatherSolarPlan(ca) {
+    if (!$("solar_plan")) return;
+    const mode = $("solar_plan").value || "off";
+    ca.solar_plan = mode;
+    if (mode === "off") return;    // keep the rest of the settings out of the way
+    ca.solar_source = $("solar_source").value || "auto";
+    const oe = $("solar_outlook_entity").value; if (oe) ca.solar_outlook_entity = oe;
+    const pe = $("solar_production_entity").value; if (pe) ca.solar_production_entity = pe;
+    SOLAR_PLAN_NUMS.forEach((fid) => {
+      const el = $(fid);
+      if (el && el.value !== "") { const n = Number(el.value); if (Number.isFinite(n)) ca[fid] = n; }
+    });
+    ca.solar_plan_notify = !!$("solar_plan_notify").checked;
+    const boxes = Array.from(document.querySelectorAll("[data-solar-entry]"));
+    const ticked = boxes.filter((b) => b.checked).map((b) => b.dataset.solarEntry);
+    // All ticked (or none listed) = use every forecast integration: save nothing.
+    if (boxes.length && ticked.length && ticked.length < boxes.length) ca.solar_forecast_entries = ticked;
   }
 
   function toggleBalance() {
@@ -1453,6 +1529,7 @@
     // (Smart charge + Smart + Solar). They live outside the per-mode section,
     // so gather them explicitly here (not via the section-scoped FIELDS loop).
     if (COMMUTE_MODES.includes(currentMode)) {
+      gatherSolarPlan(ca);
       const cars = gatherCars();
       if (cars.length) ca.cars = cars;                       // empty = single-car
       const uc = $("unknown_car");
@@ -1662,6 +1739,8 @@
     $("cheapest_window").addEventListener("change", () => { toggleCheapest(); updateSummary(); });
     $("commute_enabled").addEventListener("change", () => { toggleCommute(); updateSummary(); });
     if ($("balance_enabled")) $("balance_enabled").addEventListener("change", () => { toggleBalance(); updateSummary(); });
+    if ($("solar_plan")) $("solar_plan").addEventListener("change", () => { toggleSolarPlan(); updateSummary(); });
+    if ($("solar_source")) $("solar_source").addEventListener("change", () => { toggleSolarPlan(); updateSummary(); });
     $("commute_source").addEventListener("change", () => { toggleCommuteSource(); updateSummary(); });
     if ($("commute_efficiency_source")) $("commute_efficiency_source").addEventListener("change", () => { toggleCommuteEfficiency(); updateSummary(); });
     $("car-add").addEventListener("click", () => { addCarRow(); updateSummary(); });

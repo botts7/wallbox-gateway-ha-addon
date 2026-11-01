@@ -4,6 +4,23 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.57.4] - 2026-11-01
+
+### Added
+- **"Plan around tomorrow's solar" settings** in the Charge Assistant (Smart
+  charge and Smart + Solar). Off, Preview (shows the plan, changes nothing) or
+  On (charges less overnight when solar will make it up, never below the
+  morning floor). Pick the solar source: any installed forecast integration
+  (Forecast.Solar, Solcast, Open-Meteo; tick which ones), or a sensor with an
+  hourly outlook. Also the morning floor, how often the car must be home for an
+  hour to count, the production sensor that corrects the forecast, house
+  daytime load, charging efficiency, history needed, and the evening note.
+  Needs the integration with the solar planner; older versions ignore it.
+
+### Fixed
+- Saving the Charge Assistant page no longer drops the solar plan settings
+  when they were set some other way (the page only saved the keys it knew).
+
 ## [0.57.3] - 2026-10-31
 
 ### Added

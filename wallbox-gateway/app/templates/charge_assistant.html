@@ -1042,6 +1042,87 @@
     </div>
   </section>
 
+  <!-- ── Plan around tomorrow's solar (Smart charge / Smart+Solar) ── -->
+  <section class="ca-card ca-acting-card ca-start-collapsed" data-modes="target_soc,smart_solar" hidden>
+    <div class="ca-card-head">
+      <span class="ca-card-icon" style="--chip:#eab308">&#x1F324;&#xFE0F;</span>
+      <div class="ca-card-titles">
+        <h2>Plan around tomorrow's solar <span class="ca-opt">optional</span></h2>
+        <p class="ca-card-desc">On a night when tomorrow looks sunny and the car is
+           usually home and plugged in, charge less overnight and leave the rest to
+           solar. The morning floor is always charged.</p>
+      </div>
+    </div>
+    <div class="ca-card-body">
+      <div class="ca-field">
+        <label>Mode</label>
+        <select id="solar_plan">
+          <option value="off">Off</option>
+          <option value="preview">Preview: show the plan, change nothing</option>
+          <option value="on">On: charge less overnight when solar will make it up</option>
+        </select>
+      </div>
+      <div class="ca-indent" id="solar-plan-wrap" hidden>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Morning floor</label>
+            <div class="ca-input-suffix"><input type="number" id="solar_floor_pct" min="0" max="100" step="1" placeholder="50"><span>%</span></div>
+          </div>
+          <div class="ca-field">
+            <label>Count an hour when the car is home at least</label>
+            <div class="ca-input-suffix"><input type="number" id="solar_home_threshold_pct" min="10" max="100" step="5" placeholder="70"><span>% of the time</span></div>
+          </div>
+        </div>
+        <div class="ca-field">
+          <label>Solar source</label>
+          <select id="solar_source">
+            <option value="auto">Auto: an outlook sensor if set, otherwise a forecast integration</option>
+            <option value="forecast">A forecast integration (Forecast.Solar, Solcast, Open-Meteo)</option>
+            <option value="sensor">An outlook sensor with an hourly list (e.g. Solar Comfort)</option>
+          </select>
+        </div>
+        <div class="ca-field" id="solar-forecast-entries-wrap">
+          <label>Forecast integrations to use</label>
+          <div id="solar_forecast_entries" class="ca-checklist"></div>
+          <div class="ca-hint">Leave all ticked to add them all up (for example one
+             entry per panel plane).</div>
+        </div>
+        <div class="ca-field" id="solar-outlook-wrap">
+          <label>Outlook sensor</label>
+          <select id="solar_outlook_entity" data-domains="sensor"></select>
+          <div class="ca-hint">A sensor whose <code>hourly</code> attribute lists
+             <code>start</code> and <code>kwh</code> (optional <code>kwh_low</code>)
+             for each hour. It's used as spare solar, as is.</div>
+        </div>
+        <div class="ca-field" id="solar-production-wrap">
+          <label>Solar production sensor</label>
+          <select id="solar_production_entity" data-domains="sensor" data-device-class="energy"></select>
+          <div class="ca-hint">Your inverter's energy (kWh), daily or total. Used to
+             learn how far off the forecast runs at your house. Without it the
+             forecast is used uncorrected.</div>
+        </div>
+        <div class="ca-row" id="solar-forecast-tuning">
+          <div class="ca-field">
+            <label>House daytime load</label>
+            <div class="ca-input-suffix"><input type="number" id="solar_baseline_kw" min="0" max="20" step="0.1" placeholder="0.5"><span>kW</span></div>
+          </div>
+          <div class="ca-field">
+            <label>Charging efficiency</label>
+            <div class="ca-input-suffix"><input type="number" id="solar_efficiency_pct" min="50" max="100" step="1" placeholder="90"><span>%</span></div>
+          </div>
+        </div>
+        <div class="ca-field">
+          <label>History needed before trusting the home pattern</label>
+          <div class="ca-input-suffix"><input type="number" id="solar_min_history_days" min="3" max="42" step="1" placeholder="14"><span>days</span></div>
+        </div>
+        <label class="ca-check"><input type="checkbox" id="solar_plan_notify"> <span>Send the plan as a note each evening (20:00)</span></label>
+        <div class="ca-hint">Until the car has enough history, or without a forecast,
+           no solar is counted and the night charges as it does now. The plan is on
+           the "Tonight's planned charge" sensor, with the reasons in its attributes.</div>
+      </div>
+    </div>
+  </section>
+
   <!-- ── Plug-in reminders LAYER (acting strategies only) ───────── -->
   <section class="ca-card ca-acting-card ca-start-collapsed" data-acting hidden>
     <div class="ca-card-head">
