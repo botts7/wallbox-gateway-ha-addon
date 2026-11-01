@@ -1155,10 +1155,18 @@
         'Solcast or Open-Meteo in Home Assistant, or use an outlook sensor.</div>';
       return;
     }
+    // Untitled entries (Forecast.Solar leaves the title empty) get the service
+    // name and a number, so two panel planes can be told apart.
+    const NAMES = { forecast_solar: "Forecast.Solar", solcast_solar: "Solcast",
+                    open_meteo_solar_forecast: "Open-Meteo" };
+    const seen = {};
     box.innerHTML = solarEntries.map((e) => {
       const on = !solarEntriesChosen.length || solarEntriesChosen.includes(e.entry_id);
+      const base = NAMES[e.domain] || e.domain;
+      let label = e.title && e.title !== e.domain ? e.title : "";
+      if (!label) { seen[base] = (seen[base] || 0) + 1; label = `${base} ${seen[base]}`; }
       return `<label class="ca-check"><input type="checkbox" data-solar-entry="${esc(e.entry_id)}"${on ? " checked" : ""}> ` +
-             `<span>${esc(e.title || e.domain)} <span class="ca-opt">${esc(e.domain)}</span></span></label>`;
+             `<span>${esc(label)}</span></label>`;
     }).join("");
   }
 
