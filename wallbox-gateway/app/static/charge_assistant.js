@@ -221,6 +221,7 @@
   let host = null;
   let currentMode = "off";
   let ownerState = null;       // gateway charge-control owner (from /api/status)
+  let chargerCeiling = null;   // charger's max current, once the charger data loads
 
   let hideUnavailable = false;  // GUI toggle: only show entities with a live value
 
@@ -718,11 +719,25 @@
     if (ch.ok && ch.body) {
       const rt = (ch.body.realtime && ch.body.realtime.r) || null;
       const st = (ch.body.status && ch.body.status.r) || null;
-      wbCurrentLimits.applyCeiling(wbCurrentLimits.ceilingFrom(rt, st, r.ok ? r.body : null),
-                                   ["min_current_a", "max_current_a"]);
+      chargerCeiling = wbCurrentLimits.ceilingFrom(rt, st, r.ok ? r.body : null);
+      wbCurrentLimits.applyCeiling(chargerCeiling, ["min_current_a", "max_current_a"]);
+      updateMaxCurrentNote();
     }
     updateOwnerWarn();
     updateSummary();
+  }
+
+  // Point out a max current below the charger's ceiling (older forms saved
+  // 32 A on their own). The value is kept; clearing it uses the full ceiling.
+  function updateMaxCurrentNote() {
+    const note = $("max_current_note");
+    if (!note) return;
+    const v = chargerCeiling == null ? null
+      : wbCurrentLimits.belowCeiling($("max_current_a").value, chargerCeiling);
+    note.hidden = v == null;
+    if (v != null) {
+      note.textContent = `Your charger can do ${chargerCeiling} A. Clear this to use the full ${chargerCeiling} A.`;
+    }
   }
 
   // Write the owner to the gateway. Returns true on success.
@@ -1651,6 +1666,7 @@
 
   // ── wire up ─────────────────────────────────────────────────────
   function wire() {
+    $("max_current_a").addEventListener("input", updateMaxCurrentNote);
     document.querySelectorAll(".ca-mode").forEach((el) => {
       el.addEventListener("click", () => selectMode(el.dataset.mode));
     });

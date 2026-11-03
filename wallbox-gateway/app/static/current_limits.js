@@ -35,5 +35,14 @@
     });
   }
 
-  window.wbCurrentLimits = { DEFAULT, ceilingFrom, applyCeiling };
+  // A saved limit below the charger's ceiling, else null. Older integration
+  // forms saved 32 A on their own, so a 40/48 A charger can be held back by a
+  // value nobody chose. Same rule as the integration's below_ceiling().
+  function belowCeiling(value, ceiling) {
+    if (value === "" || value === null || value === undefined) return null;
+    const v = Number(value);
+    return Number.isFinite(v) && v > 0 && v < ceiling ? v : null;
+  }
+
+  window.wbCurrentLimits = { DEFAULT, ceilingFrom, applyCeiling, belowCeiling };
 })();
