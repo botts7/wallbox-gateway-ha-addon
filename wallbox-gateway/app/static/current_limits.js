@@ -5,17 +5,21 @@
 // most EU units, 40 A or 48 A on US Pulsar Plus, lower when the installer
 // limited the circuit. Fixed max="32" controls held US chargers back (#39).
 // Same rule as the integration's current_limits.py and the gateway dashboard:
-// realtime first, then status, else 32 A.
+// realtime first, then status, then the gateway's saved ceiling
+// (max_current_ceiling in /api/status, known from boot on newer firmware),
+// else 32 A.
 (function () {
   const DEFAULT = 32;
 
-  function ceilingFrom(realtime, status) {
+  function ceilingFrom(realtime, status, gateway) {
     for (const src of [realtime, status]) {
       if (!src || typeof src !== "object") continue;
       let v = src.max_available_current;
       if (v === undefined || v === null) v = src.maxAvailableCurrent;
       if (Number.isInteger(v) && v >= 6 && v <= 80) return v;
     }
+    const g = gateway && gateway.max_current_ceiling;
+    if (Number.isInteger(g) && g >= 6 && g <= 80) return g;
     return DEFAULT;
   }
 

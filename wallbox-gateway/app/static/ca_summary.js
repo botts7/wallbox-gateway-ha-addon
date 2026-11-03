@@ -107,7 +107,8 @@
         (has(ca.surplus_start) ? ca.surplus_start : "the start") +
         ", pauses when it falls to " + (has(ca.surplus_stop) ? ca.surplus_stop : "the stop");
       if (ca.solar_dynamic) {
-        s += ", modulating the current " + ((has(ca.min_current_a) ? ca.min_current_a : 6) + "–" + (has(ca.max_current_a) ? ca.max_current_a : 32) + " A");
+        s += ", modulating the current from " + (has(ca.min_current_a) ? ca.min_current_a : 6) + " A up to " +
+             (has(ca.max_current_a) ? ca.max_current_a + " A" : "the charger's maximum");
         if (has(ca.load_limit_w) && Number(ca.load_limit_w) > 0) s += " under a " + ca.load_limit_w + " W house limit";
       }
       s += ".";

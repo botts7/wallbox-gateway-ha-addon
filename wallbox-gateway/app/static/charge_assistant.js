@@ -718,7 +718,7 @@
     if (ch.ok && ch.body) {
       const rt = (ch.body.realtime && ch.body.realtime.r) || null;
       const st = (ch.body.status && ch.body.status.r) || null;
-      wbCurrentLimits.applyCeiling(wbCurrentLimits.ceilingFrom(rt, st),
+      wbCurrentLimits.applyCeiling(wbCurrentLimits.ceilingFrom(rt, st, r.ok ? r.body : null),
                                    ["min_current_a", "max_current_a"]);
     }
     updateOwnerWarn();

@@ -612,7 +612,7 @@ async function refresh() {
     const maxCur = (typeof st.cur === 'number') ? st.cur : null;
     // Current controls follow the charger's own limit (40 A on a US Pulsar
     // Plus), not a fixed 32 A (#39).
-    wbCurrentLimits.applyCeiling(wbCurrentLimits.ceilingFrom(rt, st), ['cur-slider', 'sf-cur']);
+    wbCurrentLimits.applyCeiling(wbCurrentLimits.ceilingFrom(rt, st, status.ok ? status.body : null), ['cur-slider', 'sf-cur']);
     // Authoritative gateway flag (firmware computes it from r_lse.control_mode==1,
     // per-model). st.gen is NOT the pause flag on every charger — on the MAX Pro
     // it's accumulated green energy, so the old `st.gen !== 0` lit the banner
