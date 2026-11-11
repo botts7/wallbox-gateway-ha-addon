@@ -11,7 +11,9 @@
 (function () {
   const DEFAULT = 32;
 
-  function ceilingFrom(realtime, status, gateway) {
+  // The ceiling when the charger or gateway has actually reported one, else
+  // null. Same rule as the integration's known_ceiling().
+  function knownCeiling(realtime, status, gateway) {
     for (const src of [realtime, status]) {
       if (!src || typeof src !== "object") continue;
       let v = src.max_available_current;
@@ -20,7 +22,12 @@
     }
     const g = gateway && gateway.max_current_ceiling;
     if (Number.isInteger(g) && g >= 6 && g <= 80) return g;
-    return DEFAULT;
+    return null;
+  }
+
+  function ceilingFrom(realtime, status, gateway) {
+    const v = knownCeiling(realtime, status, gateway);
+    return v === null ? DEFAULT : v;
   }
 
   // Set each input's max (and placeholder, when it showed the old 32) to the
@@ -44,5 +51,5 @@
     return Number.isFinite(v) && v > 0 && v < ceiling ? v : null;
   }
 
-  window.wbCurrentLimits = { DEFAULT, ceilingFrom, applyCeiling, belowCeiling };
+  window.wbCurrentLimits = { DEFAULT, knownCeiling, ceilingFrom, applyCeiling, belowCeiling };
 })();

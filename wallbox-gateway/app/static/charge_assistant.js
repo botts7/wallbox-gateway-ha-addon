@@ -719,8 +719,10 @@
     if (ch.ok && ch.body) {
       const rt = (ch.body.realtime && ch.body.realtime.r) || null;
       const st = (ch.body.status && ch.body.status.r) || null;
-      chargerCeiling = wbCurrentLimits.ceilingFrom(rt, st, r.ok ? r.body : null);
-      wbCurrentLimits.applyCeiling(chargerCeiling, ["min_current_a", "max_current_a"]);
+      // The note only names a ceiling the charger has reported (not the 32 A default).
+      chargerCeiling = wbCurrentLimits.knownCeiling(rt, st, r.ok ? r.body : null);
+      wbCurrentLimits.applyCeiling(wbCurrentLimits.ceilingFrom(rt, st, r.ok ? r.body : null),
+                                   ["min_current_a", "max_current_a"]);
       updateMaxCurrentNote();
     }
     updateOwnerWarn();
