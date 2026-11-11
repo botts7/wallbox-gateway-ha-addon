@@ -4,7 +4,7 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.57.4] - 2026-11-11
 
 ### Fixed
 - **Current controls know the charger's ceiling straight after a gateway
