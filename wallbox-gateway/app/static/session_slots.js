@@ -6,9 +6,10 @@
 // wrap in practice) and its r_log <last> comes back empty. A charger that does
 // take the session number is still handled: the probe decides, by number
 // first (on a slot charger r_log <last> is empty or out of the ring), then by
-// slot. A slot hit is confirmed by the record's uid when it ends in a session
-// number (the MAX: ...00350 for session 350), since on a number charger slot
-// last-1 would be session last-1.
+// slot. On a number charger slot last-1 is session last-1, so a hit is refused
+// when its uid names the neighbouring session the wrong addressing would
+// return (the MAX's uid ends in the session number: ...00350 for 350). A uid
+// in any other form never refuses, so an unknown format can't hide history.
 (function () {
   function ringOf(rses) {
     const s = rses && rses.size;
@@ -26,12 +27,18 @@
     return mode && mode.slot && mode.ring ? Math.max(1, last - mode.ring + 1) : 1;
   }
 
-  // Whether a record is session `last` (true when its uid doesn't say).
-  function isSession(rec, last) {
+  // Whether a record's uid ends in session number n (false for a uid in any
+  // other form).
+  function uidIs(rec, n) {
     const u = String((rec && rec.uid) || '');
-    if (!/^\d+$/.test(u)) return true;
-    const n = String(last);
-    return u.slice(-n.length) === n;
+    if (!/^\d+$/.test(u)) return false;
+    const s = String(n);
+    return u.slice(-s.length) === s;
+  }
+
+  // A probe hit: a real record that isn't, by its uid, the `wrong` session.
+  function hit(rec, last, wrong) {
+    return !!(rec && rec.start) && (uidIs(rec, last) || !uidIs(rec, wrong));
   }
 
   // Learn the addressing from the newest session. fetchLog(par) resolves to an
@@ -39,16 +46,16 @@
   async function probe(last, ring, fetchLog, known) {
     const tryNumber = async () => {
       const r = await fetchLog(last);
-      return r && r.start && isSession(r, last) ? { slot: false, ring: 0 } : null;
+      return hit(r, last, last + 1) ? { slot: false, ring: 0 } : null;
     };
     const trySlot = async () => {
       const mode = { slot: true, ring };
       const r = await fetchLog(logPar(last, mode));
-      return r && r.start && isSession(r, last) ? mode : null;
+      return hit(r, last, last - 1) ? mode : null;
     };
     if (known && known.slot) return (await trySlot()) || (await tryNumber());
     return (await tryNumber()) || (await trySlot());
   }
 
-  window.wbSessionSlots = { ringOf, logPar, oldest, isSession, probe };
+  window.wbSessionSlots = { ringOf, logPar, oldest, uidIs, probe };
 })();
