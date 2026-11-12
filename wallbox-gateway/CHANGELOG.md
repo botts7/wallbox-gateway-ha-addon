@@ -4,6 +4,18 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- **Sessions page: each session shows under its own number, and the newest
+  one isn't missing.** The charger's `r_log` takes a slot, not the session
+  number (session n is in slot n - 1, wrapping at the `r_ses` size on the
+  original Pulsar). Asked by number, a Pulsar MAX returned the next session's
+  record, so every session was listed one number too low and the newest came
+  back empty. The page now works out which addressing the charger uses and
+  reads by slot where needed, and only asks for sessions the charger still
+  keeps. Sessions cached by the old page are dropped once and read again.
+
 ## [0.57.4] - 2026-11-11
 
 ### Fixed
