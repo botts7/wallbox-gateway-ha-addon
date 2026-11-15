@@ -20,6 +20,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Saving the Charge Assistant page no longer drops the solar plan settings
   when they were set some other way (the page only saved the keys it knew).
+## [0.57.4] - 2026-11-11
+
+### Fixed
+- **Current controls know the charger's ceiling straight after a gateway
+  restart.** Newer gateway firmware reports its saved ceiling
+  (`max_current_ceiling`), used until the charger's own data arrives, so the
+  sliders and the schedule form no longer sit at 32 A in the meantime.
+- **Charge Assistant summary:** an empty max current reads "up to the
+  charger's maximum" instead of "32 A".
+
+### Added
+- **Note under the Charge Assistant's Max current** when the saved value is
+  below the charger's ceiling ("Your charger can do 48 A. Clear this to use
+  the full 48 A."). Older integration forms saved 32 A on their own; a value
+  you chose is kept.
 
 ## [0.57.3] - 2026-10-31
 
