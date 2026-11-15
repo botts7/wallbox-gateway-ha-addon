@@ -43,6 +43,7 @@
     trip_target_pct: "trip_target_pct",
     trip_until: "trip_until",
     price_cap: "price_cap",
+    skip_night_above_pct: "skip_night_above_pct",
     // target — hand back to native solar + periodic battery balance
     balance_target_pct: "balance_target_pct",
     balance_interval_days: "balance_interval_days",
@@ -111,7 +112,7 @@
     "scheduled_within_h", "escalate_min", "target_soc_pct", "battery_kwh",
     "charge_power_kw", "surplus_start", "surplus_stop", "surplus_debounce_min",
     "min_current_a", "max_current_a", "supply_voltage", "supply_phases",
-    "load_limit_w", "trip_target_pct", "price_cap", "solar_max_soc",
+    "load_limit_w", "trip_target_pct", "price_cap", "skip_night_above_pct", "solar_max_soc",
     "balance_target_pct", "balance_interval_days",
     "commute_reserve_pct", "commute_margin_pct", "commute_cover_days",
     "commute_window_days", "commute_efficiency",
@@ -131,7 +132,8 @@
       "battery_kwh", "charge_power_kw", "handback_solar",
       "balance_enabled", "balance_target_pct", "balance_interval_days",
       "cheapest_window", "price_entity",
-      "trip_target_pct", "trip_until", "price_cap", "notify_service",
+      "trip_target_pct", "trip_until", "price_cap", "skip_night_above_pct", "skip_night_days",
+      "notify_service",
     ],
     solar: [
       "surplus_source", "surplus_entity", "grid_entity", "grid_export_negative",
@@ -563,6 +565,7 @@
     trip_target_pct: "A higher one-off target for an upcoming trip (e.g. 100%).",
     trip_until: "The trip target applies until this date/time, then reverts to the everyday target.",
     price_cap: "Never charge above this price (your departure time still overrides if needed to be ready).",
+    skip_night_above_pct: "On the chosen nights, a car at or above this level isn't charged from the grid, leaving the day to solar. Empty = off.",
     notify_service_t: "HA notify service(s) for charge start/stop alerts. Optional.",
     surplus_source: "Where 'available surplus' comes from: a sensor, your grid power, or solar minus house load.",
     surplus_entity: "A sensor that reports power available to divert to charging.",
@@ -798,6 +801,11 @@
     Object.entries(CHECKS).forEach(([fid, key]) => {
       const el = $(fid);
       if (el) el.checked = !!ca[key];
+    });
+    // nights the overnight grid charge may be skipped (night_skip in the integration)
+    const nights = Array.isArray(ca.skip_night_days) ? ca.skip_night_days : [];
+    document.querySelectorAll("#skip_night_days [data-night]").forEach((cb) => {
+      cb.checked = nights.includes(cb.dataset.night);
     });
     // triggers
     const trigs = Array.isArray(ca.triggers) ? ca.triggers : [];
@@ -1513,6 +1521,11 @@
       if (activeSection && !activeSection.contains(el)) return;
       ca[key] = !!el.checked;
     });
+    if (wanted.has("skip_night_days")) {
+      const nights = Array.from(document.querySelectorAll("#skip_night_days [data-night]"))
+        .filter((cb) => cb.checked).map((cb) => cb.dataset.night);
+      if (nights.length) ca.skip_night_days = nights;
+    }
     // Shared acting-mode cards (not section-scoped): charging window + the
     // plug-in reminder layer (nested `reminder` sub-dict).
     if (ACTING_MODES.includes(currentMode)) {
