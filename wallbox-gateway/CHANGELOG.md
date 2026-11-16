@@ -8,7 +8,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - **Skip the overnight grid charge when the car already has enough.** In Smart
-  charge, Battery care & limits: a battery level and the nights it applies to
+  charge (Battery care & limits) and Smart + Solar: a battery level and the nights it applies to
   (for example Fri and Sat). On those nights a car at or above the level isn't
   charged from the grid, and the charger's own solar fills it by day. Empty =
   off, no nights ticked = every night. Needs the integration version that adds

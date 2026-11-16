@@ -881,6 +881,22 @@
                protect the battery (e.g. 90%).</div>
           </div>
         </div>
+        <div class="ca-field">
+          <label>Skip the overnight grid charge at or above <span class="ca-opt">optional</span></label>
+          <div class="ca-input-suffix"><input type="number" id="skip_night_above_pct_ss" min="1" max="100" placeholder="off"><span>%</span></div>
+          <div class="ca-hint">On the nights ticked below, a car already at this level isn't
+             charged from the grid, so solar fills it by day. Below it, the night charges as usual. Empty = off.</div>
+          <div class="ca-nights" id="skip_night_days_ss">
+            <label class="ca-check"><input type="checkbox" data-night="mon"> <span>Mon</span></label>
+            <label class="ca-check"><input type="checkbox" data-night="tue"> <span>Tue</span></label>
+            <label class="ca-check"><input type="checkbox" data-night="wed"> <span>Wed</span></label>
+            <label class="ca-check"><input type="checkbox" data-night="thu"> <span>Thu</span></label>
+            <label class="ca-check"><input type="checkbox" data-night="fri"> <span>Fri</span></label>
+            <label class="ca-check"><input type="checkbox" data-night="sat"> <span>Sat</span></label>
+            <label class="ca-check"><input type="checkbox" data-night="sun"> <span>Sun</span></label>
+          </div>
+          <div class="ca-hint">Nights, noon to noon: Fri covers early Saturday. None ticked = every night.</div>
+        </div>
         <div class="ca-row">
           <div class="ca-field">
             <label>Battery capacity</label>

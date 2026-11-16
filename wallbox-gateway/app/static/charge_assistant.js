@@ -44,6 +44,7 @@
     trip_until: "trip_until",
     price_cap: "price_cap",
     skip_night_above_pct: "skip_night_above_pct",
+    skip_night_above_pct_ss: "skip_night_above_pct",
     // target — hand back to native solar + periodic battery balance
     balance_target_pct: "balance_target_pct",
     balance_interval_days: "balance_interval_days",
@@ -149,6 +150,7 @@
       "grid_export_negative", "solar_entity", "load_entity", "surplus_start",
       "solar_max_soc", "notify_service",
       "solar_use_native", "resume_eco_mode",
+      "skip_night_above_pct", "skip_night_days",
     ],
     off: [],
   };
@@ -566,6 +568,7 @@
     trip_until: "The trip target applies until this date/time, then reverts to the everyday target.",
     price_cap: "Never charge above this price (your departure time still overrides if needed to be ready).",
     skip_night_above_pct: "On the chosen nights, a car at or above this level isn't charged from the grid, leaving the day to solar. Empty = off.",
+    skip_night_above_pct_ss: "On the chosen nights, a car at or above this level isn't charged from the grid, leaving the day to solar. Empty = off.",
     notify_service_t: "HA notify service(s) for charge start/stop alerts. Optional.",
     surplus_source: "Where 'available surplus' comes from: a sensor, your grid power, or solar minus house load.",
     surplus_entity: "A sensor that reports power available to divert to charging.",
@@ -804,7 +807,7 @@
     });
     // nights the overnight grid charge may be skipped (night_skip in the integration)
     const nights = Array.isArray(ca.skip_night_days) ? ca.skip_night_days : [];
-    document.querySelectorAll("#skip_night_days [data-night]").forEach((cb) => {
+    document.querySelectorAll(".ca-nights [data-night]").forEach((cb) => {
       cb.checked = nights.includes(cb.dataset.night);
     });
     // triggers
@@ -1522,7 +1525,8 @@
       ca[key] = !!el.checked;
     });
     if (wanted.has("skip_night_days")) {
-      const nights = Array.from(document.querySelectorAll("#skip_night_days [data-night]"))
+      const box = (activeSection || document).querySelector(".ca-nights");
+      const nights = Array.from(box ? box.querySelectorAll("[data-night]") : [])
         .filter((cb) => cb.checked).map((cb) => cb.dataset.night);
       if (nights.length) ca.skip_night_days = nights;
     }
