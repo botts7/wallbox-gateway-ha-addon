@@ -4,7 +4,7 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.57.5] - 2026-11-16
 
 ### Fixed
 - **Sessions page: each session shows under its own number, and the newest
