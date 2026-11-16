@@ -364,6 +364,8 @@
   padding: 2px 0;
 }
 .ca-check input { width: 18px; height: 18px; accent-color: var(--ca-accent); cursor: pointer; flex: 0 0 auto; }
+/* Night checkboxes for skipping the overnight grid charge, wrapping on narrow screens. */
+.ca-nights { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 4px; }
 
 /* ── Triggers (mini-cards) ─────────────────────────────────────── */
 .ca-trigger {
