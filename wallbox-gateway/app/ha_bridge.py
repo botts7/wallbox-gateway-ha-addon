@@ -254,6 +254,59 @@ def list_pages(cfg: CoreConfig, timeout: float = 6.0) -> list[str]:
             pass
 
 
+# Forecast integrations that provide HA's hourly solar forecast (the energy
+# forecast hook the integration's solar planner reads). Known domains, plus
+# anything that looks like a solar forecast, so a new one still shows up.
+_FORECAST_DOMAINS = {"forecast_solar", "solcast_solar", "open_meteo_solar_forecast"}
+
+
+def _is_forecast_domain(domain: str) -> bool:
+    d = (domain or "").lower()
+    return d in _FORECAST_DOMAINS or ("solar" in d and "forecast" in d)
+
+
+def list_forecast_entries(cfg: CoreConfig, timeout: float = 6.0) -> list[dict]:
+    """Installed solar forecast config entries, for the "Plan around tomorrow's
+    solar" checkboxes: [{entry_id, title, domain}]. Best-effort via the WS API;
+    any failure returns [] and the GUI says "all forecast integrations"."""
+    if not cfg.available:
+        return []
+    try:
+        import websocket  # websocket-client; lazy so a missing dep degrades gracefully
+    except Exception:
+        return []
+    try:
+        ws = websocket.create_connection(_ws_url(cfg), timeout=timeout)
+    except Exception:
+        return []
+    try:
+        if json.loads(ws.recv()).get("type") != "auth_required":
+            return []
+        ws.send(json.dumps({"type": "auth", "access_token": cfg.token}))
+        if json.loads(ws.recv()).get("type") != "auth_ok":
+            return []
+        ws.send(json.dumps({"id": 1, "type": "config_entries/get"}))
+        msg = json.loads(ws.recv())
+        if not msg.get("success"):
+            return []
+        out = []
+        for e in msg.get("result") or []:
+            if not _is_forecast_domain(e.get("domain", "")):
+                continue
+            if e.get("disabled_by"):
+                continue
+            out.append({"entry_id": e.get("entry_id"), "domain": e.get("domain"),
+                        "title": e.get("title") or e.get("domain")})
+        return out
+    except Exception:
+        return []
+    finally:
+        try:
+            ws.close()
+        except Exception:
+            pass
+
+
 def get_config(
     cfg: CoreConfig, host: str | None = None, timeout: float = 8.0
 ) -> dict[str, Any]:

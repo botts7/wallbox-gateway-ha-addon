@@ -556,6 +556,13 @@ def api_ha_states():
         return jsonify(body), code
 
 
+@app.route("/api/ha/solar_forecast_entries")
+def api_ha_solar_forecast_entries():
+    """Installed solar forecast integrations (for the solar plan settings)."""
+    cfg = ha_bridge.config_from_env()
+    return jsonify({"entries": ha_bridge.list_forecast_entries(cfg)})
+
+
 @app.route("/api/ha/notify_services")
 def api_ha_notify_services():
     """List the user's notify.* services for the notify-target picker."""

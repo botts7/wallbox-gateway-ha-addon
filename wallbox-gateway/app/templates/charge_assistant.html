@@ -464,6 +464,13 @@
         <label class="ca-check"><input type="checkbox" id="handback_solar"> <span>&#x2600;&#xFE0F; Hand back to the charger's own solar between top-ups</span></label>
         <div class="ca-hint">Needs a charger with native Eco-Smart. Pairs with Commute
            charging: cheap grid to your commute minimum overnight, free solar for the rest.</div>
+        <div class="ca-field" style="margin-top:10px">
+          <label>Stop solar charging at <span class="ca-opt">optional</span></label>
+          <div class="ca-input-suffix"><input type="number" id="solar_cap_pct" min="50" max="99" placeholder="no cap"><span>%</span></div>
+          <div class="ca-hint">With hand back on, the charger's solar would otherwise fill the car
+             to 100%. At this level the assistant pauses it until you unplug or the car drops
+             3% below. A trip target still wins. Empty = no cap.</div>
+        </div>
       </div>
     </section>
 
@@ -1073,6 +1080,97 @@
              “start before the window” (pre-start) above — otherwise the window wins and the car may not
              reach target if the cheap hours are too short.</div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Plan around tomorrow's solar (Smart charge / Smart+Solar) ── -->
+  <section class="ca-card ca-acting-card ca-start-collapsed" data-modes="target_soc,smart_solar" hidden>
+    <div class="ca-card-head">
+      <span class="ca-card-icon" style="--chip:#eab308">&#x1F324;&#xFE0F;</span>
+      <div class="ca-card-titles">
+        <h2>Plan around tomorrow's solar <span class="ca-opt">optional</span></h2>
+        <p class="ca-card-desc">On a night when tomorrow looks sunny and the car is
+           usually home and plugged in, charge less overnight and leave the rest to
+           solar. The morning floor is always charged.</p>
+      </div>
+    </div>
+    <div class="ca-card-body">
+      <div class="ca-field">
+        <label>Mode</label>
+        <select id="solar_plan">
+          <option value="off">Off</option>
+          <option value="preview">Preview: show the plan, change nothing</option>
+          <option value="on">On: charge less overnight when solar will make it up</option>
+        </select>
+      </div>
+      <div class="ca-indent" id="solar-plan-wrap" hidden>
+        <div class="ca-row">
+          <div class="ca-field">
+            <label>Morning floor</label>
+            <div class="ca-input-suffix"><input type="number" id="solar_floor_pct" min="0" max="100" step="1" placeholder="50"><span>%</span></div>
+          </div>
+          <div class="ca-field">
+            <label>Count an hour when the car is home at least</label>
+            <div class="ca-input-suffix"><input type="number" id="solar_home_threshold_pct" min="10" max="100" step="5" placeholder="70"><span>% of the time</span></div>
+          </div>
+        </div>
+        <div class="ca-field">
+          <label>Inverter size (optional)</label>
+          <div class="ca-input-suffix"><input type="number" id="solar_inverter_kw" min="0.5" max="100" step="0.1" placeholder="learned"><span>kW</span></div>
+          <div class="ca-hint">The inverter's AC rating, the most solar one hour can give. For three-phase, enter the total (e.g. 22). Leave empty to use the most it has been seen to make, which an export limit can hold down.</div>
+        </div>
+        <div class="ca-field">
+          <label>Home schedule (optional)</label>
+          <input type="text" id="solar_home_schedule" placeholder="Mon-Fri 17:00-08:00; Sat,Sun 00:00-24:00">
+          <div class="ca-hint">Leave empty to learn when the car is home. When set, only these hours count toward tomorrow's solar, and no learning is needed. Days: Mon to Sun, ranges like Mon-Fri, or daily. Separate entries with ";".</div>
+        </div>
+        <div class="ca-field">
+          <label>Solar source</label>
+          <select id="solar_source">
+            <option value="auto">Auto: an outlook sensor if set, otherwise a forecast integration</option>
+            <option value="forecast">A forecast integration (Forecast.Solar, Solcast, Open-Meteo)</option>
+            <option value="sensor">An outlook sensor with an hourly list (e.g. Solar Comfort)</option>
+          </select>
+        </div>
+        <div class="ca-field" id="solar-forecast-entries-wrap">
+          <label>Forecast integrations to use</label>
+          <div id="solar_forecast_entries" class="ca-checklist"></div>
+          <div class="ca-hint">Leave all ticked to add them all up (for example one
+             entry per panel plane).</div>
+        </div>
+        <div class="ca-field" id="solar-outlook-wrap">
+          <label>Outlook sensor</label>
+          <select id="solar_outlook_entity" data-domains="sensor"></select>
+          <div class="ca-hint">A sensor whose <code>hourly</code> attribute lists
+             <code>start</code> and <code>kwh</code> (optional <code>kwh_low</code>)
+             for each hour. It's used as spare solar, as is.</div>
+        </div>
+        <div class="ca-field" id="solar-production-wrap">
+          <label>Solar production sensor</label>
+          <select id="solar_production_entity" data-domains="sensor" data-device-class="energy"></select>
+          <div class="ca-hint">Your inverter's energy (kWh), daily or total. Used to
+             learn how far off the forecast runs at your house. Without it the
+             forecast is used uncorrected.</div>
+        </div>
+        <div class="ca-row" id="solar-forecast-tuning">
+          <div class="ca-field">
+            <label>House daytime load</label>
+            <div class="ca-input-suffix"><input type="number" id="solar_baseline_kw" min="0" max="20" step="0.1" placeholder="0.5"><span>kW</span></div>
+          </div>
+          <div class="ca-field">
+            <label>Charging efficiency</label>
+            <div class="ca-input-suffix"><input type="number" id="solar_efficiency_pct" min="50" max="100" step="1" placeholder="90"><span>%</span></div>
+          </div>
+        </div>
+        <div class="ca-field">
+          <label>History needed before trusting the home pattern</label>
+          <div class="ca-input-suffix"><input type="number" id="solar_min_history_days" min="3" max="42" step="1" placeholder="14"><span>days</span></div>
+        </div>
+        <label class="ca-check"><input type="checkbox" id="solar_plan_notify"> <span>Send the plan as a note each evening (20:00)</span></label>
+        <div class="ca-hint">Until the car has enough history, or without a forecast,
+           no solar is counted and the night charges as it does now. The plan is on
+           the "Tonight's planned charge" sensor, with the reasons in its attributes.</div>
       </div>
     </div>
   </section>
