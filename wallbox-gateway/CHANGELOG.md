@@ -4,6 +4,15 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- **Sessions CSV has the unplug time.** New `charging_end_iso` (start plus
+  charging time) and `unplugged_iso` (when the car was unplugged, what the
+  Wallbox portal shows as End) columns.
+- **All time** falls back to the total of the loaded sessions (marked *) when
+  the charger has no lifetime meter, as on the original Pulsar.
+
 ## [0.57.5] - 2026-11-16
 
 ### Fixed

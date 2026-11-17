@@ -452,7 +452,17 @@ function recompute() {
   const wkCost = L ? L.wkCost : 0, moCost = L ? L.moCost : 0;
   const moGreen = L ? L.moGreen : 0, moGrid = L ? L.moGrid : 0, moSaved = L ? L.moSaved : 0;
   const monthBands = L ? L.monthBands : {};
-  if (_lifetimeKwh != null) setText('tile-allt', _lifetimeKwh.toFixed(0));
+  // The charger's lifetime meter (r_dca) when it has one; the original Pulsar
+  // doesn't, so fall back to the total of the sessions loaded (marked *).
+  const allt = $('tile-allt');
+  if (_lifetimeKwh != null) {
+    setText('tile-allt', _lifetimeKwh.toFixed(0));
+    if (allt) allt.title = '';
+  } else if (_sessions.length) {
+    const loaded = _sessions.reduce((a, s) => a + _sessionWh(s), 0) / 1000;
+    setText('tile-allt', loaded.toFixed(0) + '*');
+    if (allt) allt.title = `Total of the ${_sessions.length} sessions loaded (the charger reports no lifetime meter)`;
+  }
   setText('tile-week', wk.toFixed(1));
   setText('tile-month', mo.toFixed(1));
   renderSourceSplit(moGrid, moGreen, tariff ? moSaved : 0, tariff && tariff.currency || '$', tariff && L ? L.moCost : null);
@@ -746,9 +756,13 @@ async function _fetchLog(par, attempts = 3, any = false) {
 }
 
 function exportCsv() {
-  const rows = [['id', 'start_iso', 'duration_min', 'energy_kwh']];
+  // start = plug-in; charging_end = start + charging time; unplugged = r_log
+  // stop (the Wallbox portal's End), blank when the charger didn't report it.
+  const iso = (t) => new Date(t * 1000).toISOString();
+  const rows = [['id', 'start_iso', 'charging_end_iso', 'unplugged_iso', 'duration_min', 'energy_kwh']];
   _sessions.slice().sort((a, b) => a.ts - b.ts).forEach((s) => {
-    rows.push([s.id, new Date(s.ts * 1000).toISOString(), Math.round((s.dur || 0) / 60), (_sessionWh(s) / 1000).toFixed(3)]);
+    rows.push([s.id, iso(s.ts), iso(s.ts + (s.dur || 0)), (s.stop && s.stop >= s.ts) ? iso(s.stop) : '',
+      Math.round((s.dur || 0) / 60), (_sessionWh(s) / 1000).toFixed(3)]);
   });
   const csv = rows.map((r) => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
