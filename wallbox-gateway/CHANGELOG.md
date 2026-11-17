@@ -32,6 +32,11 @@ ignore them.
 ### Fixed
 - Saving the Charge Assistant page no longer drops the solar plan settings
   when they were set some other way (the page only saved the keys it knew).
+- **Sessions CSV has the unplug time.** New `charging_end_iso` (start plus
+  charging time) and `unplugged_iso` (when the car was unplugged, what the
+  Wallbox portal shows as End) columns.
+- **All time** falls back to the total of the loaded sessions (marked *) when
+  the charger has no lifetime meter, as on the original Pulsar.
 
 ## [0.57.5] - 2026-11-16
 
