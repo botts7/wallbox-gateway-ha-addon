@@ -43,6 +43,7 @@
     trip_target_pct: "trip_target_pct",
     trip_until: "trip_until",
     price_cap: "price_cap",
+    solar_cap_pct: "solar_cap_pct",
     skip_night_above_pct: "skip_night_above_pct",
     skip_night_above_pct_ss: "skip_night_above_pct",
     // target — hand back to native solar + periodic battery balance
@@ -113,7 +114,7 @@
     "scheduled_within_h", "escalate_min", "target_soc_pct", "battery_kwh",
     "charge_power_kw", "surplus_start", "surplus_stop", "surplus_debounce_min",
     "min_current_a", "max_current_a", "supply_voltage", "supply_phases",
-    "load_limit_w", "trip_target_pct", "price_cap", "skip_night_above_pct", "solar_max_soc",
+    "load_limit_w", "trip_target_pct", "price_cap", "skip_night_above_pct", "solar_cap_pct", "solar_max_soc",
     "balance_target_pct", "balance_interval_days",
     "commute_reserve_pct", "commute_margin_pct", "commute_cover_days",
     "commute_window_days", "commute_efficiency",
@@ -130,7 +131,7 @@
     ],
     target_soc: [
       "soc_entity", "target_soc_pct", "target_autostart", "departure_time",
-      "battery_kwh", "charge_power_kw", "handback_solar",
+      "battery_kwh", "charge_power_kw", "handback_solar", "solar_cap_pct",
       "balance_enabled", "balance_target_pct", "balance_interval_days",
       "cheapest_window", "price_entity",
       "trip_target_pct", "trip_until", "price_cap", "skip_night_above_pct", "skip_night_days",
