@@ -21,10 +21,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Saving the Charge Assistant page no longer drops the solar plan settings
   when they were set some other way (the page only saved the keys it knew).
 ## [Unreleased]
+## [0.57.5] - 2026-11-16
 
+### Fixed
+- **Sessions page: each session shows under its own number, and the newest
+  one isn't missing.** The charger's `r_log` takes a slot, not the session
+  number (session n is in slot n - 1, wrapping at the `r_ses` size on the
+  original Pulsar). Asked by number, a Pulsar MAX returned the next session's
+  record, so every session was listed one number too low and the newest came
+  back empty. The page now works out which addressing the charger uses and
+  reads by slot where needed, and only asks for sessions the charger still
+  keeps. Sessions cached by the old page are dropped once and read again.
 ### Added
 - **Skip the overnight grid charge when the car already has enough.** In Smart
-  charge, Battery care & limits: a battery level and the nights it applies to
+  charge (Battery care & limits) and Smart + Solar: a battery level and the nights it applies to
   (for example Fri and Sat). On those nights a car at or above the level isn't
   charged from the grid, and the charger's own solar fills it by day. Empty =
   off, no nights ticked = every night. Needs the integration version that adds

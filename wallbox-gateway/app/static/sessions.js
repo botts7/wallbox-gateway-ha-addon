@@ -18,7 +18,10 @@ function wbDayOrder() {
   return wbWeekStart() === 'sun' ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0];
 }
 let DAY_ORDER = wbDayOrder();
-const CACHE_KEY = 'wb-addon-sessions-v2';  // v2: includes gen (green energy) + gap-fill retry
+// v3: sessions read by slot (session_slots.js). v2 asked r_log by session
+// number, which on a Pulsar MAX stored each record one number too low.
+const CACHE_KEY = 'wb-addon-sessions-v3';
+try { localStorage.removeItem('wb-addon-sessions-v2'); } catch (e) {}
 const RATE_KEY = 'wb-addon-rate-v1';
 
 async function fetchJSON(path) {
@@ -690,11 +693,17 @@ async function loadSessions() {
   const ses = await fetchJSON('api/sess?met=r_ses&par=null&wait=6000');
   const last = (ses.ok && ses.body.r && ses.body.r.last) ? ses.body.r.last : 0;
   if (!last) { if (!_sessions.length) renderList(); return; }
+  // How this charger addresses r_log (by slot or by number), learned once and
+  // cached. Unknown (both probes failed) keeps the old by-number reads.
+  const S = window.wbSessionSlots;
+  const mode = cache.mode ||
+    await S.probe(last, S.ringOf(ses.body.r), (par) => _fetchLog(par, 1, true), null);
+  if (mode) cache.mode = mode;
   // Re-fetch any session in the most-recent window that isn't cached — covers
   // NEW sessions AND earlier ones whose read previously failed (rate-limit /
   // BLE busy). Without this, a single failed read permanently dropped a
   // session from the totals (the old code only tracked the highest id).
-  const startSid = Math.max(1, last - 59);
+  const startSid = Math.max(S.oldest(last, mode), last - 59);
   const missing = [];
   for (let sid = startSid; sid <= last; sid++) {
     if (!cache.s[sid]) missing.push(sid);
@@ -705,7 +714,7 @@ async function loadSessions() {
   let done = 0;
   for (const sid of missing) {
     if (firstLoad && listEl) listEl.textContent = `Loading ${done + 1} / ${missing.length}…`;
-    const sd = await _fetchLog(sid);  // retries on transient failure
+    const sd = await _fetchLog(S.logPar(sid, mode));  // retries on transient failure
     if (sd) {
       cache.s[sid] = {
         id: sid, ts: sd.start, stop: sd.stop || 0,  // plug-in span [ts, stop]
@@ -723,12 +732,14 @@ async function loadSessions() {
   renderAll();
 }
 
-// One session log, retried on transient failure (gateway rate-limit / BLE busy)
-// with a short backoff, so a session is never silently skipped.
-async function _fetchLog(sid, attempts = 3) {
+// One session log by r_log parameter (a slot or a session number, see
+// session_slots.js), retried on transient failure (gateway rate-limit / BLE
+// busy) with a short backoff, so a session is never silently skipped. `any`
+// returns the record even with no start (for the addressing probe).
+async function _fetchLog(par, attempts = 3, any = false) {
   for (let i = 0; i < attempts; i++) {
-    const r = await fetchJSON('api/sess?met=r_log&par=' + sid + '&wait=6000');
-    if (r.ok && r.body && r.body.r && r.body.r.start) return r.body.r;
+    const r = await fetchJSON('api/sess?met=r_log&par=' + par + '&wait=6000');
+    if (r.ok && r.body && r.body.r && (any || r.body.r.start)) return r.body.r;
     await new Promise((res) => setTimeout(res, 600));
   }
   return null;
