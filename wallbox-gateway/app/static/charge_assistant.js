@@ -1195,6 +1195,7 @@
     $("solar_source").value = ca.solar_source || "auto";
     $("solar_outlook_entity").value = ca.solar_outlook_entity || "";
     $("solar_production_entity").value = ca.solar_production_entity || "";
+    if ($("solar_home_schedule")) $("solar_home_schedule").value = ca.solar_home_schedule || "";
     SOLAR_PLAN_NUMS.forEach((fid) => {
       const el = $(fid); if (el) el.value = ca[fid] == null ? "" : ca[fid];
     });
@@ -1212,6 +1213,7 @@
     ca.solar_source = $("solar_source").value || "auto";
     const oe = $("solar_outlook_entity").value; if (oe) ca.solar_outlook_entity = oe;
     const pe = $("solar_production_entity").value; if (pe) ca.solar_production_entity = pe;
+    const hs = (($("solar_home_schedule") || {}).value || "").trim(); if (hs) ca.solar_home_schedule = hs;
     SOLAR_PLAN_NUMS.forEach((fid) => {
       const el = $(fid);
       if (el && el.value !== "") { const n = Number(el.value); if (Number.isFinite(n)) ca[fid] = n; }

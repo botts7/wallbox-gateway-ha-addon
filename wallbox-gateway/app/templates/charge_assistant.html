@@ -1074,6 +1074,11 @@
           </div>
         </div>
         <div class="ca-field">
+          <label>Home schedule (optional)</label>
+          <input type="text" id="solar_home_schedule" placeholder="Mon-Fri 17:00-08:00; Sat,Sun 00:00-24:00">
+          <div class="ca-hint">Leave empty to learn when the car is home. When set, only these hours count toward tomorrow's solar, and no learning is needed. Days: Mon to Sun, ranges like Mon-Fri, or daily. Separate entries with ";".</div>
+        </div>
+        <div class="ca-field">
           <label>Solar source</label>
           <select id="solar_source">
             <option value="auto">Auto: an outlook sensor if set, otherwise a forecast integration</option>
