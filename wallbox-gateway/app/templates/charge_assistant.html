@@ -1074,6 +1074,11 @@
           </div>
         </div>
         <div class="ca-field">
+          <label>Inverter size (optional)</label>
+          <div class="ca-input-suffix"><input type="number" id="solar_inverter_kw" min="0.5" max="100" step="0.1" placeholder="learned"><span>kW</span></div>
+          <div class="ca-hint">The inverter's AC rating, the most solar one hour can give. For three-phase, enter the total (e.g. 22). Leave empty to use the most it has been seen to make, which an export limit can hold down.</div>
+        </div>
+        <div class="ca-field">
           <label>Home schedule (optional)</label>
           <input type="text" id="solar_home_schedule" placeholder="Mon-Fri 17:00-08:00; Sat,Sun 00:00-24:00">
           <div class="ca-hint">Leave empty to learn when the car is home. When set, only these hours count toward tomorrow's solar, and no learning is needed. Days: Mon to Sun, ranges like Mon-Fri, or daily. Separate entries with ";".</div>
