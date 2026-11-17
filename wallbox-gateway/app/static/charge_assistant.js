@@ -1172,7 +1172,7 @@
 
   // ── Plan around tomorrow's solar (integration solar_planner) ─────────────
   const SOLAR_PLAN_NUMS = ["solar_floor_pct", "solar_home_threshold_pct", "solar_baseline_kw",
-                           "solar_efficiency_pct", "solar_min_history_days"];
+                           "solar_efficiency_pct", "solar_min_history_days", "solar_inverter_kw"];
   let solarEntries = [];          // installed forecast config entries
   let solarEntriesChosen = [];    // saved selection ([] = all)
 
