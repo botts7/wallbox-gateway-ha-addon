@@ -4,6 +4,14 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- **Stop solar charging at a level** (Smart charge, under Hand back to solar).
+  With hand back on, the charger's own solar would fill the car to 100 %; at
+  this level the integration pauses it until the car is unplugged or drops
+  3 % below. Empty = no cap. Needs the integration version that adds it.
+
 ## [0.57.5] - 2026-11-16
 
 ### Fixed

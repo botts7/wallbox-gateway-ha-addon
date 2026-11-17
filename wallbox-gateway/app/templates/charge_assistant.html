@@ -464,6 +464,13 @@
         <label class="ca-check"><input type="checkbox" id="handback_solar"> <span>&#x2600;&#xFE0F; Hand back to the charger's own solar between top-ups</span></label>
         <div class="ca-hint">Needs a charger with native Eco-Smart. Pairs with Commute
            charging: cheap grid to your commute minimum overnight, free solar for the rest.</div>
+        <div class="ca-field" style="margin-top:10px">
+          <label>Stop solar charging at <span class="ca-opt">optional</span></label>
+          <div class="ca-input-suffix"><input type="number" id="solar_cap_pct" min="50" max="99" placeholder="no cap"><span>%</span></div>
+          <div class="ca-hint">With hand back on, the charger's solar would otherwise fill the car
+             to 100%. At this level the assistant pauses it until you unplug or the car drops
+             3% below. A trip target still wins. Empty = no cap.</div>
+        </div>
       </div>
     </section>
 
