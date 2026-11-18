@@ -761,7 +761,10 @@ function exportCsv() {
   const iso = (t) => new Date(t * 1000).toISOString();
   const rows = [['id', 'start_iso', 'charging_end_iso', 'unplugged_iso', 'duration_min', 'energy_kwh']];
   _sessions.slice().sort((a, b) => a.ts - b.ts).forEach((s) => {
-    rows.push([s.id, iso(s.ts), iso(s.ts + (s.dur || 0)), (s.stop && s.stop >= s.ts) ? iso(s.stop) : '',
+    const hasStop = s.stop && s.stop >= s.ts;
+    // start + charging time can round past the unplug: never later than it.
+    const chgEnd = hasStop ? Math.min(s.ts + (s.dur || 0), s.stop) : s.ts + (s.dur || 0);
+    rows.push([s.id, iso(s.ts), iso(chgEnd), hasStop ? iso(s.stop) : '',
       Math.round((s.dur || 0) / 60), (_sessionWh(s) / 1000).toFixed(3)]);
   });
   const csv = rows.map((r) => r.join(',')).join('\n');
