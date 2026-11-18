@@ -38,7 +38,7 @@ Supervised users who want a panel for the gateway without leaving
 Home Assistant. (Entities still come from MQTT discovery *or* the
 HACS Integration — pick one of those, not both.)
 
-Roadmap:
+## Release history
 
 - **v0.1.0** — read-only dashboard (status + health + diagnostics)
 - **v0.2.0** — OTA firmware upload from inside HA
@@ -51,7 +51,7 @@ Roadmap:
   notifications · Power-Flow card · Sessions page (energy heatmap +
   CSV) · time-of-use tariff editor + NEM seasonal rates · control-owner
   banner
-- **v0.21.0 (beta)** — schedule-aware cost: each charge is billed in
+- **v0.21.0** — schedule-aware cost: each charge is billed in
   the *real* charge window (via the gateway's `/api/charge_log`
   charge-interval capture), not at plug-in time · grid-only billing
   (solar free) + dollar savings · HA-style Solar/Grid energy-flow card ·
@@ -75,8 +75,15 @@ Roadmap:
   as the total) · **stop solar charging at a level** with hand back to solar ·
   Sessions CSV with charging end and unplug time (needs integration
   **v0.38.0**)
-- **v1.0.0** — submit to community-hassio-addons for upstream
-  store listing
+
+## Roadmap
+
+- **Composable Charge Assistant**: combine modes instead of picking one, with
+  reminders as a layer on top of Smart or Solar.
+- **Car energy use from the car** as an optional input to the solar plan (kWh
+  per 1 % of battery, e.g. from a car integration), instead of only the
+  battery size.
+- **v1.0.0**: listing in the community add-on store.
 
 ## Installation
 
@@ -126,11 +133,13 @@ error).
 There are **three** components and each expects a minimum of the others. Keeping
 them on a matched set avoids blank fields / "unavailable" surprises:
 
-| Component | Known-good | Depends on |
+| Component | Minimum | Depends on |
 |-----------|-----------|------------|
 | **Gateway firmware** | v3.2.0-beta.8+ | — (talks to the charger over BLE) |
 | **Integration** (HACS) | 0.18.0+ | firmware ≥ 3.0.0 for its entities |
 | **Add-on** | 0.41.0+ | integration ≥ 0.18.0 · firmware ≥ 3.0.0 |
+
+Tested together: **firmware v3.2.24 · integration 0.38.0 · add-on 0.58.0**.
 
 The Add-on reads the gateway's firmware version (`gw_fw` in `/api/status`, added
 in firmware v3.2.0-beta.8) and warns on the dashboard when it's too old — rather
