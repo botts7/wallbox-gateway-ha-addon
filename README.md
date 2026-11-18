@@ -28,15 +28,17 @@ it actually happened — solar is free, only grid is billed, and a
 night-shifted (off-peak) charge is no longer billed at the evening
 peak. Cost stays accurate as your rates change over time.
 
-The Add-on is a **sidebar panel only — it creates no HA entities**
-(no `homeassistant_api` access), so it never duplicates anything,
-even alongside MQTT discovery or the HACS Integration. Your
+The Add-on is a **sidebar panel only — it creates no HA entities**,
+so it never duplicates anything, even alongside MQTT discovery or the
+HACS Integration. It uses Home Assistant's API only to read and save the
+integration's Charge Assistant settings and to list the solar forecast
+integrations you have installed. Your
 existing entities keep working as before. This is for HAOS / HA
 Supervised users who want a panel for the gateway without leaving
 Home Assistant. (Entities still come from MQTT discovery *or* the
 HACS Integration — pick one of those, not both.)
 
-Roadmap:
+## Release history
 
 - **v0.1.0** — read-only dashboard (status + health + diagnostics)
 - **v0.2.0** — OTA firmware upload from inside HA
@@ -49,14 +51,14 @@ Roadmap:
   notifications · Power-Flow card · Sessions page (energy heatmap +
   CSV) · time-of-use tariff editor + NEM seasonal rates · control-owner
   banner
-- **v0.21.0 (beta)** — schedule-aware cost: each charge is billed in
+- **v0.21.0** — schedule-aware cost: each charge is billed in
   the *real* charge window (via the gateway's `/api/charge_log`
   charge-interval capture), not at plug-in time · grid-only billing
   (solar free) + dollar savings · HA-style Solar/Grid energy-flow card ·
   week/month cost tiles · tariff **effective-dates** (past costs don't
   change when rates do) · next-charge in the nav bar · last-charge-burst
   readout
-- **v0.22.0–v0.57.x** *(current)* — guided **Charge Assistant** (Off /
+- **v0.22.0–v0.57.x** — guided **Charge Assistant** (Off /
   Reminder / Smart / Solar modes · cheapest-window planner · dynamic current ·
   commute target · **hand-back-to-solar** overnight grid floor then native
   Eco-Smart solar by day · periodic **LFP balance** charge) · cost engine reads
@@ -64,9 +66,24 @@ Roadmap:
   solar-by-day + native-schedule-by-night coexistence · masonry dashboard layout ·
   **Mon/Sun week-start toggle** · firmware **Update** entity · schedules &
   reminders in the charger's local timezone · matched-pair version guardrails
-  with the integration (needs integration **v0.37.0** for hand-back + balance)
-- **v1.0.0** — submit to community-hassio-addons for upstream
-  store listing
+  with the integration (needs integration **v0.37.0** for hand-back + balance) ·
+  skip the overnight grid charge above a level on chosen nights · Sessions page
+  reads the charger's own history (back years on an original Pulsar)
+- **v0.58.0** *(current)* — **plan the night around tomorrow's solar**
+  (Off / Preview / On; any forecast integration or an hourly outlook sensor;
+  learned or manual **home schedule**; optional **inverter size**, three-phase
+  as the total) · **stop solar charging at a level** with hand back to solar ·
+  Sessions CSV with charging end and unplug time (needs integration
+  **v0.38.0**)
+
+## Roadmap
+
+- **Composable Charge Assistant**: combine modes instead of picking one, with
+  reminders as a layer on top of Smart or Solar.
+- **Car energy use from the car** as an optional input to the solar plan (kWh
+  per 1 % of battery, e.g. from a car integration), instead of only the
+  battery size.
+- **v1.0.0**: listing in the community add-on store.
 
 ## Installation
 
@@ -103,6 +120,7 @@ services that were added in specific versions:
 
 | Add-on | Needs integration | Notes |
 |-------:|:------------------|:------|
+| **≥ 0.58.0** | **≥ 0.38.0** | Solar plan, home schedule, inverter size and solar cap fields. Older integrations ignore them. |
 | **≥ 0.40.0** | **≥ 0.18.0** | Charge Assistant config bridge (`get_config`/`set_config`) is on the HACS **default** channel from 0.18.0. Multiple gateways from one Add-on. |
 | 0.23.0 – 0.39.x | 0.17.0b4 (beta) | Bridge was **beta-only** — needed "show beta versions" in HACS. |
 
@@ -115,11 +133,13 @@ error).
 There are **three** components and each expects a minimum of the others. Keeping
 them on a matched set avoids blank fields / "unavailable" surprises:
 
-| Component | Known-good | Depends on |
+| Component | Minimum | Depends on |
 |-----------|-----------|------------|
 | **Gateway firmware** | v3.2.0-beta.8+ | — (talks to the charger over BLE) |
 | **Integration** (HACS) | 0.18.0+ | firmware ≥ 3.0.0 for its entities |
 | **Add-on** | 0.41.0+ | integration ≥ 0.18.0 · firmware ≥ 3.0.0 |
+
+Tested together: **firmware v3.2.24 · integration 0.38.0 · add-on 0.58.0**.
 
 The Add-on reads the gateway's firmware version (`gw_fw` in `/api/status`, added
 in firmware v3.2.0-beta.8) and warns on the dashboard when it's too old — rather
