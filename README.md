@@ -28,9 +28,11 @@ it actually happened — solar is free, only grid is billed, and a
 night-shifted (off-peak) charge is no longer billed at the evening
 peak. Cost stays accurate as your rates change over time.
 
-The Add-on is a **sidebar panel only — it creates no HA entities**
-(no `homeassistant_api` access), so it never duplicates anything,
-even alongside MQTT discovery or the HACS Integration. Your
+The Add-on is a **sidebar panel only — it creates no HA entities**,
+so it never duplicates anything, even alongside MQTT discovery or the
+HACS Integration. It uses Home Assistant's API only to read and save the
+integration's Charge Assistant settings and to list the solar forecast
+integrations you have installed. Your
 existing entities keep working as before. This is for HAOS / HA
 Supervised users who want a panel for the gateway without leaving
 Home Assistant. (Entities still come from MQTT discovery *or* the
@@ -56,7 +58,7 @@ Roadmap:
   week/month cost tiles · tariff **effective-dates** (past costs don't
   change when rates do) · next-charge in the nav bar · last-charge-burst
   readout
-- **v0.22.0–v0.57.x** *(current)* — guided **Charge Assistant** (Off /
+- **v0.22.0–v0.57.x** — guided **Charge Assistant** (Off /
   Reminder / Smart / Solar modes · cheapest-window planner · dynamic current ·
   commute target · **hand-back-to-solar** overnight grid floor then native
   Eco-Smart solar by day · periodic **LFP balance** charge) · cost engine reads
@@ -64,7 +66,15 @@ Roadmap:
   solar-by-day + native-schedule-by-night coexistence · masonry dashboard layout ·
   **Mon/Sun week-start toggle** · firmware **Update** entity · schedules &
   reminders in the charger's local timezone · matched-pair version guardrails
-  with the integration (needs integration **v0.37.0** for hand-back + balance)
+  with the integration (needs integration **v0.37.0** for hand-back + balance) ·
+  skip the overnight grid charge above a level on chosen nights · Sessions page
+  reads the charger's own history (back years on an original Pulsar)
+- **v0.58.0** *(current)* — **plan the night around tomorrow's solar**
+  (Off / Preview / On; any forecast integration or an hourly outlook sensor;
+  learned or manual **home schedule**; optional **inverter size**, three-phase
+  as the total) · **stop solar charging at a level** with hand back to solar ·
+  Sessions CSV with charging end and unplug time (needs integration
+  **v0.38.0**)
 - **v1.0.0** — submit to community-hassio-addons for upstream
   store listing
 
@@ -103,6 +113,7 @@ services that were added in specific versions:
 
 | Add-on | Needs integration | Notes |
 |-------:|:------------------|:------|
+| **≥ 0.58.0** | **≥ 0.38.0** | Solar plan, home schedule, inverter size and solar cap fields. Older integrations ignore them. |
 | **≥ 0.40.0** | **≥ 0.18.0** | Charge Assistant config bridge (`get_config`/`set_config`) is on the HACS **default** channel from 0.18.0. Multiple gateways from one Add-on. |
 | 0.23.0 – 0.39.x | 0.17.0b4 (beta) | Bridge was **beta-only** — needed "show beta versions" in HACS. |
 
