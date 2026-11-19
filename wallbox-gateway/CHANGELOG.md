@@ -4,7 +4,7 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.58.0] - 2026-11-19
 
 ### Added
 - **"Plan around tomorrow's solar" settings** in the Charge Assistant (Smart
@@ -37,6 +37,8 @@ ignore them.
   Wallbox portal shows as End) columns.
 - **All time** falls back to the total of the loaded sessions (marked *) when
   the charger has no lifetime meter, as on the original Pulsar.
+- Sessions CSV: `charging_end_iso` is never later than `unplugged_iso`
+  (start plus charging time could round past it).
 
 ## [0.57.5] - 2026-11-16
 
