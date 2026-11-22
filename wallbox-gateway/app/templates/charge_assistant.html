@@ -1118,8 +1118,13 @@
         </div>
         <div class="ca-field">
           <label>Next departure (optional)</label>
-          <select id="departure_entity" data-domains="sensor,input_datetime"></select>
-          <div class="ca-hint">A timestamp sensor or date-time helper with your next departure. A departure before the cheap window means it charges now.</div>
+          <select id="departure_entity" data-domains="calendar,sensor,input_datetime"></select>
+          <div class="ca-hint">A calendar (its next timed event), a timestamp sensor (e.g. a car's departure timer) or a date-time helper. A departure before the cheap window means it charges now. All-day events don't count.</div>
+        </div>
+        <div class="ca-field" id="departure-keyword-wrap" hidden>
+          <label>Only calendar events containing (optional)</label>
+          <input type="text" id="departure_keyword" placeholder="e.g. drive">
+          <div class="ca-hint">Matched in the event's title, description or location, any case. Empty = any timed event.</div>
         </div>
       </div>
       <div class="ca-indent" id="solar-plan-wrap" hidden>

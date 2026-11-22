@@ -1218,6 +1218,11 @@
     const so = $("solar-outlook-wrap"); if (so) so.hidden = !showSensor;
   }
 
+  function toggleDepartureKeyword() {
+    const w = $("departure-keyword-wrap");
+    if (w) w.hidden = !(($("departure_entity") || {}).value || "").startsWith("calendar.");
+  }
+
   function applySolarPlan(ca) {
     if (!$("solar_plan")) return;
     $("solar_plan").value = ca.solar_plan || "off";
@@ -1226,6 +1231,8 @@
       $("topup_wait_cheap").checked = !!ca.topup_wait_cheap;
       $("car_location_entity").value = ca.car_location_entity || "";
       $("departure_entity").value = ca.departure_entity || "";
+      $("departure_keyword").value = ca.departure_keyword || "";
+      toggleDepartureKeyword();
       $("topup-wait-wrap").hidden = !ca.topup_wait_cheap;
     }
     $("solar_source").value = ca.solar_source || "auto";
@@ -1252,6 +1259,8 @@
       ca.topup_wait_cheap = true;
       const le = $("car_location_entity").value; if (le) ca.car_location_entity = le;
       const de = $("departure_entity").value; if (de) ca.departure_entity = de;
+      const dk = ($("departure_keyword").value || "").trim();
+      if (de && de.startsWith("calendar.") && dk) ca.departure_keyword = dk;
     }
     if (mode === "off") return;    // keep the rest of the settings out of the way
     ca.solar_source = $("solar_source").value || "auto";
@@ -1804,6 +1813,7 @@
     if ($("topup_wait_cheap")) $("topup_wait_cheap").addEventListener("change", () => {
       $("topup-wait-wrap").hidden = !$("topup_wait_cheap").checked;
     });
+    if ($("departure_entity")) $("departure_entity").addEventListener("change", toggleDepartureKeyword);
     if ($("solar_source")) $("solar_source").addEventListener("change", () => { toggleSolarPlan(); updateSummary(); });
     $("commute_source").addEventListener("change", () => { toggleCommuteSource(); updateSummary(); });
     if ($("commute_efficiency_source")) $("commute_efficiency_source").addEventListener("change", () => { toggleCommuteEfficiency(); updateSummary(); });

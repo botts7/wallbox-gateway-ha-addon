@@ -7,6 +7,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Calendar as the next departure,** with an optional keyword ("only events
+  containing"). The departure picker now lists calendars.
 - **Wait for cheap hours** (with the critical level): a critical or floor
   top-up waits for the cheap window unless the car is likely to be needed
   first. Optional car location and next-departure entities teach it when the
