@@ -4,6 +4,14 @@ All notable changes to the Wallbox BLE Gateway HA Add-on.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- **Critical level (optional)** in the Charge Assistant's solar plan card:
+  below it the car charges to it from the grid straight away, whatever the
+  solar forecast. Saved even with the solar plan off. Needs the integration
+  version that adds it.
+
 ## [0.58.0] - 2026-11-19
 
 ### Added

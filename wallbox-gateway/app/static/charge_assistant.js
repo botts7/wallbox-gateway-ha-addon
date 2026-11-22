@@ -1221,6 +1221,7 @@
   function applySolarPlan(ca) {
     if (!$("solar_plan")) return;
     $("solar_plan").value = ca.solar_plan || "off";
+    if ($("critical_floor_pct")) $("critical_floor_pct").value = ca.critical_floor_pct == null ? "" : ca.critical_floor_pct;
     $("solar_source").value = ca.solar_source || "auto";
     $("solar_outlook_entity").value = ca.solar_outlook_entity || "";
     $("solar_production_entity").value = ca.solar_production_entity || "";
@@ -1238,6 +1239,9 @@
     if (!$("solar_plan")) return;
     const mode = $("solar_plan").value || "off";
     ca.solar_plan = mode;
+    // The critical level works with the plan off too, so it's saved either way.
+    const crit = (($("critical_floor_pct") || {}).value || "").trim();
+    if (crit !== "" && Number.isFinite(Number(crit))) ca.critical_floor_pct = Number(crit);
     if (mode === "off") return;    // keep the rest of the settings out of the way
     ca.solar_source = $("solar_source").value || "auto";
     const oe = $("solar_outlook_entity").value; if (oe) ca.solar_outlook_entity = oe;

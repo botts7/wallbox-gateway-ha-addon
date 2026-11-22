@@ -1104,6 +1104,11 @@
           <option value="on">On: charge less overnight when solar will make it up</option>
         </select>
       </div>
+      <div class="ca-field">
+        <label>Critical level (optional)</label>
+        <div class="ca-input-suffix"><input type="number" id="critical_floor_pct" min="1" max="99" step="1" placeholder="off"><span>%</span></div>
+        <div class="ca-hint">Below this the car charges to it from the grid straight away, whatever the solar forecast. Above it, the morning floor waits for the sun when today's forecast will get there. Empty = off.</div>
+      </div>
       <div class="ca-indent" id="solar-plan-wrap" hidden>
         <div class="ca-row">
           <div class="ca-field">
