@@ -1222,6 +1222,12 @@
     if (!$("solar_plan")) return;
     $("solar_plan").value = ca.solar_plan || "off";
     if ($("critical_floor_pct")) $("critical_floor_pct").value = ca.critical_floor_pct == null ? "" : ca.critical_floor_pct;
+    if ($("topup_wait_cheap")) {
+      $("topup_wait_cheap").checked = !!ca.topup_wait_cheap;
+      $("car_location_entity").value = ca.car_location_entity || "";
+      $("departure_entity").value = ca.departure_entity || "";
+      $("topup-wait-wrap").hidden = !ca.topup_wait_cheap;
+    }
     $("solar_source").value = ca.solar_source || "auto";
     $("solar_outlook_entity").value = ca.solar_outlook_entity || "";
     $("solar_production_entity").value = ca.solar_production_entity || "";
@@ -1242,6 +1248,11 @@
     // The critical level works with the plan off too, so it's saved either way.
     const crit = (($("critical_floor_pct") || {}).value || "").trim();
     if (crit !== "" && Number.isFinite(Number(crit))) ca.critical_floor_pct = Number(crit);
+    if ($("topup_wait_cheap") && $("topup_wait_cheap").checked) {
+      ca.topup_wait_cheap = true;
+      const le = $("car_location_entity").value; if (le) ca.car_location_entity = le;
+      const de = $("departure_entity").value; if (de) ca.departure_entity = de;
+    }
     if (mode === "off") return;    // keep the rest of the settings out of the way
     ca.solar_source = $("solar_source").value || "auto";
     const oe = $("solar_outlook_entity").value; if (oe) ca.solar_outlook_entity = oe;
@@ -1790,6 +1801,9 @@
     $("commute_enabled").addEventListener("change", () => { toggleCommute(); updateSummary(); });
     if ($("balance_enabled")) $("balance_enabled").addEventListener("change", () => { toggleBalance(); updateSummary(); });
     if ($("solar_plan")) $("solar_plan").addEventListener("change", () => { toggleSolarPlan(); updateSummary(); });
+    if ($("topup_wait_cheap")) $("topup_wait_cheap").addEventListener("change", () => {
+      $("topup-wait-wrap").hidden = !$("topup_wait_cheap").checked;
+    });
     if ($("solar_source")) $("solar_source").addEventListener("change", () => { toggleSolarPlan(); updateSummary(); });
     $("commute_source").addEventListener("change", () => { toggleCommuteSource(); updateSummary(); });
     if ($("commute_efficiency_source")) $("commute_efficiency_source").addEventListener("change", () => { toggleCommuteEfficiency(); updateSummary(); });

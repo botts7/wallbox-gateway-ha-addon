@@ -38,6 +38,7 @@ _PICKER_DOMAINS = (
     "input_select",
     "number",
     "switch",
+    "input_datetime",
 )
 
 _INTEGRATION_DOMAIN = "wallbox_gateway"
