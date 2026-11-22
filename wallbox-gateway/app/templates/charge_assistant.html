@@ -1109,6 +1109,19 @@
         <div class="ca-input-suffix"><input type="number" id="critical_floor_pct" min="1" max="99" step="1" placeholder="off"><span>%</span></div>
         <div class="ca-hint">Below this the car charges to it from the grid straight away, whatever the solar forecast. Above it, the morning floor waits for the sun when today's forecast will get there. Empty = off.</div>
       </div>
+      <label class="ca-check"><input type="checkbox" id="topup_wait_cheap"> <span>Wait for cheap hours: a critical or floor top-up waits for the cheap window, unless the car is likely to be needed before it</span></label>
+      <div class="ca-indent" id="topup-wait-wrap" hidden>
+        <div class="ca-field">
+          <label>Car location (optional)</label>
+          <select id="car_location_entity" data-domains="device_tracker,person,binary_sensor"></select>
+          <div class="ca-hint">Teaches when the car is normally out, also while it's home but unplugged. A tracker or person that's <code>home</code>, or a binary sensor that's on at home. Empty = learn from when the car is plugged in.</div>
+        </div>
+        <div class="ca-field">
+          <label>Next departure (optional)</label>
+          <select id="departure_entity" data-domains="sensor,input_datetime"></select>
+          <div class="ca-hint">A timestamp sensor or date-time helper with your next departure. A departure before the cheap window means it charges now.</div>
+        </div>
+      </div>
       <div class="ca-indent" id="solar-plan-wrap" hidden>
         <div class="ca-row">
           <div class="ca-field">

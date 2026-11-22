@@ -7,6 +7,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Wait for cheap hours** (with the critical level): a critical or floor
+  top-up waits for the cheap window unless the car is likely to be needed
+  first. Optional car location and next-departure entities teach it when the
+  car is normally out.
 - **Critical level (optional)** in the Charge Assistant's solar plan card:
   below it the car charges to it from the grid straight away, whatever the
   solar forecast. Saved even with the solar plan off. Needs the integration
